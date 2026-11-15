@@ -102,16 +102,24 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 @keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 .roombar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-6px 0 8px;flex-wrap:wrap}
 .roommeta{display:flex;align-items:center;gap:8px;min-width:0}
-.roomactions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .badge{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:750}
 .badge.private{border-color:var(--mark);color:var(--mark)}
 .code{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.35rem;letter-spacing:.16em}
 .roomcount{color:var(--muted);font-size:.85rem;font-weight:700}
 .textbtn{border:0;background:transparent;color:var(--blue);font-weight:700;cursor:pointer;padding:6px 4px}
-.namebtn{margin:0 0 14px;padding:10px 14px;font-size:.95rem}
-.renamebox{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+.room-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:12px 14px;background:var(--chip);border-radius:12px}
+.room-title-row .label{margin:0 0 4px}
+.room-title-text{margin:0;font-weight:800;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.room-title-btn{width:auto;margin:0;padding:10px 12px;font-size:.9rem;flex:0 0 auto}
+.renamebox{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
 .renamebox input{flex:1;min-width:140px;border:1px solid var(--line);background:var(--chip);color:var(--text);border-radius:12px;padding:12px 14px;font-size:1rem}
 .renamebox .btn{width:auto;margin:0;padding:12px 16px}
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,21,36,.55)}
+.modal.hidden{display:none !important}
+.modal-card{width:min(100%,420px);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 16px 40px rgba(15,30,70,.28)}
+.modal-card h3{margin:0 0 6px;text-align:center}
+.modal-card .sub{margin-bottom:14px}
+.modal-card .btn.ghost{margin-top:8px}
 .rooms{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto}
 .room{display:flex;align-items:center;gap:10px;background:var(--chip);border-radius:12px;padding:10px 12px}
 .room.locked{border:1px solid rgba(194,65,12,.28);background:linear-gradient(180deg,rgba(194,65,12,.08),var(--chip))}

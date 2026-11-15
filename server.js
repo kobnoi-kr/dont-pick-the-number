@@ -33,6 +33,9 @@ function send(ws, obj) {
 function cleanName(value) {
   return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().replace(/\s+/g, " ").slice(0, 24);
 }
+function cleanRoomTitle(value) {
+  return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().replace(/\s+/g, " ").slice(0, 32);
+}
 function validToken(value) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
@@ -151,6 +154,7 @@ function blankRoom(code, visibility, host) {
   return {
     code,
     visibility,
+    title: "",
     hostId: host.id,
     created: Date.now(),
     players: [host],
@@ -205,11 +209,19 @@ function publicSpin(spin) {
     owner: spin.owner || ""
   };
 }
+function roomLabel(room) {
+  const title = cleanRoomTitle(room.title);
+  if (title) return title;
+  const host = room.players.find((item) => item.id === room.hostId);
+  return host ? ("ห้องของ " + host.name) : ("ห้อง " + room.code);
+}
 function snap(room, player) {
   return {
     t: "state",
     code: room.code,
     visibility: room.visibility,
+    title: room.title || "",
+    roomLabel: roomLabel(room),
     hostId: room.hostId,
     youId: player ? player.id : "",
     phase: room.phase,
@@ -261,9 +273,11 @@ function lobbyMsg() {
     if (!room.players.some((item) => item.connected)) continue;
     const host = room.players.find((item) => item.id === room.hostId);
     const count = room.players.filter((item) => item.connected).length;
+    const priv = room.visibility === "private";
     list.push({
-      code: room.code,
-      visibility: room.visibility === "private" ? "private" : "public",
+      code: priv ? "" : room.code,
+      visibility: priv ? "private" : "public",
+      title: roomLabel(room),
       host: host ? host.name : "",
       count,
       max: MAX_PLAYERS,
@@ -868,9 +882,19 @@ function onRename(ws, msg) {
   ws.pendingName = name;
   const ctx = seat(ws);
   if (!ctx) return send(ws, { t: "renamed", name });
+  if (ctx.room.phase !== "lobby") return fail(ws, "เปลี่ยนชื่อผู้เล่นได้เฉพาะตอนอยู่ในล็อบบี้");
   if (!renameInRoom(ctx.room, ctx.player, name)) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
   broadcast(ctx.room);
   send(ws, { t: "renamed", name });
+}
+function onRenameRoom(ws, msg) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เปลี่ยนชื่อห้องได้");
+  if (ctx.room.phase !== "lobby") return fail(ws, "เปลี่ยนชื่อห้องได้เฉพาะตอนอยู่ในล็อบบี้");
+  const title = cleanRoomTitle(msg.title);
+  if (!title) return fail(ws, "ใส่ชื่อห้องก่อน");
+  ctx.room.title = title;
+  broadcast(ctx.room);
 }
 function identity(ws, msg) {
   const name = cleanName(msg.name) || ws.pendingName;
@@ -964,6 +988,7 @@ function onMessage(ws, raw) {
   if (msg.t === "clear") return onClear(ws);
   if (msg.t === "kick") return onKick(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);
+  if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
 }
 function serve(req, res) {
   const url = new URL(req.url || "/", "http://localhost");

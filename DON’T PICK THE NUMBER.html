@@ -19,16 +19,8 @@
       <button type="button" id="copyCode" class="textbtn">คัดลอก</button>
     </div>
     <span id="roomCount" class="roomcount"></span>
-    <div class="roomactions">
-      <button type="button" id="renameMe" class="textbtn">เปลี่ยนชื่อ</button>
-      <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
-    </div>
+    <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
   </div>
-  <form id="renameForm" class="renamebox hidden" autocomplete="off">
-    <input id="renameInput" maxlength="24" placeholder="ชื่อใหม่">
-    <button class="btn" type="submit">บันทึก</button>
-    <button class="btn ghost" type="button" id="renameCancel">ยกเลิก</button>
-  </form>
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
     <div class="brand" aria-label="NUMVERSE">
@@ -39,7 +31,6 @@
     <label class="field">ชื่อของคุณ
       <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
     </label>
-    <button type="button" id="gateRename" class="btn ghost namebtn">เปลี่ยนชื่อ</button>
     <p class="label">สร้างห้อง</p>
     <div class="modes cats">
       <button type="button" class="mode" id="makePublic">ห้องสาธารณะ</button>
@@ -62,6 +53,18 @@
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
+    <div class="room-title-row">
+      <div>
+        <p class="label">ชื่อห้อง</p>
+        <p id="roomTitleText" class="room-title-text">ห้องใหม่</p>
+      </div>
+      <button type="button" id="renameRoomBtn" class="btn ghost room-title-btn">เปลี่ยนชื่อห้อง</button>
+    </div>
+    <form id="renameRoomForm" class="renamebox hidden" autocomplete="off">
+      <input id="renameRoomInput" maxlength="32" placeholder="ชื่อห้องใหม่">
+      <button class="btn" type="submit">บันทึก</button>
+      <button class="btn ghost" type="button" id="renameRoomCancel">ยกเลิก</button>
+    </form>
     <form id="setup">
       <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องและเริ่มเกมได้</p>
       <p class="label">หมวดเกม</p>
@@ -200,6 +203,18 @@
   <button class="btn" type="button" id="spin" disabled>สุ่มลำดับ</button>
   <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
 </aside>
+</div>
+<div id="codeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
+  <div class="modal-card">
+    <h3 id="codeModalTitle">ห้องส่วนตัว</h3>
+    <p class="sub" id="codeModalHint">ใส่รหัสห้อง 6 หลักเพื่อเข้า</p>
+    <form id="codeModalForm" class="jump" autocomplete="off">
+      <input id="codeModalInput" inputmode="numeric" maxlength="6" placeholder="รหัส 6 หลัก">
+      <button class="btn" type="submit">เข้าห้อง</button>
+    </form>
+    <button type="button" id="codeModalCancel" class="btn ghost">ยกเลิก</button>
+    <p id="codeModalMsg" class="msg"></p>
+  </div>
 </div>
 <div class="volbar" id="volBar" aria-label="ปรับเสียง">
   <button type="button" id="volDown" class="volbtn" aria-label="ลดเสียง">−</button>

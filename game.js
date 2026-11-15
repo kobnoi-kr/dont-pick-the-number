@@ -1353,31 +1353,37 @@ function setLocalName(name){
   const clean=String(name||"").trim().replace(/\s+/g," ").slice(0,24);
   if(!clean) return "";
   $("myName").value=clean;
-  $("renameInput").value=clean;
   localStorage.setItem("dpn-name", clean);
   return clean;
 }
-function openRename(){
-  const cur=myName()||typedName()||localStorage.getItem("dpn-name")||"";
-  $("renameInput").value=cur;
-  $("renameForm").classList.remove("hidden");
-  $("renameInput").focus();
-  $("renameInput").select();
+function openRenameRoom(){
+  if(!isHost()||netPhase!=="lobby") return;
+  const cur=($("roomTitleText").textContent||"").trim();
+  $("renameRoomInput").value=cur==="ห้องใหม่"?"":cur;
+  $("renameRoomForm").classList.remove("hidden");
+  $("renameRoomInput").focus();
+  $("renameRoomInput").select();
 }
-function closeRename(){
-  $("renameForm").classList.add("hidden");
+function closeRenameRoom(){
+  $("renameRoomForm").classList.add("hidden");
 }
-function submitRename(raw){
-  const name=String(raw||"").trim().replace(/\s+/g," ").slice(0,24);
-  if(!name){
-    if(netPhase==="gate") $("gateMsg").textContent="ใส่ชื่อก่อน";
-    else showErr("ใส่ชื่อก่อน");
-    return;
-  }
-  setLocalName(name);
-  if(sock&&sock.readyState===1) send({t:"rename",name,token:myToken()});
-  closeRename();
-  if(netPhase==="gate") $("gateMsg").textContent="บันทึกชื่อแล้ว: "+name;
+function submitRenameRoom(raw){
+  const title=String(raw||"").trim().replace(/\s+/g," ").slice(0,32);
+  if(!title){ showErr("ใส่ชื่อห้องก่อน"); return; }
+  if(!isHost()||netPhase!=="lobby"){ showErr("เปลี่ยนชื่อห้องได้เฉพาะโฮสต์ตอนอยู่ในล็อบบี้"); return; }
+  send({t:"renameRoom",title});
+  closeRenameRoom();
+}
+function openCodeModal(hint){
+  $("codeModalHint").textContent=hint||"ใส่รหัสห้อง 6 หลักเพื่อเข้า";
+  $("codeModalMsg").textContent="";
+  $("codeModalInput").value="";
+  $("codeModal").classList.remove("hidden");
+  $("codeModalInput").focus();
+}
+function closeCodeModal(){
+  $("codeModal").classList.add("hidden");
+  $("codeModalMsg").textContent="";
 }
 function send(obj){
   if(sock&&sock.readyState===1) sock.send(JSON.stringify(obj));
@@ -1389,7 +1395,8 @@ function showGate(){
   myId="";
   hostId="";
   myTurn=false;
-  closeRename();
+  closeRenameRoom();
+  closeCodeModal();
   document.title="NUMVERSE";
   show("gate");
 }
@@ -1464,6 +1471,9 @@ function hostLocks(){
     $(id).classList.toggle("hidden",!host);
     $(id).textContent="กลับห้อง";
   });
+  const canRenameRoom=host&&lobby;
+  $("renameRoomBtn").classList.toggle("hidden",!canRenameRoom);
+  if(!canRenameRoom) closeRenameRoom();
 }
 function paintRoom(s){
   $("roomCode").textContent=s.code||"";
@@ -1472,7 +1482,8 @@ function paintRoom(s){
   $("visBadge").classList.toggle("private",priv);
   const count=(s.players||[]).filter(p=>p.connected).length;
   $("roomCount").textContent=count+"/"+(s.maxPlayers||12);
-  $("roomNote").textContent=priv?"ห้องส่วนตัวโชว์ในล็อบบี้ออนไลน์แบบล็อก · แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
+  $("roomNote").textContent=priv?"ห้องส่วนตัว · ต้องใส่รหัสถึงจะเข้าได้ · แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
+  $("roomTitleText").textContent=s.roomLabel||s.title||(priv?"ห้องส่วนตัว":"ห้องสาธารณะ");
   document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
   const mine=(s.players||[]).find(p=>p.id===s.youId);
   if(mine&&mine.name) setLocalName(mine.name);
@@ -1690,36 +1701,48 @@ function renderLobby(msg){
     const meta=document.createElement("div");
     meta.className="meta";
     const title=document.createElement("b");
+    const label=room.title||(room.host?("ห้องของ "+room.host):"ห้องออนไลน์");
     if(priv){
       const lock=document.createElement("span");
       lock.className="lock";
       lock.setAttribute("aria-hidden","true");
       lock.textContent="🔒";
-      title.append(lock, document.createTextNode(room.host?("ห้องของ "+room.host):("ห้อง "+room.code)));
-    }else{
-      title.textContent=room.host?("ห้องของ "+room.host):("ห้อง "+room.code);
-    }
+      title.append(lock, document.createTextNode(label));
+    }else title.textContent=label;
     const sub=document.createElement("small");
     const cat=room.cat==="wheel"?"วงล้อสุ่มเลข":"ห้ามโดนเลขลับ";
     const state=room.phase==="lobby"?"รอผู้เล่น":"กำลังเล่น";
     const vis=priv?"ส่วนตัว":"สาธารณะ";
-    sub.textContent=room.code+" · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max;
+    sub.textContent=priv
+      ?("ล็อก · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max)
+      :(room.code+" · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max);
     meta.append(title,sub);
     const btn=document.createElement("button");
     btn.type="button";
     btn.className="btn";
-    btn.textContent=room.joinable?"เข้า":(room.phase==="lobby"?"เต็ม":"กำลังเล่น");
+    btn.textContent=room.joinable?(priv?"ใส่รหัส":"เข้า"):(room.phase==="lobby"?"เต็ม":"กำลังเล่น");
     btn.disabled=!room.joinable;
-    btn.onclick=()=>joinCode(room.code);
+    btn.onclick=()=>{
+      if(priv) openCodeModal("ห้องของ "+(room.host||"เพื่อน")+" ล็อกอยู่ · ใส่รหัส 6 หลัก");
+      else joinCode(room.code);
+    };
     li.append(meta,btn);
     list.appendChild(li);
   });
 }
 function joinCode(code){
   const name=typedName();
-  if(!name){ $("gateMsg").textContent="ใส่ชื่อก่อน"; return; }
+  if(!name){ $("gateMsg").textContent="ใส่ชื่อก่อน"; return false; }
+  const clean=String(code||"").replace(/\D/g,"").slice(0,6);
+  if(!/^\d{6}$/.test(clean)){
+    if(!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
+    else $("gateMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
+    return false;
+  }
   $("gateMsg").textContent="";
-  send({t:"join",code:String(code||"").replace(/\D/g,"").slice(0,6),name,token:myToken()});
+  send({t:"join",code:clean,name,token:myToken()});
+  closeCodeModal();
+  return true;
 }
 function makeRoom(visibility){
   const name=typedName();
@@ -1767,10 +1790,13 @@ function connect(){
     else if(msg.t==="lobby"){
       if(!wantRoom) showGate();
       renderLobby(msg);
-    }else if(msg.t==="left") showGate();
+    }    else if(msg.t==="left") showGate();
     else if(msg.t==="renamed"){
       if(msg.name) setLocalName(msg.name);
-    }else if(msg.t==="err") showErr(msg.message||"");
+    }else if(msg.t==="err"){
+      if(!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent=msg.message||"";
+      else showErr(msg.message||"");
+    }
   };
   ws.onclose=()=>{
     if(sock!==ws) return;
@@ -1810,13 +1836,20 @@ function bootOnline(){
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
   $("leaveRoom").onclick=()=>send({t:"leave"});
-  $("renameMe").onclick=()=>openRename();
-  $("gateRename").onclick=()=>openRename();
-  $("renameCancel").onclick=()=>closeRename();
-  $("renameForm").onsubmit=e=>{
+  $("renameRoomBtn").onclick=()=>openRenameRoom();
+  $("renameRoomCancel").onclick=()=>closeRenameRoom();
+  $("renameRoomForm").onsubmit=e=>{
     e.preventDefault();
-    submitRename($("renameInput").value);
+    submitRenameRoom($("renameRoomInput").value);
   };
+  $("codeModalCancel").onclick=()=>closeCodeModal();
+  $("codeModal").addEventListener("click",e=>{ if(e.target===$("codeModal")) closeCodeModal(); });
+  $("codeModalForm").onsubmit=e=>{
+    e.preventDefault();
+    if(!typedName()){ $("codeModalMsg").textContent="ใส่ชื่อของคุณก่อนที่หน้าแรก"; return; }
+    joinCode($("codeModalInput").value);
+  };
+  $("codeModalInput").addEventListener("input",()=>{ $("codeModalInput").value=$("codeModalInput").value.replace(/\D/g,"").slice(0,6); });
   $("copyCode").onclick=async()=>{
     try{
       await navigator.clipboard.writeText(roomCode);
