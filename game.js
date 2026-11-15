@@ -1349,6 +1349,36 @@ function typedName(){
   if(name) localStorage.setItem("dpn-name", name);
   return name;
 }
+function setLocalName(name){
+  const clean=String(name||"").trim().replace(/\s+/g," ").slice(0,24);
+  if(!clean) return "";
+  $("myName").value=clean;
+  $("renameInput").value=clean;
+  localStorage.setItem("dpn-name", clean);
+  return clean;
+}
+function openRename(){
+  const cur=myName()||typedName()||localStorage.getItem("dpn-name")||"";
+  $("renameInput").value=cur;
+  $("renameForm").classList.remove("hidden");
+  $("renameInput").focus();
+  $("renameInput").select();
+}
+function closeRename(){
+  $("renameForm").classList.add("hidden");
+}
+function submitRename(raw){
+  const name=String(raw||"").trim().replace(/\s+/g," ").slice(0,24);
+  if(!name){
+    if(netPhase==="gate") $("gateMsg").textContent="ใส่ชื่อก่อน";
+    else showErr("ใส่ชื่อก่อน");
+    return;
+  }
+  setLocalName(name);
+  if(sock&&sock.readyState===1) send({t:"rename",name,token:myToken()});
+  closeRename();
+  if(netPhase==="gate") $("gateMsg").textContent="บันทึกชื่อแล้ว: "+name;
+}
 function send(obj){
   if(sock&&sock.readyState===1) sock.send(JSON.stringify(obj));
 }
@@ -1359,6 +1389,7 @@ function showGate(){
   myId="";
   hostId="";
   myTurn=false;
+  closeRename();
   document.title="NUMVERSE";
   show("gate");
 }
@@ -1437,12 +1468,14 @@ function hostLocks(){
 function paintRoom(s){
   $("roomCode").textContent=s.code||"";
   const priv=s.visibility==="private";
-  $("visBadge").textContent=priv?"ส่วนตัว":"สาธารณะ";
+  $("visBadge").textContent=priv?"🔒 ส่วนตัว":"สาธารณะ";
   $("visBadge").classList.toggle("private",priv);
   const count=(s.players||[]).filter(p=>p.connected).length;
   $("roomCount").textContent=count+"/"+(s.maxPlayers||12);
-  $("roomNote").textContent=priv?"ห้องส่วนตัว ไม่โชว์ในล็อบบี้สาธารณะ แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้สาธารณะ";
+  $("roomNote").textContent=priv?"ห้องส่วนตัวโชว์ในล็อบบี้ออนไลน์แบบล็อก · แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
   document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
+  const mine=(s.players||[]).find(p=>p.id===s.youId);
+  if(mine&&mine.name) setLocalName(mine.name);
 }
 function syncOrderWheel(s){
   if(s.activeSpin&&s.activeSpin.kind==="order") return;
@@ -1651,16 +1684,26 @@ function renderLobby(msg){
   const found=Array.isArray(msg.rooms)?msg.rooms:[];
   $("lobbyEmpty").classList.toggle("hidden",found.length>0);
   found.forEach(room=>{
+    const priv=room.visibility==="private";
     const li=document.createElement("li");
-    li.className="room";
+    li.className="room"+(priv?" locked":"");
     const meta=document.createElement("div");
     meta.className="meta";
     const title=document.createElement("b");
-    title.textContent=room.host?("ห้องของ "+room.host):("ห้อง "+room.code);
+    if(priv){
+      const lock=document.createElement("span");
+      lock.className="lock";
+      lock.setAttribute("aria-hidden","true");
+      lock.textContent="🔒";
+      title.append(lock, document.createTextNode(room.host?("ห้องของ "+room.host):("ห้อง "+room.code)));
+    }else{
+      title.textContent=room.host?("ห้องของ "+room.host):("ห้อง "+room.code);
+    }
     const sub=document.createElement("small");
     const cat=room.cat==="wheel"?"วงล้อสุ่มเลข":"ห้ามโดนเลขลับ";
     const state=room.phase==="lobby"?"รอผู้เล่น":"กำลังเล่น";
-    sub.textContent=room.code+" · "+cat+" · "+state+" · "+room.count+"/"+room.max;
+    const vis=priv?"ส่วนตัว":"สาธารณะ";
+    sub.textContent=room.code+" · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max;
     meta.append(title,sub);
     const btn=document.createElement("button");
     btn.type="button";
@@ -1725,7 +1768,9 @@ function connect(){
       if(!wantRoom) showGate();
       renderLobby(msg);
     }else if(msg.t==="left") showGate();
-    else if(msg.t==="err") showErr(msg.message||"");
+    else if(msg.t==="renamed"){
+      if(msg.name) setLocalName(msg.name);
+    }else if(msg.t==="err") showErr(msg.message||"");
   };
   ws.onclose=()=>{
     if(sock!==ws) return;
@@ -1765,6 +1810,13 @@ function bootOnline(){
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
   $("leaveRoom").onclick=()=>send({t:"leave"});
+  $("renameMe").onclick=()=>openRename();
+  $("gateRename").onclick=()=>openRename();
+  $("renameCancel").onclick=()=>closeRename();
+  $("renameForm").onsubmit=e=>{
+    e.preventDefault();
+    submitRename($("renameInput").value);
+  };
   $("copyCode").onclick=async()=>{
     try{
       await navigator.clipboard.writeText(roomCode);

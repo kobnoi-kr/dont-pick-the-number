@@ -258,21 +258,27 @@ function snap(room, player) {
 function lobbyMsg() {
   const list = [];
   for (const room of rooms.values()) {
-    if (room.visibility !== "public") continue;
     if (!room.players.some((item) => item.connected)) continue;
     const host = room.players.find((item) => item.id === room.hostId);
     const count = room.players.filter((item) => item.connected).length;
     list.push({
       code: room.code,
+      visibility: room.visibility === "private" ? "private" : "public",
       host: host ? host.name : "",
       count,
       max: MAX_PLAYERS,
       cat: room.cat,
       phase: room.phase,
-      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS
+      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+      created: room.created || 0
     });
   }
-  list.sort((a, b) => (rooms.get(b.code)?.created || 0) - (rooms.get(a.code)?.created || 0));
+  list.sort((a, b) => {
+    const ap = a.visibility === "private" ? 1 : 0;
+    const bp = b.visibility === "private" ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    return (b.created || 0) - (a.created || 0);
+  });
   return { t: "lobby", rooms: list.slice(0, 50) };
 }
 function broadcastLobby() {
@@ -833,6 +839,39 @@ function onKick(ws, msg) {
   if (!target) return;
   takeOut(ctx.room, target, target.ws, true);
 }
+function swapName(list, from, to) {
+  if (!Array.isArray(list)) return list;
+  return list.map((item) => (item === from ? to : item));
+}
+function renameInRoom(room, player, nextName) {
+  const prev = player.name;
+  if (prev === nextName) return true;
+  if (room.players.some((item) => item.id !== player.id && item.name.toLowerCase() === nextName.toLowerCase())) return false;
+  player.name = nextName;
+  room.order = swapName(room.order, prev, nextName);
+  room.alive = swapName(room.alive, prev, nextName);
+  room.roundOrder = swapName(room.roundOrder, prev, nextName);
+  room.wheelOrder = swapName(room.wheelOrder, prev, nextName);
+  room.wheelAlive = swapName(room.wheelAlive, prev, nextName);
+  if (Object.prototype.hasOwnProperty.call(room.picks, prev)) {
+    room.picks[nextName] = room.picks[prev];
+    delete room.picks[prev];
+  }
+  room.picked = room.picked.map((item) => (item && item.who === prev ? { ...item, who: nextName } : item));
+  room.wheelLog = room.wheelLog.map((item) => (item && item.who === prev ? { ...item, who: nextName } : item));
+  if (room.activeSpin && room.activeSpin.owner === prev) room.activeSpin.owner = nextName;
+  return true;
+}
+function onRename(ws, msg) {
+  const name = cleanName(msg.name);
+  if (!name) return fail(ws, "ใส่ชื่อก่อน");
+  ws.pendingName = name;
+  const ctx = seat(ws);
+  if (!ctx) return send(ws, { t: "renamed", name });
+  if (!renameInRoom(ctx.room, ctx.player, name)) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
+  broadcast(ctx.room);
+  send(ws, { t: "renamed", name });
+}
 function identity(ws, msg) {
   const name = cleanName(msg.name) || ws.pendingName;
   const token = validToken(msg.token) ? msg.token : validToken(ws.token) ? ws.token : crypto.randomUUID();
@@ -924,6 +963,7 @@ function onMessage(ws, raw) {
   if (msg.t === "abort") return onAbort(ws);
   if (msg.t === "clear") return onClear(ws);
   if (msg.t === "kick") return onKick(ws, msg);
+  if (msg.t === "rename") return onRename(ws, msg);
 }
 function serve(req, res) {
   const url = new URL(req.url || "/", "http://localhost");

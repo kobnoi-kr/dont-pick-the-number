@@ -19,8 +19,16 @@
       <button type="button" id="copyCode" class="textbtn">คัดลอก</button>
     </div>
     <span id="roomCount" class="roomcount"></span>
-    <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
+    <div class="roomactions">
+      <button type="button" id="renameMe" class="textbtn">เปลี่ยนชื่อ</button>
+      <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
+    </div>
   </div>
+  <form id="renameForm" class="renamebox hidden" autocomplete="off">
+    <input id="renameInput" maxlength="24" placeholder="ชื่อใหม่">
+    <button class="btn" type="submit">บันทึก</button>
+    <button class="btn ghost" type="button" id="renameCancel">ยกเลิก</button>
+  </form>
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
     <div class="brand" aria-label="NUMVERSE">
@@ -31,18 +39,19 @@
     <label class="field">ชื่อของคุณ
       <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
     </label>
+    <button type="button" id="gateRename" class="btn ghost namebtn">เปลี่ยนชื่อ</button>
     <p class="label">สร้างห้อง</p>
     <div class="modes cats">
-      <button type="button" class="mode" id="makePublic">ล็อบบี้สาธารณะ</button>
+      <button type="button" class="mode" id="makePublic">ห้องสาธารณะ</button>
       <button type="button" class="mode" id="makePrivate">ห้องส่วนตัว</button>
     </div>
     <form id="joinForm" class="jump">
       <input id="joinCode" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="รหัส 6 หลัก">
       <button class="btn" type="submit">เข้าห้อง</button>
     </form>
-    <p class="label lobby-label">ล็อบบี้สาธารณะ</p>
+    <p class="label lobby-label"><span class="live-dot" aria-hidden="true"></span>ล็อบบี้ที่กำลังออนไลน์</p>
     <ul id="roomList" class="rooms"></ul>
-    <p id="lobbyEmpty" class="hint">ยังไม่มีห้องสาธารณะ</p>
+    <p id="lobbyEmpty" class="hint">ยังไม่มีห้องออนไลน์</p>
     <p id="gateMsg" class="msg"></p>
     <p id="connMsg" class="hint"></p>
   </section>
