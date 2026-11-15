@@ -1359,7 +1359,7 @@ function showGate(){
   myId="";
   hostId="";
   myTurn=false;
-  document.title="DON’T PICK THE NUMBER";
+  document.title="NUMVERSE";
   show("gate");
 }
 function showErr(message){
@@ -1442,7 +1442,7 @@ function paintRoom(s){
   const count=(s.players||[]).filter(p=>p.connected).length;
   $("roomCount").textContent=count+"/"+(s.maxPlayers||12);
   $("roomNote").textContent=priv?"ห้องส่วนตัว ไม่โชว์ในล็อบบี้สาธารณะ แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้สาธารณะ";
-  document.title=(s.code?s.code+" · ":"")+"DON’T PICK THE NUMBER";
+  document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
 }
 function syncOrderWheel(s){
   if(s.activeSpin&&s.activeSpin.kind==="order") return;

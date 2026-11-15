@@ -8,6 +8,11 @@ body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(
 .side{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px 18px 18px;width:100%;max-width:340px;flex:0 0 340px;box-shadow:0 8px 30px rgba(30,50,100,.08)}
 h1{margin:0 0 6px;font-size:1.7rem;text-align:center;letter-spacing:.5px}
 h2.side-title{margin:0;font-size:1.15rem;text-align:center}
+.brand{display:flex;justify-content:center;margin:0 0 10px}
+.brand-logo{display:block;width:min(100%,300px);height:auto;border-radius:16px;background:#000;box-shadow:0 8px 24px rgba(15,30,70,.18)}
+.brand.compact{margin:0 0 6px}
+.brand.compact .brand-logo{width:min(100%,190px);border-radius:12px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .sub{text-align:center;color:var(--muted);margin:0 0 22px}
 .side .sub{margin:4px 0 12px;font-size:.9rem}
 .label{margin:0 0 8px;color:var(--muted);font-size:.85rem}

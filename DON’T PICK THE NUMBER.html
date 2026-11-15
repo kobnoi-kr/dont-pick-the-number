@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DON’T PICK THE NUMBER</title>
+<title>NUMVERSE</title>
+<meta name="application-name" content="NUMVERSE">
+<link rel="icon" href="numverse.png" type="image/png">
+<link rel="apple-touch-icon" href="numverse.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +23,10 @@
   </div>
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
-    <h1>DON’T PICK THE NUMBER</h1>
+    <div class="brand" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
+    <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข</p>
     <label class="field">ชื่อของคุณ
       <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
@@ -42,7 +48,10 @@
   </section>
 
   <section id="start" class="hidden">
-    <h1>DON’T PICK THE NUMBER</h1>
+    <div class="brand" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
+    <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
     <form id="setup">
       <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องและเริ่มเกมได้</p>
@@ -82,7 +91,10 @@
   </section>
 
   <section id="play" class="hidden">
-    <h1>DON’T PICK THE NUMBER</h1>
+    <div class="brand compact" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
+    <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="modeLabel"></p>
     <div id="turnbar" class="turnbar hidden" aria-live="polite">ตาของ <b id="turnName"></b><span id="turnRank"></span></div>
     <div class="range" id="rangeText">ตอนนี้เลขลับอยู่ระหว่าง <b id="lo"></b> – <b id="hi"></b></div>
@@ -102,6 +114,9 @@
   </section>
 
   <section id="pick" class="hidden">
+    <div class="brand compact" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
     <h1>วงล้อสุ่มเลข</h1>
     <p class="sub" id="pickMode"></p>
     <div id="pickTurn" class="turnbar"><b id="pickName"></b><span id="pickProgress"></span></div>
@@ -124,6 +139,9 @@
   </section>
 
   <section id="wheelGame" class="hidden">
+    <div class="brand compact" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
     <h1>วงล้อสุ่มเลข</h1>
     <p class="sub" id="wheelMode"></p>
     <div class="numdial">
@@ -140,6 +158,9 @@
   </section>
 
   <section id="over" class="hidden lose">
+    <div class="brand compact" aria-label="NUMVERSE">
+      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
     <h2 id="overTitle">คุณเลือกโดนเลขลับ!</h2>
     <p id="overNote" class="sub"></p>
     <div id="secretLabel">เลขลับคือ</div>
