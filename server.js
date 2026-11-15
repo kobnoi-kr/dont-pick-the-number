@@ -1,0 +1,992 @@
+const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const crypto = require("crypto");
+const { WebSocketServer } = require("ws");
+
+const PORT = Number(process.env.PORT) || 8787;
+const MAX_PLAYERS = 12;
+const MAX_ROOMS = 200;
+const SEAT_MS = 45000;
+const ROOM_MS = 60000;
+const ROOT = __dirname;
+const PAGE = fs.readdirSync(ROOT).find((name) => name.endsWith(".html")) || "index.html";
+const TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".mp3": "audio/mpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml"
+};
+const BLOCKED = new Set(["server.js", "package.json", "package-lock.json"]);
+
+const rooms = new Map();
+const byWs = new Map();
+const watchers = new Set();
+
+function send(ws, obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+function cleanName(value) {
+  return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().replace(/\s+/g, " ").slice(0, 24);
+}
+function validToken(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+function allow(ws) {
+  const now = Date.now();
+  if (!ws.rl || now - ws.rl.t > 1000) ws.rl = { t: now, n: 0 };
+  ws.rl.n += 1;
+  return ws.rl.n <= 40;
+}
+function makeCode() {
+  for (let i = 0; i < 30; i++) {
+    const code = String(100000 + Math.floor(Math.random() * 900000));
+    if (!rooms.has(code)) return code;
+  }
+  return "";
+}
+function findSeat(token) {
+  if (!token) return null;
+  for (const room of rooms.values()) {
+    const player = room.players.find((item) => item.id === token);
+    if (player) return { room, player };
+  }
+  return null;
+}
+function byName(room, name) {
+  return room.players.find((item) => item.name === name) || null;
+}
+function scoreOf(room, player) {
+  if (!player) return 0;
+  return room.cat === "wheel" ? player.scoreWheel : player.scoreSecret;
+}
+function scoreByName(room, name) {
+  return scoreOf(room, byName(room, name));
+}
+function addPoint(room, name) {
+  const player = byName(room, name);
+  if (!player) return;
+  if (room.cat === "wheel") player.scoreWheel += 1;
+  else player.scoreSecret += 1;
+}
+function clearPoints(room) {
+  room.players.forEach((player) => {
+    if (room.cat === "wheel") player.scoreWheel = 0;
+    else player.scoreSecret = 0;
+  });
+}
+function currentName(room) {
+  if (!room.alive.length) return "";
+  const index = ((room.turn % room.alive.length) + room.alive.length) % room.alive.length;
+  return room.alive[index];
+}
+function orderReady(room) {
+  const names = room.players.map((player) => player.name);
+  if (names.length < 2) return false;
+  if (room.order.length !== names.length) return false;
+  const seen = Object.create(null);
+  for (const name of room.order) {
+    if (!names.includes(name) || seen[name]) return false;
+    seen[name] = 1;
+  }
+  return true;
+}
+function yourTurn(room, player) {
+  if (!player || !player.connected) return false;
+  if (room.phase === "play") return currentName(room) === player.name;
+  if (room.phase === "pick") {
+    const each = Math.max(room.pickEach, 1);
+    const total = room.wheelOrder.length * each;
+    if (room.pickCursor >= total) return false;
+    return room.wheelOrder[Math.floor(room.pickCursor / each)] === player.name;
+  }
+  return false;
+}
+function checkRange(min, max) {
+  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) return "กรอกจำนวนเต็มเท่านั้น";
+  if (min >= max) return "เลขต่ำสุดต้องน้อยกว่าเลขสูงสุด";
+  if (max - min + 1 > 1000000) return "ช่วงตัวเลขต้องไม่เกิน 1,000,000 จำนวน";
+  return "";
+}
+function checkCount(min, max, count) {
+  if (!Number.isSafeInteger(count) || count < 1) return "จำนวนเลขลับต้องเป็นจำนวนเต็มตั้งแต่ 1";
+  if (count > max - min + 1) return "จำนวนเลขลับต้องไม่เกินจำนวนตัวเลขในช่วง";
+  return "";
+}
+function checkWin(target) {
+  if (!Number.isSafeInteger(target) || target < 1) return "แต้มที่ชนะต้องเป็นจำนวนเต็มตั้งแต่ 1";
+  if (target > 999) return "แต้มที่ชนะต้องไม่เกิน 999";
+  return "";
+}
+function drawSecrets(min, max, count) {
+  const span = max - min + 1;
+  if (count >= span) {
+    const all = [];
+    for (let n = min; n <= max; n++) all.push(n);
+    return all;
+  }
+  const pick = count > span / 2 ? span - count : count;
+  const bag = new Set();
+  while (bag.size < pick) bag.add(Math.floor(Math.random() * span) + min);
+  if (count <= span / 2) return [...bag].sort((a, b) => a - b);
+  const secrets = [];
+  for (let n = min; n <= max; n++) if (!bag.has(n)) secrets.push(n);
+  return secrets;
+}
+function joinThai(names) {
+  if (names.length <= 1) return names[0] || "";
+  if (names.length === 2) return names.join(" กับ ");
+  return names.slice(0, -1).join(", ") + " และ " + names[names.length - 1];
+}
+function cancelSpin(room) {
+  if (room.timer) clearTimeout(room.timer);
+  room.timer = null;
+  room.activeSpin = null;
+}
+function blankRoom(code, visibility, host) {
+  return {
+    code,
+    visibility,
+    hostId: host.id,
+    created: Date.now(),
+    players: [host],
+    phase: "lobby",
+    cat: "secret",
+    rangeMode: "99",
+    min: 1,
+    max: 99,
+    winTarget: 3,
+    secretCount: 1,
+    pickEach: 1,
+    pointAll: true,
+    order: [],
+    rot: 0,
+    alive: [],
+    roundOrder: [],
+    turn: 0,
+    gameMin: 1,
+    gameMax: 99,
+    lo: 1,
+    hi: 99,
+    secrets: [],
+    secretAll: [],
+    secretTotal: 1,
+    picked: [],
+    wheelMin: 1,
+    wheelMax: 99,
+    wheelOrder: [],
+    picks: {},
+    pickCursor: 0,
+    wheelAlive: [],
+    wheelLog: [],
+    wheelRot: 0,
+    over: null,
+    activeSpin: null,
+    timer: null,
+    emptyTimer: null
+  };
+}
+function publicSpin(spin) {
+  if (!spin) return null;
+  return {
+    id: spin.id,
+    kind: spin.kind,
+    dur: spin.dur,
+    left: Math.max(0, spin.until - Date.now()),
+    rot: spin.rot || 0,
+    from: spin.from || 0,
+    target: spin.target || 0,
+    n: Number.isInteger(spin.n) ? spin.n : null,
+    hit: !!spin.hit,
+    owner: spin.owner || ""
+  };
+}
+function snap(room, player) {
+  return {
+    t: "state",
+    code: room.code,
+    visibility: room.visibility,
+    hostId: room.hostId,
+    youId: player ? player.id : "",
+    phase: room.phase,
+    cat: room.cat,
+    rangeMode: room.rangeMode,
+    min: room.min,
+    max: room.max,
+    winTarget: room.winTarget,
+    secretCount: room.secretCount,
+    pickEach: room.pickEach,
+    pointAll: room.pointAll,
+    maxPlayers: MAX_PLAYERS,
+    players: room.players.map((item) => ({
+      id: item.id,
+      name: item.name,
+      score: scoreOf(room, item),
+      connected: item.connected,
+      host: item.id === room.hostId
+    })),
+    order: room.order,
+    alive: room.alive,
+    roundOrder: room.roundOrder,
+    turn: room.turn,
+    gameMin: room.gameMin,
+    gameMax: room.gameMax,
+    lo: room.lo,
+    hi: room.hi,
+    secretsLeft: room.secrets.length,
+    secretTotal: room.secretTotal,
+    picked: room.picked.map((item) => ({ n: item.n, who: item.who, hit: !!item.hit })),
+    revealed: room.phase === "over" && room.cat !== "wheel" ? room.secretAll.slice() : [],
+    wheelMin: room.wheelMin,
+    wheelMax: room.wheelMax,
+    wheelOrder: room.wheelOrder,
+    picks: room.picks,
+    pickCursor: room.pickCursor,
+    wheelAlive: room.wheelAlive,
+    wheelLog: room.wheelLog.map((item) => ({ n: item.n, who: item.who })),
+    wheelRot: room.wheelRot,
+    orderRot: room.rot,
+    over: room.over,
+    activeSpin: publicSpin(room.activeSpin),
+    yourTurn: yourTurn(room, player)
+  };
+}
+function lobbyMsg() {
+  const list = [];
+  for (const room of rooms.values()) {
+    if (room.visibility !== "public") continue;
+    if (!room.players.some((item) => item.connected)) continue;
+    const host = room.players.find((item) => item.id === room.hostId);
+    const count = room.players.filter((item) => item.connected).length;
+    list.push({
+      code: room.code,
+      host: host ? host.name : "",
+      count,
+      max: MAX_PLAYERS,
+      cat: room.cat,
+      phase: room.phase,
+      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS
+    });
+  }
+  list.sort((a, b) => (rooms.get(b.code)?.created || 0) - (rooms.get(a.code)?.created || 0));
+  return { t: "lobby", rooms: list.slice(0, 50) };
+}
+function broadcastLobby() {
+  const msg = lobbyMsg();
+  for (const ws of watchers) send(ws, msg);
+}
+function broadcast(room) {
+  for (const player of room.players) send(player.ws, snap(room, player));
+  broadcastLobby();
+}
+function fail(ws, message) {
+  send(ws, { t: "err", message });
+}
+function scheduleDelete(room) {
+  if (room.emptyTimer) return;
+  room.emptyTimer = setTimeout(() => {
+    room.emptyTimer = null;
+    if (room.players.some((player) => player.connected)) return;
+    cancelSpin(room);
+    rooms.delete(room.code);
+    broadcastLobby();
+  }, ROOM_MS);
+}
+function attach(ws, room, player) {
+  watchers.delete(ws);
+  if (player.ws && player.ws !== ws) {
+    const old = player.ws;
+    player.ws = null;
+    byWs.delete(old);
+    try { old.close(); } catch (err) {}
+  }
+  player.ws = ws;
+  player.connected = true;
+  player.lastSeen = Date.now();
+  byWs.set(ws, { room, player });
+  if (room.emptyTimer) {
+    clearTimeout(room.emptyTimer);
+    room.emptyTimer = null;
+  }
+  broadcast(room);
+}
+function skipToConnected(room) {
+  if (room.phase !== "play" || room.alive.length < 2) return false;
+  if (!room.alive.some((name) => {
+    const player = byName(room, name);
+    return player && player.connected;
+  })) return false;
+  const start = room.turn;
+  let hops = 0;
+  while (hops < room.alive.length) {
+    const player = byName(room, currentName(room));
+    if (player && player.connected) break;
+    room.turn = (room.turn + 1) % room.alive.length;
+    hops += 1;
+  }
+  return room.turn !== start;
+}
+function finishRound(room) {
+  const left = room.roundOrder.filter((name) => room.alive.includes(name));
+  const gained = !left.length ? [] : room.pointAll ? left : [left[left.length - 1]];
+  gained.forEach((name) => addPoint(room, name));
+  const champs = gained.filter((name) => scoreByName(room, name) >= room.winTarget);
+  const won = champs.length > 0;
+  const champText = joinThai(champs);
+  let title = "";
+  let note = "";
+  if (!room.roundOrder.length) {
+    title = "คุณเลือกโดนเลขลับ!";
+  } else if (won) {
+    title = champText + " ชนะแล้ว!";
+    note = "ถึง " + room.winTarget + " แต้ม";
+  } else if (room.alive.length === 1) {
+    title = room.alive[0] + " เป็นคนสุดท้าย";
+    note = "ได้ 1 แต้ม";
+  } else if (!room.alive.length && room.roundOrder.length > 1) {
+    title = "ทุกคนโดนเลขลับ";
+  } else if (!room.alive.length) {
+    title = (room.roundOrder[0] || "คุณ") + " เลือกโดนเลขลับ!";
+  } else if (room.pointAll) {
+    title = "เลขลับหมดแล้ว";
+    note = "ทุกคนได้คนละ 1 แต้ม ยกเว้นคนที่โดนเลขลับ";
+  } else {
+    title = gained[0] + " เป็นคนสุดท้าย";
+    note = "ได้ 1 แต้ม";
+  }
+  room.phase = "over";
+  room.activeSpin = null;
+  room.over = {
+    title,
+    note,
+    secretLabel: "เลขลับคือ",
+    secretText: room.secretAll.join(", "),
+    many: room.secretAll.length > 3,
+    hist: null,
+    again: won ? "เริ่มแมตช์ใหม่" : "เล่นอีกครั้ง",
+    reset: won,
+    mode: ""
+  };
+}
+function begin(room) {
+  const count = room.secretCount;
+  room.gameMin = room.min;
+  room.gameMax = room.max;
+  room.secretTotal = count;
+  room.secretAll = drawSecrets(room.min, room.max, count);
+  room.secrets = room.secretAll.slice();
+  room.alive = room.order.slice();
+  room.roundOrder = room.order.slice();
+  room.lo = room.min;
+  room.hi = room.max;
+  room.picked = [];
+  room.turn = 0;
+  room.phase = "play";
+  room.over = null;
+  skipToConnected(room);
+}
+function startPick(room) {
+  cancelSpin(room);
+  room.wheelMin = room.min;
+  room.wheelMax = room.max;
+  room.wheelOrder = room.order.slice();
+  room.picks = {};
+  room.pickCursor = 0;
+  room.wheelAlive = [];
+  room.wheelLog = [];
+  room.wheelRot = 0;
+  room.phase = "pick";
+  room.over = null;
+}
+function finishWheel(room) {
+  const winner = room.wheelAlive[0] || "";
+  if (winner) addPoint(room, winner);
+  const won = !!(winner && scoreByName(room, winner) >= room.winTarget);
+  const nums = winner && Array.isArray(room.picks[winner]) ? room.picks[winner] : [];
+  const text = nums.join(", ");
+  room.phase = "over";
+  room.activeSpin = null;
+  room.over = {
+    title: won ? winner + " ชนะแล้ว!" : winner ? winner + " เป็นคนสุดท้าย" : "ไม่มีผู้ชนะ",
+    note: won ? "ถึง " + room.winTarget + " แต้ม" : winner ? "ได้ 1 แต้ม" : "",
+    secretLabel: winner ? "เลขที่เลือก" : "",
+    secretText: text,
+    many: nums.length > 1 || text.length > 4,
+    hist: room.wheelLog.map((item) => ({ n: item.n, who: item.who })),
+    again: won ? "เริ่มแมตช์ใหม่" : "รอบถัดไป",
+    reset: won,
+    mode: "wheel"
+  };
+}
+function ownerOf(room, n) {
+  for (const name of room.wheelOrder) {
+    const list = room.picks[name];
+    if (Array.isArray(list) && list.includes(n)) return name;
+  }
+  return "";
+}
+function planNumSpin(room) {
+  const span = room.wheelMax - room.wheelMin + 1;
+  const n = room.wheelMin + Math.floor(Math.random() * span);
+  const owner = ownerOf(room, n);
+  const hit = !!(owner && room.wheelAlive.includes(owner));
+  const slice = 360 / span;
+  const index = n - room.wheelMin;
+  const margin = slice * 0.18;
+  const roomj = Math.max(slice / 2 - margin, 0);
+  const jitter = (Math.random() * 2 - 1) * roomj;
+  const base = ((room.wheelRot % 360) + 360) % 360;
+  const desiredMod = (((-index * slice + jitter) % 360) + 360) % 360;
+  let delta = desiredMod - base;
+  if (delta <= 0) delta += 360;
+  const extra = hit ? 4 + Math.floor(Math.random() * 2) : 2;
+  return { n, from: base, target: base + extra * 360 + delta, dur: hit ? 7200 : 3400, hit, owner };
+}
+function applyLand(room, plan) {
+  room.wheelRot = plan.target;
+  room.activeSpin = null;
+  if (plan.hit) {
+    const index = room.wheelAlive.indexOf(plan.owner);
+    if (index >= 0) room.wheelAlive.splice(index, 1);
+    room.wheelLog.push({ n: plan.n, who: plan.owner });
+  }
+}
+function beginNumSpin(room) {
+  if (room.phase !== "wheel") return;
+  if (room.wheelAlive.length < 2) {
+    finishWheel(room);
+    broadcast(room);
+    return;
+  }
+  const plan = planNumSpin(room);
+  const id = crypto.randomUUID();
+  room.activeSpin = {
+    id,
+    kind: "num",
+    dur: plan.dur,
+    until: Date.now() + plan.dur,
+    from: plan.from,
+    target: plan.target,
+    n: plan.n,
+    hit: plan.hit,
+    owner: plan.owner
+  };
+  broadcast(room);
+  room.timer = setTimeout(() => {
+    if (!room.activeSpin || room.activeSpin.id !== id) return;
+    applyLand(room, plan);
+    const delay = !plan.hit ? 450 : room.wheelAlive.length <= 1 ? 1100 : 1400;
+    broadcast(room);
+    room.timer = setTimeout(() => {
+      if (room.phase !== "wheel") return;
+      if (room.wheelAlive.length <= 1) {
+        finishWheel(room);
+        broadcast(room);
+      } else beginNumSpin(room);
+    }, delay);
+  }, plan.dur);
+}
+function planOrderSpin(room) {
+  const next = room.players.map((player) => player.name);
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const swap = next[i];
+    next[i] = next[j];
+    next[j] = swap;
+  }
+  const names = room.players.map((player) => player.name);
+  const index = Math.max(0, names.indexOf(next[0]));
+  const slice = 360 / names.length;
+  const margin = Math.min(slice * 0.12, 8);
+  const jitter = margin + Math.random() * Math.max(slice - margin * 2, 0);
+  const fromTop = index * slice + jitter;
+  const current = ((room.rot % 360) + 360) % 360;
+  let target = (360 - fromTop) % 360;
+  let delta = target - current;
+  if (delta < 0) delta += 360;
+  const extra = 5 + Math.floor(Math.random() * 3);
+  return { next, rot: room.rot + extra * 360 + delta, dur: 4300 };
+}
+function beginOrderSpin(room) {
+  const plan = planOrderSpin(room);
+  const id = crypto.randomUUID();
+  room.activeSpin = { id, kind: "order", dur: plan.dur, until: Date.now() + plan.dur, rot: plan.rot, next: plan.next };
+  broadcast(room);
+  room.timer = setTimeout(() => {
+    if (!room.activeSpin || room.activeSpin.id !== id) return;
+    room.order = plan.next.slice();
+    room.rot = plan.rot;
+    room.activeSpin = null;
+    broadcast(room);
+  }, plan.dur);
+}
+function dropFromRound(room, name) {
+  room.order = room.order.filter((item) => item !== name);
+  if (room.phase === "play") {
+    room.alive = room.alive.filter((item) => item !== name);
+    room.roundOrder = room.roundOrder.filter((item) => item !== name);
+    if (room.turn >= room.alive.length) room.turn = 0;
+    if (room.alive.length <= 1 || !room.secrets.length) finishRound(room);
+    else skipToConnected(room);
+  } else if (room.phase === "pick") {
+    room.wheelOrder = room.wheelOrder.filter((item) => item !== name);
+    delete room.picks[name];
+    room.pickCursor = room.wheelOrder.reduce((sum, item) => sum + ((room.picks[item] || []).length), 0);
+    if (room.wheelOrder.length < 2) {
+      cancelSpin(room);
+      room.phase = "lobby";
+    }
+  } else if (room.phase === "wheel") {
+    cancelSpin(room);
+    room.wheelAlive = room.wheelAlive.filter((item) => item !== name);
+    room.wheelOrder = room.wheelOrder.filter((item) => item !== name);
+    if (room.wheelAlive.length <= 1) finishWheel(room);
+  }
+}
+function transferHost(room) {
+  if (room.players.some((player) => player.id === room.hostId)) return;
+  const next = room.players.find((player) => player.connected) || room.players[0];
+  room.hostId = next ? next.id : "";
+}
+function releaseSocket(ws, notify) {
+  watchers.delete(ws);
+  const ctx = byWs.get(ws);
+  if (!ctx || ctx.player.ws !== ws) {
+    byWs.delete(ws);
+    return;
+  }
+  byWs.delete(ws);
+  const { room, player } = ctx;
+  player.connected = false;
+  player.lastSeen = Date.now();
+  player.ws = null;
+  if (room.hostId === player.id) {
+    const next = room.players.find((item) => item.connected);
+    if (next) room.hostId = next.id;
+  }
+  if (notify) {
+    watchers.add(ws);
+    send(ws, { t: "left" });
+    send(ws, lobbyMsg());
+  }
+  if (room.phase === "lobby") broadcast(room);
+  else {
+    if (room.phase === "play") skipToConnected(room);
+    broadcast(room);
+  }
+  if (!room.players.some((item) => item.connected)) scheduleDelete(room);
+}
+function tellLobby(sock) {
+  if (!sock || sock.readyState !== 1) return;
+  watchers.add(sock);
+  send(sock, { t: "left" });
+  send(sock, lobbyMsg());
+}
+function takeOut(room, player, ws, notify) {
+  const name = player.name;
+  if (player.ws) {
+    const sock = player.ws;
+    byWs.delete(sock);
+    player.ws = null;
+    if (notify && sock !== ws) tellLobby(sock);
+  }
+  byWs.delete(ws);
+  if (notify) tellLobby(ws);
+  room.players = room.players.filter((item) => item.id !== player.id);
+  transferHost(room);
+  if (room.phase === "lobby") {
+    cancelSpin(room);
+    room.order = [];
+    room.rot = 0;
+  } else dropFromRound(room, name);
+  if (!room.players.length) scheduleDelete(room);
+  else broadcast(room);
+  broadcastLobby();
+}
+function seat(ws) {
+  return byWs.get(ws) || null;
+}
+function hostOnly(ctx) {
+  return !!(ctx && ctx.player.id === ctx.room.hostId);
+}
+function setInt(patch, key, min, max) {
+  const value = patch[key];
+  if (!Number.isInteger(value)) return null;
+  return Math.min(max, Math.max(min, value));
+}
+function onSetup(ws, msg) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx) || ctx.room.phase !== "lobby" || ctx.room.activeSpin) return;
+  const patch = msg.patch && typeof msg.patch === "object" ? msg.patch : {};
+  const room = ctx.room;
+  if (patch.cat === "wheel" || patch.cat === "secret") room.cat = patch.cat;
+  if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
+    room.rangeMode = patch.rangeMode;
+    if (patch.rangeMode === "99") { room.min = 1; room.max = 99; }
+    if (patch.rangeMode === "999") { room.min = 1; room.max = 999; }
+    if (patch.rangeMode === "9999") { room.min = 1; room.max = 9999; }
+  }
+  if (room.rangeMode === "custom") {
+    const min = setInt(patch, "min", -1000000000, 1000000000);
+    const max = setInt(patch, "max", -1000000000, 1000000000);
+    if (min != null) room.min = min;
+    if (max != null) room.max = max;
+  }
+  const winTarget = setInt(patch, "winTarget", 1, 999);
+  const secretCount = setInt(patch, "secretCount", 1, 1000000);
+  const pickEach = setInt(patch, "pickEach", 1, 99);
+  if (winTarget != null) room.winTarget = winTarget;
+  if (secretCount != null) room.secretCount = secretCount;
+  if (pickEach != null) room.pickEach = pickEach;
+  if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
+  broadcast(room);
+}
+function onSpinOrder(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่สุ่มลำดับได้");
+  const room = ctx.room;
+  if (room.phase !== "lobby" || room.activeSpin) return;
+  if (room.players.filter((item) => item.connected).length < 2) return fail(ws, "ต้องมีผู้เล่นออนไลน์อย่างน้อย 2 คน");
+  beginOrderSpin(room);
+}
+function onStart(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เริ่มเกมได้");
+  const room = ctx.room;
+  if (room.phase !== "lobby" || room.activeSpin) return;
+  if (room.players.filter((item) => item.connected).length < 2) return fail(ws, "ต้องมีผู้เล่นออนไลน์อย่างน้อย 2 คน");
+  if (room.players.some((item) => !item.connected)) return fail(ws, "มีผู้เล่นที่หลุดอยู่ รอให้กลับหรือเอาออกก่อน");
+  if (!orderReady(room)) return fail(ws, "กดสุ่มลำดับก่อนเริ่มเกม");
+  const rangeErr = checkRange(room.min, room.max);
+  const winErr = checkWin(room.winTarget);
+  if (room.cat === "wheel") {
+    const each = room.pickEach;
+    const eachErr = !Number.isInteger(each) || each < 1 ? "จำนวนเลขต่อคนต้องเป็นจำนวนเต็มตั้งแต่ 1" : each > 99 ? "จำนวนเลขต่อคนต้องไม่เกิน 99" : "";
+    const err = rangeErr || winErr || eachErr;
+    if (err) return fail(ws, err);
+    if (room.players.length * each > room.max - room.min + 1) return fail(ws, "เลขในช่วงไม่พอให้ทุกคนเลือก");
+    startPick(room);
+    broadcast(room);
+    return;
+  }
+  const err = rangeErr || checkCount(room.min, room.max, room.secretCount) || winErr;
+  if (err) return fail(ws, err);
+  begin(room);
+  broadcast(room);
+}
+function onPick(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "play") return;
+  const room = ctx.room;
+  const who = currentName(room);
+  if (ctx.player.name !== who) return fail(ws, "ยังไม่ถึงตาคุณ");
+  const n = msg.n;
+  if (!Number.isSafeInteger(n)) return fail(ws, "ใส่เป็นจำนวนเต็ม");
+  if (n < room.lo || n > room.hi) return fail(ws, "เลือกเลขระหว่าง " + room.lo + " ถึง " + room.hi);
+  if (room.picked.some((item) => item.n === n)) return fail(ws, "เลขนี้ถูกเลือกแล้ว");
+  const hit = room.secrets.includes(n);
+  room.picked.push({ n, who, hit });
+  if (hit) {
+    room.secrets = room.secrets.filter((secret) => secret !== n);
+    const index = room.alive.indexOf(who);
+    if (index >= 0) room.alive.splice(index, 1);
+    room.turn = room.alive.length ? index % room.alive.length : 0;
+    if (room.alive.length <= 1 || !room.secrets.length) {
+      finishRound(room);
+      broadcast(room);
+      return;
+    }
+  } else if (room.alive.length) {
+    room.turn = (room.turn + 1) % room.alive.length;
+  }
+  const below = room.secrets.some((secret) => secret < n);
+  const above = room.secrets.some((secret) => secret > n);
+  if (!below) room.lo = n + 1;
+  if (!above) room.hi = n - 1;
+  skipToConnected(room);
+  broadcast(room);
+}
+function taken(room) {
+  const set = new Set();
+  room.wheelOrder.forEach((name) => (room.picks[name] || []).forEach((n) => set.add(n)));
+  return set;
+}
+function onPickNum(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "pick") return;
+  const room = ctx.room;
+  const each = Math.max(room.pickEach, 1);
+  const total = room.wheelOrder.length * each;
+  if (room.pickCursor >= total) return;
+  const name = room.wheelOrder[Math.floor(room.pickCursor / each)];
+  if (ctx.player.name !== name) return fail(ws, "ยังไม่ถึงตาคุณ");
+  const n = msg.n;
+  if (!Number.isSafeInteger(n)) return fail(ws, "ใส่เป็นจำนวนเต็ม");
+  if (n < room.wheelMin || n > room.wheelMax) return fail(ws, "เลือกเลขระหว่าง " + room.wheelMin + " ถึง " + room.wheelMax);
+  if (taken(room).has(n)) return fail(ws, "เลขนี้มีคนเลือกแล้ว");
+  if (!room.picks[name]) room.picks[name] = [];
+  room.picks[name].push(n);
+  room.pickCursor += 1;
+  broadcast(room);
+}
+function onUndo(ws) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "pick" || ctx.room.activeSpin) return;
+  const room = ctx.room;
+  if (room.pickCursor <= 0) return;
+  const each = Math.max(room.pickEach, 1);
+  const name = room.wheelOrder[Math.floor((room.pickCursor - 1) / each)];
+  if (ctx.player.name !== name && ctx.player.id !== room.hostId) return fail(ws, "ย้อนได้เฉพาะเลขของตัวเอง");
+  room.pickCursor -= 1;
+  const list = room.picks[name] || [];
+  list.pop();
+  if (!list.length) delete room.picks[name];
+  broadcast(room);
+}
+function onOpenWheel(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เริ่มหมุนได้");
+  const room = ctx.room;
+  if (room.phase !== "pick") return;
+  const total = room.wheelOrder.length * Math.max(room.pickEach, 1);
+  if (!room.wheelOrder.length || room.pickCursor < total) return fail(ws, "ยังเลือกเลขไม่ครบ");
+  cancelSpin(room);
+  room.wheelAlive = room.wheelOrder.slice();
+  room.wheelLog = [];
+  room.wheelRot = 0;
+  room.phase = "wheel";
+  broadcast(room);
+}
+function onSpinNum(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่หมุนวงล้อได้");
+  const room = ctx.room;
+  if (room.phase !== "wheel" || room.activeSpin) return;
+  if (room.wheelAlive.length < 2) return;
+  beginNumSpin(room);
+}
+function onRepick(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์");
+  const room = ctx.room;
+  if (room.phase !== "wheel" || room.activeSpin || room.wheelLog.length) return;
+  room.picks = {};
+  room.pickCursor = 0;
+  room.phase = "pick";
+  broadcast(room);
+}
+function onAgain(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เริ่มรอบใหม่ได้");
+  const room = ctx.room;
+  if (room.phase !== "over" || !room.over) return;
+  if (!orderReady(room)) {
+    room.phase = "lobby";
+    room.order = [];
+    broadcast(room);
+    return fail(ws, "ผู้เล่นในห้องเปลี่ยน กลับไปสุ่มลำดับใหม่");
+  }
+  if (room.over.reset) clearPoints(room);
+  if (room.over.mode === "wheel") startPick(room);
+  else begin(room);
+  broadcast(room);
+}
+function onAbort(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่พากลับห้องได้");
+  const room = ctx.room;
+  cancelSpin(room);
+  room.phase = "lobby";
+  room.over = null;
+  room.picked = [];
+  room.alive = [];
+  room.roundOrder = [];
+  room.secrets = [];
+  room.secretAll = [];
+  room.wheelLog = [];
+  room.wheelAlive = [];
+  room.wheelOrder = [];
+  room.picks = {};
+  room.pickCursor = 0;
+  broadcast(room);
+}
+function onClear(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return;
+  const room = ctx.room;
+  if (room.phase === "play" || room.phase === "pick" || room.phase === "wheel") return;
+  clearPoints(room);
+  broadcast(room);
+}
+function onKick(ws, msg) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return;
+  const id = typeof msg.id === "string" ? msg.id : "";
+  if (!id || id === ctx.player.id) return;
+  const target = ctx.room.players.find((player) => player.id === id);
+  if (!target) return;
+  takeOut(ctx.room, target, target.ws, true);
+}
+function identity(ws, msg) {
+  const name = cleanName(msg.name) || ws.pendingName;
+  const token = validToken(msg.token) ? msg.token : validToken(ws.token) ? ws.token : crypto.randomUUID();
+  ws.token = token;
+  return { name, token };
+}
+function onCreate(ws, msg) {
+  const { name, token } = identity(ws, msg);
+  if (!name) return fail(ws, "ใส่ชื่อก่อน");
+  if (rooms.size >= MAX_ROOMS) return fail(ws, "เซิร์ฟเวอร์เต็ม ลองใหม่ภายหลัง");
+  const code = makeCode();
+  if (!code) return fail(ws, "สร้างห้องไม่สำเร็จ ลองใหม่");
+  const old = findSeat(token);
+  if (old) takeOut(old.room, old.player, ws);
+  const player = { id: token, name, ws: null, connected: true, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
+  rooms.set(code, room);
+  attach(ws, room, player);
+}
+function onJoin(ws, msg) {
+  const code = String(msg.code || "").trim();
+  if (!/^\d{6}$/.test(code)) return fail(ws, "รหัสต้องเป็นตัวเลข 6 หลัก");
+  const room = rooms.get(code);
+  if (!room) return fail(ws, "ไม่พบห้องนี้");
+  const { name, token } = identity(ws, msg);
+  const existing = room.players.find((player) => player.id === token);
+  if (existing) {
+    attach(ws, room, existing);
+    return;
+  }
+  if (!name) return fail(ws, "ใส่ชื่อก่อน");
+  if (room.phase !== "lobby") return fail(ws, "ห้องนี้เริ่มเกมแล้ว");
+  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (room.players.some((player) => player.name.toLowerCase() === name.toLowerCase())) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
+  const old = findSeat(token);
+  if (old) takeOut(old.room, old.player, ws);
+  const player = { id: token, name, ws: null, connected: true, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  room.players.push(player);
+  if (room.phase === "lobby") {
+    cancelSpin(room);
+    room.order = [];
+    room.rot = 0;
+  }
+  attach(ws, room, player);
+}
+function onHello(ws, msg) {
+  const token = validToken(msg.token) ? msg.token : "";
+  ws.token = token;
+  ws.pendingName = cleanName(msg.name);
+  if (token) {
+    const found = findSeat(token);
+    if (found) {
+      attach(ws, found.room, found.player);
+      return;
+    }
+  }
+  watchers.add(ws);
+  send(ws, lobbyMsg());
+}
+function onLeave(ws) {
+  const ctx = seat(ws);
+  if (!ctx) {
+    watchers.add(ws);
+    send(ws, { t: "left" });
+    send(ws, lobbyMsg());
+    return;
+  }
+  takeOut(ctx.room, ctx.player, ws, true);
+}
+function onMessage(ws, raw) {
+  if (!allow(ws)) return;
+  let msg;
+  try { msg = JSON.parse(raw.toString()); } catch (err) { return; }
+  if (!msg || typeof msg !== "object") return;
+  if (msg.t === "hello") return onHello(ws, msg);
+  if (msg.t === "create") return onCreate(ws, msg);
+  if (msg.t === "join") return onJoin(ws, msg);
+  if (msg.t === "leave") return onLeave(ws);
+  if (msg.t === "setup") return onSetup(ws, msg);
+  if (msg.t === "spinOrder") return onSpinOrder(ws);
+  if (msg.t === "start") return onStart(ws);
+  if (msg.t === "pick") return onPick(ws, msg);
+  if (msg.t === "pickNum") return onPickNum(ws, msg);
+  if (msg.t === "undo") return onUndo(ws);
+  if (msg.t === "openWheel") return onOpenWheel(ws);
+  if (msg.t === "spinNum") return onSpinNum(ws);
+  if (msg.t === "repick") return onRepick(ws);
+  if (msg.t === "again") return onAgain(ws);
+  if (msg.t === "abort") return onAbort(ws);
+  if (msg.t === "clear") return onClear(ws);
+  if (msg.t === "kick") return onKick(ws, msg);
+}
+function serve(req, res) {
+  const url = new URL(req.url || "/", "http://localhost");
+  let name = decodeURIComponent(url.pathname);
+  if (name === "/") name = "/" + PAGE;
+  const file = path.normalize(path.join(ROOT, name));
+  const rel = path.relative(ROOT, file);
+  if (rel.startsWith("..") || path.isAbsolute(rel) || rel.split(path.sep).includes("node_modules") || BLOCKED.has(path.basename(file))) {
+    res.writeHead(404);
+    res.end("not found");
+    return;
+  }
+  const stream = fs.createReadStream(file);
+  stream.on("error", () => {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+  stream.on("open", () => {
+    res.writeHead(200, {
+      "Content-Type": TYPES[path.extname(file).toLowerCase()] || "application/octet-stream",
+      "Cache-Control": "no-cache"
+    });
+    stream.pipe(res);
+  });
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const room of rooms.values()) {
+    if (room.phase === "lobby") {
+      const keep = room.players.filter((player) => player.connected || now - player.lastSeen < SEAT_MS);
+      if (keep.length !== room.players.length) {
+        room.players = keep;
+        transferHost(room);
+        cancelSpin(room);
+        room.order = [];
+        room.rot = 0;
+        if (!keep.length) scheduleDelete(room);
+        else broadcast(room);
+        broadcastLobby();
+      }
+    } else if (skipToConnected(room)) {
+      broadcast(room);
+    }
+    if (room.players.length && !room.players.some((player) => player.connected)) scheduleDelete(room);
+  }
+}, 1000);
+
+const server = http.createServer(serve);
+const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 8000 });
+wss.on("connection", (ws) => {
+  ws.on("message", (buf) => onMessage(ws, buf));
+  ws.on("close", () => releaseSocket(ws, false));
+  ws.on("error", () => {});
+});
+server.listen(PORT, "0.0.0.0", () => {
+  console.log("เปิดเกมที่ http://localhost:" + PORT);
+  const nets = os.networkInterfaces();
+  for (const list of Object.values(nets)) {
+    for (const item of list || []) {
+      if ((item.family === "IPv4" || item.family === 4) && !item.internal) console.log("ในวงแลน: http://" + item.address + ":" + PORT);
+    }
+  }
+});

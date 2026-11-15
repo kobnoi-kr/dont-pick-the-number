@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DON’T PICK THE NUMBER</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="stage">
+<main class="card">
+  <div id="roombar" class="roombar hidden">
+    <div class="roommeta">
+      <span id="visBadge" class="badge">สาธารณะ</span>
+      <span id="roomCode" class="code">------</span>
+      <button type="button" id="copyCode" class="textbtn">คัดลอก</button>
+    </div>
+    <span id="roomCount" class="roomcount"></span>
+    <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
+  </div>
+  <p id="roomNote" class="hint hidden"></p>
+  <section id="gate">
+    <h1>DON’T PICK THE NUMBER</h1>
+    <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข</p>
+    <label class="field">ชื่อของคุณ
+      <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
+    </label>
+    <p class="label">สร้างห้อง</p>
+    <div class="modes cats">
+      <button type="button" class="mode" id="makePublic">ล็อบบี้สาธารณะ</button>
+      <button type="button" class="mode" id="makePrivate">ห้องส่วนตัว</button>
+    </div>
+    <form id="joinForm" class="jump">
+      <input id="joinCode" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="รหัส 6 หลัก">
+      <button class="btn" type="submit">เข้าห้อง</button>
+    </form>
+    <p class="label lobby-label">ล็อบบี้สาธารณะ</p>
+    <ul id="roomList" class="rooms"></ul>
+    <p id="lobbyEmpty" class="hint">ยังไม่มีห้องสาธารณะ</p>
+    <p id="gateMsg" class="msg"></p>
+    <p id="connMsg" class="hint"></p>
+  </section>
+
+  <section id="start" class="hidden">
+    <h1>DON’T PICK THE NUMBER</h1>
+    <p class="sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
+    <form id="setup">
+      <p class="label">หมวดเกม</p>
+      <div class="modes cats" id="cats">
+        <button type="button" class="mode on" data-cat="secret" aria-pressed="true">ห้ามโดนเลขลับ</button>
+        <button type="button" class="mode" data-cat="wheel" aria-pressed="false">วงล้อสุ่มเลข</button>
+      </div>
+      <p class="label">เลือกช่วงตัวเลข</p>
+      <div class="modes" id="modes">
+        <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
+        <button type="button" class="mode" data-min="1" data-max="999" aria-pressed="false">1–999</button>
+        <button type="button" class="mode" data-min="1" data-max="9999" aria-pressed="false">1–9999</button>
+        <button type="button" class="mode" data-custom="1" aria-pressed="false">กำหนดเอง</button>
+      </div>
+      <div id="custom" class="custom hidden">
+        <label>ต่ำสุด<input id="cmin" type="number" inputmode="numeric" value="1"></label>
+        <label>สูงสุด<input id="cmax" type="number" inputmode="numeric" value="50"></label>
+      </div>
+      <p id="err" class="msg"></p>
+      <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
+      <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
+      <div id="wheelOnly" class="hidden">
+        <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
+      </div>
+      <div id="secretOnly">
+        <div class="row count-row"><label for="secretCount">จำนวนเลขลับ</label><input id="secretCount" type="number" inputmode="numeric" value="1"></div>
+        <p class="label">ถ้าเลขลับหมด แต่ยังเหลือมากกว่า 1 คน</p>
+        <div class="modes restmodes" id="restModes">
+          <button type="button" class="mode on" data-rest="all" aria-pressed="true">ทุกคน ยกเว้นคนที่โดน</button>
+          <button type="button" class="mode" data-rest="last" aria-pressed="false">คนสุดท้ายที่เหลือ</button>
+        </div>
+        <div class="row"><div><small>วิธีเลือกเลขลับ</small>สุ่มเลขอัตโนมัติ<small>ระบบจะสุ่มเลขลับให้ตามจำนวนที่กำหนด</small></div></div>
+      </div>
+      <button class="btn" type="submit">เริ่มเกม →</button>
+    </form>
+  </section>
+
+  <section id="play" class="hidden">
+    <h1>DON’T PICK THE NUMBER</h1>
+    <p class="sub" id="modeLabel"></p>
+    <div id="turnbar" class="turnbar hidden" aria-live="polite">ตาของ <b id="turnName"></b><span id="turnRank"></span></div>
+    <div class="range" id="rangeText">ตอนนี้เลขลับอยู่ระหว่าง <b id="lo"></b> – <b id="hi"></b></div>
+    <div id="pager" class="pager hidden">
+      <button type="button" id="prev">←</button>
+      <span id="pageLabel"></span>
+      <button type="button" id="next">→</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <form id="jump" class="jump hidden" novalidate>
+      <input id="guess" type="number" inputmode="numeric" autocomplete="off" placeholder="หรือพิมพ์เลข">
+      <button class="btn" type="submit">เลือก</button>
+    </form>
+    <p id="msg" class="msg"></p>
+    <div class="hist">ประวัติการเลือก: <span id="hist">ยังไม่มี</span></div>
+    <button class="btn ghost" type="button" id="leave">เปลี่ยนโหมด</button>
+  </section>
+
+  <section id="pick" class="hidden">
+    <h1>วงล้อสุ่มเลข</h1>
+    <p class="sub" id="pickMode"></p>
+    <div id="pickTurn" class="turnbar"><b id="pickName"></b><span id="pickProgress"></span></div>
+    <div class="range">เลือกเลขในช่วง <b id="pickLo"></b> – <b id="pickHi"></b></div>
+    <div id="pickPager" class="pager hidden">
+      <button type="button" id="pickPrev">←</button>
+      <span id="pickPageLabel"></span>
+      <button type="button" id="pickNext">→</button>
+    </div>
+    <div class="grid" id="pickGrid"></div>
+    <form id="pickJump" class="jump" novalidate>
+      <input id="pickGuess" type="number" inputmode="numeric" autocomplete="off" placeholder="หรือพิมพ์เลข">
+      <button class="btn" type="submit">เลือก</button>
+    </form>
+    <p id="pickMsg" class="msg"></p>
+    <div class="hist">เลขที่เลือก: <span id="pickHist">ยังไม่มี</span></div>
+    <button class="btn hidden" type="button" id="pickGo">เริ่มหมุน →</button>
+    <button class="btn ghost" type="button" id="pickUndo">ย้อนกลับ</button>
+    <button class="btn ghost" type="button" id="pickLeave">เปลี่ยนโหมด</button>
+  </section>
+
+  <section id="wheelGame" class="hidden">
+    <h1>วงล้อสุ่มเลข</h1>
+    <p class="sub" id="wheelMode"></p>
+    <div class="numdial">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="numWheel" width="320" height="320" aria-hidden="true"></canvas>
+      <div id="numRead" class="numread" aria-hidden="true">—</div>
+    </div>
+    <p id="wheelResult" class="winner" aria-live="polite">กดหมุนวงล้อ</p>
+    <div id="wheelChips" class="chips"></div>
+    <div class="hist">ประวัติการหมุน: <span id="wheelHist">ยังไม่มี</span></div>
+    <button class="btn" type="button" id="doSpin">หมุนวงล้อ</button>
+    <button class="btn ghost" type="button" id="wheelRepick">เลือกเลขใหม่</button>
+    <button class="btn ghost" type="button" id="wheelLeave">เปลี่ยนโหมด</button>
+  </section>
+
+  <section id="over" class="hidden lose">
+    <h2 id="overTitle">คุณเลือกโดนเลขลับ!</h2>
+    <p id="overNote" class="sub"></p>
+    <div id="secretLabel">เลขลับคือ</div>
+    <div class="secret" id="secret"></div>
+    <div class="hist hidden" id="overHistWrap">ผลรอบนี้: <span id="overHist"></span></div>
+    <ol id="finalScores" class="scores"></ol>
+    <button class="btn" type="button" id="again">เล่นอีกครั้ง</button>
+    <button class="btn ghost" type="button" id="back">เลือกโหมดใหม่</button>
+  </section>
+</main>
+
+<aside class="side hidden">
+  <h2 class="side-title">ผู้เล่นในห้อง</h2>
+  <p class="sub">สุ่มครั้งเดียว แล้วเล่นจนเหลือคนสุดท้าย</p>
+  <div class="dial">
+    <div class="pointer" aria-hidden="true"></div>
+    <canvas id="wheel" width="280" height="280" aria-hidden="true"></canvas>
+  </div>
+  <p id="winner" class="winner" aria-live="polite">รอผู้เล่นเข้าห้อง</p>
+  <p id="onlineWait" class="hint">แต่ละคนเข้าจากเครื่องตัวเอง แล้วโฮสต์สุ่มลำดับ</p>
+  <form id="addForm" class="addrow hidden">
+    <input id="pname" type="text" maxlength="24" autocomplete="off" placeholder="ชื่อผู้เล่น">
+    <button class="btn" type="submit">เพิ่ม</button>
+  </form>
+  <p id="perr" class="msg"></p>
+  <ol class="board" id="board"></ol>
+  <p class="hint" id="sideHint">โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ</p>
+  <button class="btn" type="button" id="spin" disabled>สุ่มลำดับ</button>
+  <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
+</aside>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

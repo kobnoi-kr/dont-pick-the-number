@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: dont-pick-the-number
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
