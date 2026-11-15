@@ -11,11 +11,13 @@ const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.28, SPIN_BASE=0.5, SFX_BASE=1;
-const spinAudio=new Audio(SPIN_SOUND);
-const bgAudio=new Audio(encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3"));
-bgAudio.loop=true;
+const BG_SRC=encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
+const bgAudio=new Audio();
+bgAudio.crossOrigin="anonymous";
 bgAudio.preload="auto";
-spinAudio.preload="auto";
+bgAudio.loop=true;
+bgAudio.playsInline=true;
+bgAudio.src=BG_SRC;
 let masterVol=1;
 try{
   const raw=localStorage.getItem(VOL_STORE);
@@ -24,7 +26,8 @@ try{
     if(Number.isFinite(saved)) masterVol=Math.min(1,Math.max(0,Math.round(saved*10)/10));
   }
 }catch(e){}
-let audioCtx=null, masterGain=null, mediaWired=false;
+let audioCtx=null, masterGain=null, bgGain=null, spinGain=null;
+let bgWired=false, spinNode=null, audioWarm=null;
 const clipCache={};
 function ensureAudio(){
   const AC=window.AudioContext||window.webkitAudioContext;
@@ -34,85 +37,123 @@ function ensureAudio(){
     masterGain=audioCtx.createGain();
     masterGain.gain.value=masterVol;
     masterGain.connect(audioCtx.destination);
+    bgGain=audioCtx.createGain();
+    bgGain.gain.value=BG_BASE;
+    bgGain.connect(masterGain);
+    spinGain=audioCtx.createGain();
+    spinGain.gain.value=SPIN_BASE;
+    spinGain.connect(masterGain);
   }
   if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
-  if(!mediaWired&&masterGain){
-    try{
-      const bgNode=audioCtx.createMediaElementSource(bgAudio);
-      const bgGain=audioCtx.createGain();
-      bgGain.gain.value=BG_BASE;
-      bgNode.connect(bgGain).connect(masterGain);
-      const spinNode=audioCtx.createMediaElementSource(spinAudio);
-      const spinGain=audioCtx.createGain();
-      spinGain.gain.value=SPIN_BASE;
-      spinNode.connect(spinGain).connect(masterGain);
-      bgAudio.volume=1;
-      spinAudio.volume=1;
-      mediaWired=true;
-    }catch(e){}
-  }
   return audioCtx;
 }
-function applyVolume(){
-  if(masterGain){
-    const g=masterGain.gain;
-    if(audioCtx) g.setTargetAtTime(masterVol, audioCtx.currentTime, 0.015);
-    else g.value=masterVol;
-  }
-  if(!mediaWired){
-    bgAudio.volume=BG_BASE*masterVol;
-    spinAudio.volume=SPIN_BASE*masterVol;
-  }else{
+function wireBackground(){
+  const ctx=ensureAudio();
+  if(!ctx||!bgGain||bgWired) return;
+  try{
+    ctx.createMediaElementSource(bgAudio).connect(bgGain);
     bgAudio.volume=1;
-    spinAudio.volume=1;
+    bgWired=true;
+  }catch(e){}
+}
+function unlockAudio(){
+  const ctx=ensureAudio();
+  if(!ctx) return null;
+  if(ctx.state==="suspended") ctx.resume().catch(()=>{});
+  try{
+    const blank=ctx.createBuffer(1, 1, ctx.sampleRate||22050);
+    const src=ctx.createBufferSource();
+    src.buffer=blank;
+    src.connect(ctx.destination);
+    src.start(0);
+  }catch(e){}
+  wireBackground();
+  warmClips();
+  return ctx;
+}
+function loadClip(src){
+  if(clipCache[src]) return Promise.resolve(clipCache[src]);
+  const ctx=ensureAudio();
+  if(!ctx) return Promise.reject(new Error("no audio"));
+  return fetch(src).then(r=>{
+    if(!r.ok) throw new Error("fetch "+src);
+    return r.arrayBuffer();
+  }).then(ab=>ctx.decodeAudioData(ab.slice(0))).then(buf=>{
+    clipCache[src]=buf;
+    return buf;
+  });
+}
+function warmClips(){
+  if(audioWarm) return audioWarm;
+  audioWarm=Promise.allSettled([
+    loadClip(SPIN_SOUND),
+    loadClip(POP_SOUND),
+    loadClip(BOMB_SOUND)
+  ]);
+  return audioWarm;
+}
+function applyVolume(){
+  if(masterGain&&audioCtx){
+    const t=audioCtx.currentTime;
+    try{ masterGain.gain.cancelScheduledValues(t); }catch(e){}
+    masterGain.gain.setValueAtTime(Math.max(0, masterVol), t);
+  }else if(masterGain){
+    masterGain.gain.value=masterVol;
   }
-  const muted=masterVol<=0;
-  bgAudio.muted=muted;
-  spinAudio.muted=muted;
-  if(muted&&!bgAudio.paused) bgAudio.pause();
+  bgAudio.muted=masterVol<=0;
+  if(masterVol<=0){
+    stopBackground();
+    stopSpinSound();
+  }
   const label=$("volLabel");
   if(label) label.textContent=Math.round(masterVol*100)+"%";
   const down=$("volDown"), up=$("volUp");
-  if(down) down.disabled=muted;
+  if(down) down.disabled=masterVol<=0;
   if(up) up.disabled=masterVol>=1;
 }
 function setVolume(next, preview){
   masterVol=Math.min(1,Math.max(0,Math.round(next*10)/10));
   try{ localStorage.setItem(VOL_STORE,String(masterVol)); }catch(e){}
-  ensureAudio();
+  unlockAudio();
   applyVolume();
   if(masterVol>0) startBackground();
   if(preview&&masterVol>0) playClip(POP_SOUND);
 }
 function nudgeVolume(delta){ setVolume(masterVol+delta, true); }
+function stopBackground(){
+  try{ bgAudio.pause(); }catch(e){}
+}
 function startBackground(){
   if(masterVol<=0) return;
-  ensureAudio();
-  if(!bgAudio.paused) return;
-  bgAudio.play().catch(()=>{});
+  const ctx=unlockAudio();
+  if(!ctx) return;
+  wireBackground();
+  const run=()=>{ bgAudio.play().catch(()=>{}); };
+  if(ctx.state==="running") run();
+  else ctx.resume().then(run).catch(run);
 }
 function playClip(src){
   if(masterVol<=0) return;
-  const ctx=ensureAudio();
-  const fallback=()=>{
-    const audio=new Audio(src);
-    audio.volume=Math.min(1, SFX_BASE*masterVol);
-    audio.play().catch(()=>{});
-  };
-  if(!ctx||!masterGain){ fallback(); return; }
-  const startBuf=buf=>{
+  const ctx=unlockAudio();
+  if(!ctx||!masterGain) return;
+  const start=buf=>{
+    if(!buf||masterVol<=0) return;
     const node=ctx.createBufferSource();
     node.buffer=buf;
     const g=ctx.createGain();
     g.gain.value=SFX_BASE;
     node.connect(g).connect(masterGain);
-    node.start();
+    try{ node.start(0); }catch(e){}
   };
-  if(clipCache[src]){ startBuf(clipCache[src]); return; }
-  fetch(src).then(r=>r.arrayBuffer()).then(ab=>ctx.decodeAudioData(ab.slice(0))).then(buf=>{
-    clipCache[src]=buf;
-    startBuf(buf);
-  }).catch(fallback);
+  if(clipCache[src]){
+    if(ctx.state==="running") start(clipCache[src]);
+    else ctx.resume().then(()=>start(clipCache[src])).catch(()=>{});
+    return;
+  }
+  loadClip(src).then(buf=>{
+    if(ctx.state==="running") start(buf);
+    else ctx.resume().then(()=>start(buf)).catch(()=>{});
+  }).catch(()=>{});
 }
 applyVolume();
 let lastBombKey="";
@@ -129,13 +170,33 @@ function maybePlayBomb(list){
 }
 function playSpinSound(){
   if(masterVol<=0) return;
-  ensureAudio();
-  spinAudio.currentTime=0;
-  spinAudio.play().catch(()=>{});
+  const ctx=unlockAudio();
+  if(!ctx||!spinGain) return;
+  stopSpinSound();
+  const start=buf=>{
+    if(!buf||masterVol<=0) return;
+    const node=ctx.createBufferSource();
+    node.buffer=buf;
+    node.loop=true;
+    node.connect(spinGain);
+    node.onended=()=>{ if(spinNode===node) spinNode=null; };
+    try{
+      node.start(0);
+      spinNode=node;
+    }catch(e){ spinNode=null; }
+  };
+  if(clipCache[SPIN_SOUND]){
+    if(ctx.state==="running") start(clipCache[SPIN_SOUND]);
+    else ctx.resume().then(()=>start(clipCache[SPIN_SOUND])).catch(()=>{});
+  }else loadClip(SPIN_SOUND).then(buf=>{
+    if(ctx.state==="running") start(buf);
+    else ctx.resume().then(()=>start(buf)).catch(()=>{});
+  }).catch(()=>{});
 }
 function stopSpinSound(){
-  spinAudio.pause();
-  spinAudio.currentTime=0;
+  if(!spinNode) return;
+  try{ spinNode.onended=null; spinNode.stop(); }catch(e){}
+  spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
@@ -1157,10 +1218,15 @@ function applyCat(next){
   renderPlayers();
 }
 
-document.addEventListener("pointerdown",startBackground);
-document.addEventListener("keydown",startBackground);
-document.addEventListener("click",e=>{
+function onUserGesture(){
+  unlockAudio();
   startBackground();
+}
+document.addEventListener("pointerdown",onUserGesture);
+document.addEventListener("touchstart",onUserGesture,{passive:true});
+document.addEventListener("keydown",onUserGesture);
+document.addEventListener("click",e=>{
+  onUserGesture();
   const btn=e.target.closest("button");
   if(btn&&!btn.closest("#volBar")) playClip(POP_SOUND);
 });
@@ -1711,8 +1777,22 @@ function bootOnline(){
   $("makePrivate").onclick=()=>makeRoom("private");
   $("joinForm").onsubmit=e=>{ e.preventDefault(); joinCode($("joinCode").value); };
   $("joinCode").addEventListener("input",()=>{ $("joinCode").value=$("joinCode").value.replace(/\D/g,"").slice(0,6); });
-  $("volDown").onclick=()=>nudgeVolume(-0.1);
-  $("volUp").onclick=()=>nudgeVolume(0.1);
+  const bindVol=(id, delta)=>{
+    const el=$(id);
+    let armed=false;
+    const go=e=>{
+      if(armed) return;
+      armed=true;
+      setTimeout(()=>{ armed=false; }, 250);
+      if(e&&e.cancelable) e.preventDefault();
+      unlockAudio();
+      nudgeVolume(delta);
+    };
+    el.addEventListener("pointerdown",go);
+    el.addEventListener("click",go);
+  };
+  bindVol("volDown", -0.1);
+  bindVol("volUp", 0.1);
   applyVolume();
   show("gate");
   connect();

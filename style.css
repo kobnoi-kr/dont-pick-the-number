@@ -111,11 +111,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .setup.locked button,.setup.locked input{opacity:.85}
 .host-only-note{display:none;margin:0 0 10px;color:var(--muted);font-size:.92rem}
 .setup.locked .host-only-note{display:block}
-.volbar{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12)}
-.volbtn{width:36px;height:36px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:1.25rem;font-weight:700;line-height:1;cursor:pointer}
+.volbar{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.volbtn{width:44px;height:44px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:1.35rem;font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .volbtn:hover{background:var(--blue);color:#fff}
 .volbtn:disabled{opacity:.4;cursor:not-allowed}
-.vollabel{min-width:3.2em;text-align:center;font-size:.85rem;font-weight:700;color:var(--muted)}
+.vollabel{min-width:3.2em;text-align:center;font-size:.85rem;font-weight:700;color:var(--muted);pointer-events:none}
 .grid button.wait:disabled{opacity:1;background:var(--chip);color:var(--text);cursor:not-allowed}
 .prow.off{opacity:.45}
 .turnbar.you{color:var(--mark)}
