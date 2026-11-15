@@ -9,20 +9,43 @@ const $=id=>document.getElementById(id);
 const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
+const VOL_STORE="dpn-volume";
+const BG_BASE=0.1, SPIN_BASE=0.3, SFX_BASE=1;
 const spinAudio=new Audio(SPIN_SOUND);
-spinAudio.volume=0.3;
 const bgAudio=new Audio(encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3"));
 bgAudio.loop=true;
-bgAudio.volume=0.1;
+let masterVol=1;
+try{
+  const saved=Number(localStorage.getItem(VOL_STORE));
+  if(Number.isFinite(saved)) masterVol=Math.min(1,Math.max(0,Math.round(saved*10)/10));
+}catch(e){}
+function applyVolume(){
+  bgAudio.volume=BG_BASE*masterVol;
+  spinAudio.volume=SPIN_BASE*masterVol;
+  const label=$("volLabel");
+  if(label) label.textContent=Math.round(masterVol*100)+"%";
+  const down=$("volDown"), up=$("volUp");
+  if(down) down.disabled=masterVol<=0;
+  if(up) up.disabled=masterVol>=1;
+}
+function setVolume(next){
+  masterVol=Math.min(1,Math.max(0,Math.round(next*10)/10));
+  try{ localStorage.setItem(VOL_STORE,String(masterVol)); }catch(e){}
+  applyVolume();
+  if(masterVol>0) startBackground();
+}
+function nudgeVolume(delta){ setVolume(masterVol+delta); }
 function startBackground(){
   if(!bgAudio.paused) return;
   bgAudio.play().catch(()=>{});
 }
 function playClip(src){
+  if(masterVol<=0) return;
   const audio=new Audio(src);
-  audio.volume=1;
+  audio.volume=SFX_BASE*masterVol;
   audio.play().catch(()=>{});
 }
+applyVolume();
 let lastBombKey="";
 function bombKey(list){
   const last=Array.isArray(list)&&list.length?list[list.length-1]:null;
@@ -36,6 +59,7 @@ function maybePlayBomb(list){
   playClip(BOMB_SOUND);
 }
 function playSpinSound(){
+  if(masterVol<=0) return;
   spinAudio.currentTime=0;
   spinAudio.play().catch(()=>{});
 }
@@ -1067,7 +1091,8 @@ document.addEventListener("pointerdown",startBackground);
 document.addEventListener("keydown",startBackground);
 document.addEventListener("click",e=>{
   startBackground();
-  if(e.target.closest("button")) playClip(POP_SOUND);
+  const btn=e.target.closest("button");
+  if(btn&&!btn.closest("#volBar")) playClip(POP_SOUND);
 });
 $("restModes").onclick=e=>{
   if(onlineMode&&!isHost()) return;
@@ -1616,6 +1641,9 @@ function bootOnline(){
   $("makePrivate").onclick=()=>makeRoom("private");
   $("joinForm").onsubmit=e=>{ e.preventDefault(); joinCode($("joinCode").value); };
   $("joinCode").addEventListener("input",()=>{ $("joinCode").value=$("joinCode").value.replace(/\D/g,"").slice(0,6); });
+  $("volDown").onclick=()=>nudgeVolume(-0.1);
+  $("volUp").onclick=()=>nudgeVolume(0.1);
+  applyVolume();
   show("gate");
   connect();
 }
