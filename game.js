@@ -10,40 +10,109 @@ const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
 const VOL_STORE="dpn-volume";
-const BG_BASE=0.1, SPIN_BASE=0.3, SFX_BASE=1;
+const BG_BASE=0.28, SPIN_BASE=0.5, SFX_BASE=1;
 const spinAudio=new Audio(SPIN_SOUND);
 const bgAudio=new Audio(encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3"));
 bgAudio.loop=true;
+bgAudio.preload="auto";
+spinAudio.preload="auto";
 let masterVol=1;
 try{
-  const saved=Number(localStorage.getItem(VOL_STORE));
-  if(Number.isFinite(saved)) masterVol=Math.min(1,Math.max(0,Math.round(saved*10)/10));
+  const raw=localStorage.getItem(VOL_STORE);
+  if(raw!=null&&raw!==""){
+    const saved=Number(raw);
+    if(Number.isFinite(saved)) masterVol=Math.min(1,Math.max(0,Math.round(saved*10)/10));
+  }
 }catch(e){}
+let audioCtx=null, masterGain=null, mediaWired=false;
+const clipCache={};
+function ensureAudio(){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return null;
+  if(!audioCtx){
+    audioCtx=new AC();
+    masterGain=audioCtx.createGain();
+    masterGain.gain.value=masterVol;
+    masterGain.connect(audioCtx.destination);
+  }
+  if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
+  if(!mediaWired&&masterGain){
+    try{
+      const bgNode=audioCtx.createMediaElementSource(bgAudio);
+      const bgGain=audioCtx.createGain();
+      bgGain.gain.value=BG_BASE;
+      bgNode.connect(bgGain).connect(masterGain);
+      const spinNode=audioCtx.createMediaElementSource(spinAudio);
+      const spinGain=audioCtx.createGain();
+      spinGain.gain.value=SPIN_BASE;
+      spinNode.connect(spinGain).connect(masterGain);
+      bgAudio.volume=1;
+      spinAudio.volume=1;
+      mediaWired=true;
+    }catch(e){}
+  }
+  return audioCtx;
+}
 function applyVolume(){
-  bgAudio.volume=BG_BASE*masterVol;
-  spinAudio.volume=SPIN_BASE*masterVol;
+  if(masterGain){
+    const g=masterGain.gain;
+    if(audioCtx) g.setTargetAtTime(masterVol, audioCtx.currentTime, 0.015);
+    else g.value=masterVol;
+  }
+  if(!mediaWired){
+    bgAudio.volume=BG_BASE*masterVol;
+    spinAudio.volume=SPIN_BASE*masterVol;
+  }else{
+    bgAudio.volume=1;
+    spinAudio.volume=1;
+  }
+  const muted=masterVol<=0;
+  bgAudio.muted=muted;
+  spinAudio.muted=muted;
+  if(muted&&!bgAudio.paused) bgAudio.pause();
   const label=$("volLabel");
   if(label) label.textContent=Math.round(masterVol*100)+"%";
   const down=$("volDown"), up=$("volUp");
-  if(down) down.disabled=masterVol<=0;
+  if(down) down.disabled=muted;
   if(up) up.disabled=masterVol>=1;
 }
-function setVolume(next){
+function setVolume(next, preview){
   masterVol=Math.min(1,Math.max(0,Math.round(next*10)/10));
   try{ localStorage.setItem(VOL_STORE,String(masterVol)); }catch(e){}
+  ensureAudio();
   applyVolume();
   if(masterVol>0) startBackground();
+  if(preview&&masterVol>0) playClip(POP_SOUND);
 }
-function nudgeVolume(delta){ setVolume(masterVol+delta); }
+function nudgeVolume(delta){ setVolume(masterVol+delta, true); }
 function startBackground(){
+  if(masterVol<=0) return;
+  ensureAudio();
   if(!bgAudio.paused) return;
   bgAudio.play().catch(()=>{});
 }
 function playClip(src){
   if(masterVol<=0) return;
-  const audio=new Audio(src);
-  audio.volume=SFX_BASE*masterVol;
-  audio.play().catch(()=>{});
+  const ctx=ensureAudio();
+  const fallback=()=>{
+    const audio=new Audio(src);
+    audio.volume=Math.min(1, SFX_BASE*masterVol);
+    audio.play().catch(()=>{});
+  };
+  if(!ctx||!masterGain){ fallback(); return; }
+  const startBuf=buf=>{
+    const node=ctx.createBufferSource();
+    node.buffer=buf;
+    const g=ctx.createGain();
+    g.gain.value=SFX_BASE;
+    node.connect(g).connect(masterGain);
+    node.start();
+  };
+  if(clipCache[src]){ startBuf(clipCache[src]); return; }
+  fetch(src).then(r=>r.arrayBuffer()).then(ab=>ctx.decodeAudioData(ab.slice(0))).then(buf=>{
+    clipCache[src]=buf;
+    startBuf(buf);
+  }).catch(fallback);
 }
 applyVolume();
 let lastBombKey="";
@@ -60,6 +129,7 @@ function maybePlayBomb(list){
 }
 function playSpinSound(){
   if(masterVol<=0) return;
+  ensureAudio();
   spinAudio.currentTime=0;
   spinAudio.play().catch(()=>{});
 }
