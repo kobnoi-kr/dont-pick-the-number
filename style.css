@@ -106,8 +106,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .room b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .room small{color:var(--muted)}
 .room .btn{width:auto;margin:0;padding:8px 14px;font-size:.92rem}
-.setup.locked{opacity:.8}
-.setup.locked button,.setup.locked input{pointer-events:none}
+.setup.locked{opacity:.72}
+.setup.locked,.setup.locked *{pointer-events:none;cursor:not-allowed}
+.setup.locked button,.setup.locked input{opacity:.85}
+.host-only-note{display:none;margin:0 0 10px;color:var(--muted);font-size:.92rem}
+.setup.locked .host-only-note{display:block}
 .grid button.wait:disabled{opacity:1;background:var(--chip);color:var(--text);cursor:not-allowed}
 .prow.off{opacity:.45}
 .turnbar.you{color:var(--mark)}

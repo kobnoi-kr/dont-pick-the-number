@@ -1057,6 +1057,7 @@ document.addEventListener("click",e=>{
   if(e.target.closest("button")) playClip(POP_SOUND);
 });
 $("restModes").onclick=e=>{
+  if(onlineMode&&!isHost()) return;
   const b=e.target.closest("button");
   if(!b) return;
   for(const x of $("restModes").children){
@@ -1067,6 +1068,7 @@ $("restModes").onclick=e=>{
   if(onlineMode&&!applying&&isHost()) send({t:"setup",patch:{pointAll:!!$("restModes").querySelector("[data-rest='all'].on")}});
 };
 $("modes").onclick=e=>{
+  if(onlineMode&&!isHost()) return;
   const b=e.target.closest("button");
   if(!b) return;
   for(const x of $("modes").children){
@@ -1083,9 +1085,10 @@ $("modes").onclick=e=>{
     send({t:"setup",patch});
   }
 };
-$("cmin").oninput=refreshLabel;
-$("cmax").oninput=refreshLabel;
+$("cmin").oninput=()=>{ if(onlineMode&&!isHost()) return; refreshLabel(); };
+$("cmax").oninput=()=>{ if(onlineMode&&!isHost()) return; refreshLabel(); };
 $("cats").onclick=e=>{
+  if(onlineMode&&!isHost()) return;
   const b=e.target.closest("button");
   if(!b) return;
   for(const x of $("cats").children){
@@ -1099,7 +1102,8 @@ $("cats").onclick=e=>{
 $("setup").onsubmit=e=>{
   e.preventDefault();
   if(onlineMode){
-    if(isHost()) send({t:"start"});
+    if(!isHost()){ $("err").textContent="เฉพาะโฮสต์ที่เริ่มเกมได้"; return; }
+    send({t:"start"});
     return;
   }
   const c=choice();
@@ -1226,10 +1230,27 @@ function syncSetup(s){
   $("rangeLabel").textContent=s.min+"–"+s.max;
 }
 function hostLocks(){
+  if(!onlineMode){
+    $("setup").classList.remove("locked");
+    ["winScore","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["cats","modes","restModes"].forEach(id=>{
+      for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
+    });
+    return;
+  }
   const host=isHost();
   const lobby=netPhase==="lobby";
-  $("setup").classList.toggle("locked",!(host&&lobby));
-  const startBtn=$("setup").querySelector("button.btn");
+  const canSetup=host&&lobby;
+  $("setup").classList.toggle("locked",!canSetup);
+  $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
+  ["winScore","secretCount","pickEach","cmin","cmax"].forEach(id=>{
+    const el=$(id);
+    if(el) el.disabled=!canSetup;
+  });
+  ["cats","modes","restModes"].forEach(id=>{
+    for(const btn of $(id).querySelectorAll("button")) btn.disabled=!canSetup;
+  });
+  const startBtn=$("setup").querySelector("button.btn[type='submit']")||$("setup").querySelector("button.btn");
   if(startBtn){
     startBtn.disabled=!host;
     startBtn.textContent=host?"เริ่มเกม →":"รอโฮสต์เริ่มเกม";

@@ -620,7 +620,9 @@ function setInt(patch, key, min, max) {
 }
 function onSetup(ws, msg) {
   const ctx = seat(ws);
-  if (!hostOnly(ctx) || ctx.room.phase !== "lobby" || ctx.room.activeSpin) return;
+  if (!ctx) return;
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่ตั้งค่าห้องได้");
+  if (ctx.room.phase !== "lobby" || ctx.room.activeSpin) return;
   const patch = msg.patch && typeof msg.patch === "object" ? msg.patch : {};
   const room = ctx.room;
   if (patch.cat === "wheel" || patch.cat === "secret") room.cat = patch.cat;
