@@ -10,7 +10,7 @@ const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
 const VOL_STORE="dpn-volume";
-const BG_BASE=0.28, SPIN_BASE=0.5, SFX_BASE=1;
+const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
 const bgAudio=new Audio();
 bgAudio.crossOrigin="anonymous";
@@ -18,7 +18,7 @@ bgAudio.preload="auto";
 bgAudio.loop=true;
 bgAudio.playsInline=true;
 bgAudio.src=BG_SRC;
-let masterVol=1;
+let masterVol=0.4;
 try{
   const raw=localStorage.getItem(VOL_STORE);
   if(raw!=null&&raw!==""){
