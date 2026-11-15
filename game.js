@@ -20,7 +20,20 @@ function startBackground(){
 }
 function playClip(src){
   const audio=new Audio(src);
+  audio.volume=1;
   audio.play().catch(()=>{});
+}
+let lastBombKey="";
+function bombKey(list){
+  const last=Array.isArray(list)&&list.length?list[list.length-1]:null;
+  if(!last||!last.hit) return "";
+  return String(list.length)+"|"+last.n+"|"+(last.who||"");
+}
+function maybePlayBomb(list){
+  const key=bombKey(list);
+  if(!key||key===lastBombKey) return;
+  lastBombKey=key;
+  playClip(BOMB_SOUND);
 }
 function playSpinSound(){
   spinAudio.currentTime=0;
@@ -1298,7 +1311,10 @@ function applySnap(s){
   gameMax=s.gameMax;
   lo=s.lo;
   hi=s.hi;
-  picked=Array.isArray(s.picked)?s.picked:[];
+  const nextPicked=Array.isArray(s.picked)?s.picked:[];
+  if(s.phase==="lobby"||!nextPicked.length) lastBombKey="";
+  else if(s.phase==="play"||s.phase==="over") maybePlayBomb(nextPicked);
+  picked=nextPicked;
   secrets=Array.from({length:s.secretsLeft||0});
   secretAll=Array.isArray(s.revealed)?s.revealed:[];
   secretTotal=s.secretTotal||1;
@@ -1454,6 +1470,7 @@ function startNumAnim(spin, done){
     applyWheelRot();
     $("numRead").textContent=spin.n==null?"—":String(spin.n);
     if(spin.hit){
+      lastBombKey="wheel|"+spin.id+"|"+spin.n;
       playClip(BOMB_SOUND);
       $("numRead").classList.add("hit");
       $("wheelResult").textContent=(spin.owner||"")+" โดนเลข "+spin.n+" ออกจากเกม";
