@@ -15,17 +15,24 @@ const {
   sendToUser: sendToUserCore,
   filterOnline
 } = require("./src/presence");
+const { handleDashboardApi } = require("./src/dashboard/routes");
+const { attachGameApi } = require("./src/dashboard/bridge");
+const { persistFinishedGame } = require("./src/dashboard/persist");
 
 const PORT = Number(process.env.PORT) || 8787;
+/** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
+const HOST = process.env.HOST || "0.0.0.0";
+/** Admin dashboard — default localhost-only so public users cannot reach it */
+const ADMIN_PORT = Number(process.env.ADMIN_PORT || 9100);
+const ADMIN_HOST = process.env.ADMIN_HOST || "127.0.0.1";
 const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
 const ROOT = __dirname;
-const PAGE =
-  fs.readdirSync(ROOT).find((name) => /^don.?t pick the number\.html$/i.test(name)) ||
-  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|reset-password|verify-email|friends)\.html$/i.test(name)) ||
-  "index.html";
+const PUBLIC = path.join(ROOT, "public");
+const PUBLIC_PAGE = fs.existsSync(path.join(PUBLIC, "play.html")) ? "play.html" : "index.html";
+const ADMIN_PAGE = fs.existsSync(path.join(PUBLIC, "index.html")) ? "index.html" : PUBLIC_PAGE;
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -33,10 +40,81 @@ const TYPES = {
   ".mp3": "audio/mpeg",
   ".png": "image/png",
   ".webp": "image/webp",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2"
 };
-const BLOCKED = new Set(["server.js", "package.json", "package-lock.json"]);
-const BLOCKED_DIRS = new Set(["src", "prisma", "node_modules", ".git"]);
+
+/** โดเมนที่อนุญาตให้เข้า (จาก APP_BASE_URL + ALLOWED_HOSTS) — บล็อกการเข้าผ่าน IP */
+function collectAllowedHosts() {
+  const hosts = new Set();
+  const add = (value) => {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return;
+    try {
+      const url = raw.includes("://") ? new URL(raw) : new URL("http://" + raw);
+      if (url.hostname) hosts.add(url.hostname.toLowerCase());
+    } catch {
+      const host = raw.split("/")[0].replace(/:\d+$/, "");
+      if (host) hosts.add(host);
+    }
+  };
+  add(process.env.APP_BASE_URL);
+  for (const part of String(process.env.ALLOWED_HOSTS || "").split(",")) add(part);
+  add(process.env.RENDER_EXTERNAL_HOSTNAME);
+  return hosts;
+}
+const ALLOWED_HOSTS = collectAllowedHosts();
+const ENFORCE_HOST =
+  process.env.ENFORCE_HOST === "1" ||
+  (process.env.ENFORCE_HOST !== "0" &&
+    ALLOWED_HOSTS.size > 0 &&
+    ![...ALLOWED_HOSTS].every((h) => h === "localhost" || h === "127.0.0.1" || h === "::1"));
+
+function isIpHostname(hostname) {
+  const h = String(hostname || "").replace(/^\[|\]$/g, "");
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return true;
+  if (h.includes(":")) return true;
+  return false;
+}
+function isLoopbackHost(hostname) {
+  const h = String(hostname || "").toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1";
+}
+function requestHostname(req) {
+  const raw = String(req.headers.host || "").split(",")[0].trim();
+  if (!raw) return "";
+  try {
+    return new URL("http://" + raw).hostname.toLowerCase();
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+function hostAllowed(req) {
+  if (!ENFORCE_HOST) return true;
+  const hostname = requestHostname(req);
+  if (!hostname) return false;
+  if (isIpHostname(hostname)) return false;
+  if (isLoopbackHost(hostname)) return true;
+  return ALLOWED_HOSTS.has(hostname);
+}
+function rejectWrongHost(req, res) {
+  const base = String(process.env.APP_BASE_URL || "").replace(/\/$/, "");
+  if (base && (req.method === "GET" || req.method === "HEAD")) {
+    let pathQuery = req.url || "/";
+    try {
+      const u = new URL(req.url || "/", "http://localhost");
+      pathQuery = u.pathname + u.search;
+    } catch {
+      /* keep raw */
+    }
+    res.writeHead(301, { Location: base + pathQuery });
+    res.end();
+    return;
+  }
+  res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end(base ? "กรุณาเข้าผ่าน " + base : "Forbidden host");
+}
 
 const rooms = new Map();
 const byWs = new Map();
@@ -305,8 +383,33 @@ function blankRoom(code, visibility, host) {
     timer: null,
     turnTimer: null,
     turnUntil: 0,
-    emptyTimer: null
+    emptyTimer: null,
+    spectators: [],
+    startedAt: null,
+    _persisted: false
   };
+}
+function applyRoomSetup(room, setup) {
+  if (!setup || typeof setup !== "object") return;
+  if (setup.cat === "wheel" || setup.cat === "secret") room.cat = setup.cat;
+  if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
+    room.rangeMode = setup.rangeMode;
+    room.min = 1;
+    room.max = Number(setup.rangeMode);
+  }
+  if (Number.isInteger(setup.winTarget) && setup.winTarget > 0) room.winTarget = Math.min(99, setup.winTarget);
+  if (Number.isInteger(setup.turnSec) && setup.turnSec >= 0) room.turnSec = Math.min(120, setup.turnSec);
+  if (Number.isInteger(setup.secretCount) && setup.secretCount > 0) room.secretCount = Math.min(20, setup.secretCount);
+  if (Number.isInteger(setup.pickEach) && setup.pickEach > 0) room.pickEach = Math.min(10, setup.pickEach);
+  if (Number.isInteger(setup.min) && Number.isInteger(setup.max) && setup.max > setup.min) {
+    room.rangeMode = "custom";
+    room.min = setup.min;
+    room.max = setup.max;
+  }
+  if (typeof setup.title === "string") {
+    const title = cleanRoomTitle(setup.title);
+    if (title) room.title = title;
+  }
 }
 function publicSpin(spin) {
   if (!spin) return null;
@@ -329,8 +432,9 @@ function roomLabel(room) {
   const host = room.players.find((item) => item.id === room.hostId);
   return host ? ("ห้องของ " + host.name) : ("ห้อง " + room.code);
 }
-function snap(room, player) {
-  return {
+function snap(room, player, opts) {
+  const spectator = !!(opts && opts.spectator);
+  const base = {
     t: "state",
     code: room.code,
     visibility: room.visibility,
@@ -338,6 +442,7 @@ function snap(room, player) {
     roomLabel: roomLabel(room),
     hostId: room.hostId,
     youId: player ? player.id : "",
+    spectator,
     phase: room.phase,
     cat: room.cat,
     rangeMode: room.rangeMode,
@@ -348,6 +453,7 @@ function snap(room, player) {
     pickEach: room.pickEach,
     pointAll: room.pointAll,
     maxPlayers: MAX_PLAYERS,
+    spectatorCount: Array.isArray(room.spectators) ? room.spectators.length : 0,
     players: room.players.map((item) => ({
       id: item.id,
       name: item.name,
@@ -374,7 +480,7 @@ function snap(room, player) {
     wheelMin: room.wheelMin,
     wheelMax: room.wheelMax,
     wheelOrder: room.wheelOrder,
-    picks: room.picks,
+    picks: spectator && room.phase !== "over" ? {} : room.picks,
     pickCursor: room.pickCursor,
     wheelAlive: room.wheelAlive,
     wheelLog: room.wheelLog.map((item) => ({ n: item.n, who: item.who })),
@@ -385,8 +491,9 @@ function snap(room, player) {
     activeSpin: publicSpin(room.activeSpin),
     turnSec: room.turnSec || 0,
     turnLeft: room.turnUntil ? Math.max(0, room.turnUntil - Date.now()) : 0,
-    yourTurn: yourTurn(room, player)
+    yourTurn: spectator ? false : yourTurn(room, player)
   };
+  return base;
 }
 function lobbyMsg() {
   const list = [];
@@ -422,16 +529,30 @@ function broadcastLobby() {
 }
 function broadcast(room) {
   for (const player of room.players) send(player.ws, snap(room, player));
+  if (Array.isArray(room.spectators)) {
+    for (const sp of room.spectators) send(sp.ws, snap(room, null, { spectator: true }));
+  }
   broadcastLobby();
+  if (room.phase === "over") {
+    persistFinishedGame(room, scoreOf).catch(() => {});
+  }
 }
 function fail(ws, message) {
   send(ws, { t: "err", message });
 }
 function scheduleDelete(room) {
   if (room.emptyTimer) return;
+  if (room.holdUntil && Date.now() < room.holdUntil) {
+    room.emptyTimer = setTimeout(() => {
+      room.emptyTimer = null;
+      scheduleDelete(room);
+    }, Math.max(1000, room.holdUntil - Date.now()));
+    return;
+  }
   room.emptyTimer = setTimeout(() => {
     room.emptyTimer = null;
     if (room.players.some((player) => player.connected)) return;
+    if (Array.isArray(room.spectators) && room.spectators.length) return;
     cancelSpin(room);
     rooms.delete(room.code);
     broadcastLobby();
@@ -620,6 +741,8 @@ function begin(room) {
   room.turn = 0;
   room.phase = "play";
   room.over = null;
+  room.startedAt = room.startedAt || Date.now();
+  room._persisted = false;
   skipToConnected(room);
   armTurnTimer(room);
 }
@@ -637,6 +760,8 @@ function startPick(room) {
   room.wheelRot = 0;
   room.phase = "pick";
   room.over = null;
+  room.startedAt = room.startedAt || Date.now();
+  room._persisted = false;
   armTurnTimer(room);
 }
 function finishWheel(room) {
@@ -1192,8 +1317,43 @@ function onCreate(ws, msg) {
   if (old) takeOut(old.room, old.player, ws);
   const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
+  if (msg.title) room.title = cleanRoomTitle(msg.title) || room.title;
+  applyRoomSetup(room, msg.setup);
   rooms.set(code, room);
   attach(ws, room, player);
+}
+function detachSpectator(ws) {
+  for (const room of rooms.values()) {
+    if (!Array.isArray(room.spectators)) continue;
+    const before = room.spectators.length;
+    room.spectators = room.spectators.filter((sp) => sp.ws !== ws);
+    if (room.spectators.length !== before) broadcastLobby();
+  }
+}
+function onWatch(ws, msg) {
+  const code = String(msg.code || "").trim();
+  if (!/^\d{6}$/.test(code)) return fail(ws, "รหัสต้องเป็นตัวเลข 6 หลัก");
+  const room = rooms.get(code);
+  if (!room) return fail(ws, "ไม่พบห้องนี้");
+  if (room.phase === "lobby") return fail(ws, "เกมยังไม่เริ่ม — เข้าเป็นผู้เล่นแทน");
+  if (room.visibility === "private") return fail(ws, "ห้องส่วนตัวไม่เปิดให้ชม");
+  detachSpectator(ws);
+  const seatCtx = seat(ws);
+  if (seatCtx) takeOut(seatCtx.room, seatCtx.player, ws, false);
+  watchers.delete(ws);
+  if (!Array.isArray(room.spectators)) room.spectators = [];
+  const token = validToken(msg.token) ? msg.token : crypto.randomUUID();
+  ws.token = token;
+  room.spectators = room.spectators.filter((sp) => sp.ws !== ws && sp.id !== token);
+  room.spectators.push({ id: token, ws, name: cleanName(msg.name) || "Viewer" });
+  send(ws, snap(room, null, { spectator: true }));
+  broadcastLobby();
+}
+function onUnwatch(ws) {
+  detachSpectator(ws);
+  watchers.add(ws);
+  send(ws, { t: "left" });
+  send(ws, lobbyMsg());
 }
 function onJoin(ws, msg) {
   const code = String(msg.code || "").trim();
@@ -1315,6 +1475,20 @@ async function onInviteFriend(ws, msg) {
     return fail(ws, "เพื่อนออฟไลน์อยู่");
   }
   send(ws, { t: "inviteSent", friendUserId, inviteId });
+  getPrisma()
+    .then((prisma) =>
+      prisma.notification.create({
+        data: {
+          userId: friendUserId,
+          type: "room_invitation",
+          title: "Room invitation",
+          body: (inv.fromName || "Friend") + " invited you to " + inv.roomTitle,
+          payload: { inviteId, code: inv.code }
+        }
+      })
+    )
+    .then(() => sendToUser(friendUserId, { t: "notification:new" }))
+    .catch(() => {});
 }
 function onDeclineInvite(ws, msg) {
   const inviteId = String(msg.inviteId || "");
@@ -1354,6 +1528,8 @@ function onMessage(ws, raw) {
   if (msg.t === "hello") return onHello(ws, msg);
   if (msg.t === "create") return onCreate(ws, msg);
   if (msg.t === "join") return onJoin(ws, msg);
+  if (msg.t === "watch") return onWatch(ws, msg);
+  if (msg.t === "unwatch") return onUnwatch(ws);
   if (msg.t === "leave") return onLeave(ws);
   if (msg.t === "friendsOnline") return void onFriendsOnline(ws);
   if (msg.t === "inviteFriend") return void onInviteFriend(ws, msg);
@@ -1378,27 +1554,17 @@ function onMessage(ws, raw) {
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
 }
-async function serve(req, res) {
-  const url = new URL(req.url || "/", "http://localhost");
-  const pathname = decodeURIComponent(url.pathname);
-  if (pathname.startsWith("/api/")) {
-    const handled = await handleAuthApi(req, res, pathname);
-    if (handled) return;
-    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ error: "not_found" }));
-    return;
-  }
-  let name = pathname;
-  if (name === "/") name = "/" + PAGE;
-  const file = path.normalize(path.join(ROOT, name));
-  const rel = path.relative(ROOT, file);
-  const parts = rel.split(path.sep);
-  if (
-    rel.startsWith("..") ||
-    path.isAbsolute(rel) ||
-    parts.some((part) => BLOCKED_DIRS.has(part)) ||
-    BLOCKED.has(path.basename(file))
-  ) {
+function isDashboardAsset(name) {
+  const n = String(name || "").replace(/^\/+/, "").replace(/\\/g, "/");
+  if (n === "index.html" || n === "") return true;
+  if (n.startsWith("js/dashboard/") || n.startsWith("css/dashboard.css")) return true;
+  return false;
+}
+
+function sendStaticFile(res, name) {
+  const file = path.normalize(path.join(PUBLIC, name));
+  const rel = path.relative(PUBLIC, file);
+  if (rel.startsWith("..") || path.isAbsolute(rel) || rel.includes("\0")) {
     res.writeHead(404);
     res.end("not found");
     return;
@@ -1419,6 +1585,73 @@ async function serve(req, res) {
     });
     stream.pipe(res);
   });
+}
+
+async function servePublic(req, res) {
+  if (!hostAllowed(req)) {
+    rejectWrongHost(req, res);
+    return;
+  }
+  const url = new URL(req.url || "/", "http://localhost");
+  const pathname = decodeURIComponent(url.pathname);
+  if (pathname.startsWith("/api/")) {
+    const handled = await handleAuthApi(req, res, pathname);
+    if (handled) return;
+    // Dashboard APIs are admin-port only
+    if (
+      pathname.startsWith("/api/v1/dashboard") ||
+      pathname.startsWith("/api/v1/rooms") ||
+      pathname.startsWith("/api/v1/live-games") ||
+      pathname.startsWith("/api/v1/history") ||
+      pathname.startsWith("/api/v1/stats") ||
+      pathname.startsWith("/api/v1/leaderboard") ||
+      pathname.startsWith("/api/v1/settings") ||
+      pathname.startsWith("/api/v1/notifications")
+    ) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "not_found" }));
+      return;
+    }
+    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    return;
+  }
+  let name = pathname === "/" ? PUBLIC_PAGE : pathname.replace(/^\/+/, "");
+  if (isDashboardAsset(name)) {
+    res.writeHead(302, { Location: "/play.html" });
+    res.end();
+    return;
+  }
+  sendStaticFile(res, name);
+}
+
+async function serveAdmin(req, res) {
+  // Admin port is localhost-bound — no public Host enforcement needed
+  const url = new URL(req.url || "/", "http://localhost");
+  const pathname = decodeURIComponent(url.pathname);
+  if (pathname === "/js/dashboard/runtime-config.js") {
+    const publicWs =
+      process.env.ADMIN_PUBLIC_WS_HOST ||
+      ("127.0.0.1:" + PORT);
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(
+      "window.NV_PUBLIC_WS_HOST=" +
+        JSON.stringify(publicWs) +
+        ";window.NV_ADMIN_DASHBOARD=true;\n"
+    );
+    return;
+  }
+  if (pathname.startsWith("/api/")) {
+    const handled = await handleAuthApi(req, res, pathname);
+    if (handled) return;
+    const dash = await handleDashboardApi(req, res, pathname);
+    if (dash) return;
+    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    return;
+  }
+  let name = pathname === "/" ? ADMIN_PAGE : pathname.replace(/^\/+/, "");
+  sendStaticFile(res, name);
 }
 
 setInterval(() => {
@@ -1444,12 +1677,107 @@ setInterval(() => {
   }
 }, 1000);
 
-const server = http.createServer(serve);
-const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 8000 });
+function lobbyRoomRow(room) {
+  const host = room.players.find((item) => item.id === room.hostId);
+  const count = room.players.filter((item) => item.connected).length;
+  const priv = room.visibility === "private";
+  return {
+    code: priv && room.phase === "lobby" ? "" : room.code,
+    visibility: priv ? "private" : "public",
+    title: roomLabel(room),
+    host: host ? host.name : "",
+    count,
+    max: MAX_PLAYERS,
+    cat: room.cat,
+    phase: room.phase,
+    joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+    spectators: Array.isArray(room.spectators) ? room.spectators.length : 0,
+    created: room.created || 0,
+    startedAt: room.startedAt || null
+  };
+}
+
+attachGameApi({
+  listLobbyRooms() {
+    const list = [];
+    for (const room of rooms.values()) {
+      if (!room.players.some((item) => item.connected) && !(room.spectators && room.spectators.length)) continue;
+      list.push(lobbyRoomRow(room));
+    }
+    list.sort((a, b) => (b.created || 0) - (a.created || 0));
+    return list.slice(0, 50);
+  },
+  listLiveGames() {
+    const list = [];
+    for (const room of rooms.values()) {
+      if (room.phase === "lobby" || room.phase === "over") continue;
+      if (room.visibility === "private") continue;
+      if (!room.players.some((item) => item.connected)) continue;
+      list.push(lobbyRoomRow(room));
+    }
+    return list.slice(0, 50);
+  },
+  findQuickPlayRoom() {
+    for (const room of rooms.values()) {
+      if (room.visibility !== "public") continue;
+      if (room.phase !== "lobby") continue;
+      if (room.players.length >= MAX_PLAYERS) continue;
+      if (!room.players.some((p) => p.connected)) continue;
+      return { code: room.code, title: roomLabel(room) };
+    }
+    return null;
+  },
+  inspectRoom(code) {
+    const room = rooms.get(String(code || ""));
+    if (!room) return null;
+    return {
+      code: room.code,
+      title: roomLabel(room),
+      phase: room.phase,
+      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS
+    };
+  },
+  createRoomHttp({ visibility, title, token, name, avatarUrl, setup }) {
+    if (rooms.size >= MAX_ROOMS) return null;
+    const code = makeCode();
+    if (!code) return null;
+    const id = validToken(token) ? token : crypto.randomUUID();
+    const player = {
+      id,
+      name: cleanName(name) || "Player",
+      avatarUrl: cleanAvatar(avatarUrl),
+      ws: null,
+      connected: false,
+      bot: false,
+      auto: false,
+      scoreSecret: 0,
+      scoreWheel: 0,
+      lastSeen: Date.now()
+    };
+    const room = blankRoom(code, visibility === "private" ? "private" : "public", player);
+    if (title) room.title = cleanRoomTitle(title) || "";
+    applyRoomSetup(room, setup);
+    room.holdUntil = Date.now() + 120000;
+    rooms.set(code, room);
+    scheduleDelete(room);
+    return { code, token: id, title: roomLabel(room) };
+  }
+});
+
+const server = http.createServer(servePublic);
+const wss = new WebSocketServer({
+  server,
+  path: "/ws",
+  maxPayload: 8000,
+  verifyClient(info) {
+    return hostAllowed(info.req);
+  }
+});
 wss.on("connection", (ws) => {
   ws.on("message", (buf) => onMessage(ws, buf));
   ws.on("close", () => {
     untrackPresence(ws);
+    detachSpectator(ws);
     releaseSocket(ws, false);
   });
   ws.on("error", () => {});
@@ -1460,13 +1788,32 @@ setInterval(() => {
     if (inv.expires < now) purgeInvite(id);
   }
 }, 5000);
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("เปิดเกมที่ http://localhost:" + PORT);
-  console.log("Auth V1: " + (authEnabled() ? "on" : "off (ตั้ง DATABASE_URL เพื่อเปิด)"));
-  const nets = os.networkInterfaces();
-  for (const list of Object.values(nets)) {
-    for (const item of list || []) {
-      if ((item.family === "IPv4" || item.family === 4) && !item.internal) console.log("ในวงแลน: http://" + item.address + ":" + PORT);
-    }
+server.listen(PORT, HOST, () => {
+  console.log("Public game: http://localhost:" + PORT + " (play.html)");
+  console.log("Bind public: " + HOST + ":" + PORT + (HOST === "0.0.0.0" ? " (เครือข่าย)" : " (local)"));
+  if (ENFORCE_HOST) {
+    console.log("Public host allowlist: " + [...ALLOWED_HOSTS].join(", ") + " (+ localhost)");
+    console.log("เข้าผ่าน IP สาธารณะจะถูกปฏิเสธ — ใช้โดเมนเท่านั้น");
   }
+  console.log("Auth V1: " + (authEnabled() ? "on" : "off"));
+  const base = String(process.env.APP_BASE_URL || "").replace(/\/$/, "");
+  if (base) console.log("โดเมนสาธารณะ: " + base);
 });
+
+if (ADMIN_PORT > 0) {
+  const adminServer = http.createServer(serveAdmin);
+  adminServer.listen(ADMIN_PORT, ADMIN_HOST, () => {
+    console.log(
+      "Admin dashboard: http://" +
+        (ADMIN_HOST === "0.0.0.0" ? "127.0.0.1" : ADMIN_HOST) +
+        ":" +
+        ADMIN_PORT +
+        " (user ปกติเข้าไม่ได้ — bind " +
+        ADMIN_HOST +
+        ")"
+    );
+    if (ADMIN_HOST === "127.0.0.1" || ADMIN_HOST === "localhost") {
+      console.log("Remote admin: ssh -L " + ADMIN_PORT + ":127.0.0.1:" + ADMIN_PORT + " user@server");
+    }
+  });
+}

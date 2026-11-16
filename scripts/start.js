@@ -5,7 +5,16 @@ require("dotenv").config();
 const { spawn } = require("child_process");
 const path = require("path");
 
+async function ensureEmbeddedPg() {
+  if (process.env.EMBEDDED_PG !== "1") return;
+  const { startEmbeddedPostgres } = require("./embedded-pg");
+  const { url } = await startEmbeddedPostgres();
+  process.env.DATABASE_URL = url;
+  console.log("DATABASE_URL ready (embedded Postgres)");
+}
+
 async function prepareDb() {
+  await ensureEmbeddedPg();
   if (!process.env.DATABASE_URL) {
     console.log("DATABASE_URL not set — Auth stays off, game still starts");
     return;
@@ -29,6 +38,11 @@ async function prepareDb() {
   }
 }
 
-prepareDb().finally(() => {
-  require(path.join(__dirname, "..", "server.js"));
-});
+prepareDb()
+  .then(() => {
+    require(path.join(__dirname, "..", "server.js"));
+  })
+  .catch((err) => {
+    console.error("Startup failed:", err.message || err);
+    process.exit(1);
+  });

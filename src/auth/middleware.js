@@ -52,9 +52,25 @@ function userHasAnyRole(user, roleNames) {
   return (user.userRoles || []).some((ur) => ur.role && set.has(ur.role.name));
 }
 
+function isAdminUser(user) {
+  return userHasAnyRole(user, ["admin", "super_admin", "moderator"]);
+}
+
+async function requireAdmin(req, res) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return null;
+  if (!isAdminUser(auth.user)) {
+    sendJson(res, 403, { error: "admin_required" });
+    return null;
+  }
+  return auth;
+}
+
 module.exports = {
   resolveAuth,
   requireAuth,
+  requireAdmin,
   userHasRole,
-  userHasAnyRole
+  userHasAnyRole,
+  isAdminUser
 };

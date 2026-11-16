@@ -54,6 +54,9 @@ model User {
   adminLogs          AdminLog[]          @relation("AdminActor")
   friendshipsSent     Friendship[]       @relation("FriendshipRequester")
   friendshipsReceived Friendship[]       @relation("FriendshipAddressee")
+  gamePlayers         GamePlayer[]
+  playerStatistics    PlayerStatistics?
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -223,4 +226,91 @@ model AccountEvent {
   @@index([userId])
   @@index([eventType])
   @@map("account_events")
+}
+
+model Game {
+  id          String    @id @default(uuid()) @db.Uuid
+  roomCode    String    @map("room_code") @db.VarChar(16)
+  roomName    String    @map("room_name") @db.VarChar(64)
+  gameMode    String    @map("game_mode") @db.VarChar(32)
+  visibility  String    @default("public") @db.VarChar(16)
+  status      String    @default("finished") @db.VarChar(32)
+  playerCount Int       @map("player_count")
+  startedAt   DateTime  @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  durationSec Int       @default(0) @map("duration_sec")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  players GamePlayer[]
+  rounds  GameRound[]
+
+  @@index([endedAt])
+  @@index([gameMode])
+  @@map("games")
+}
+
+model GamePlayer {
+  id          String  @id @default(uuid()) @db.Uuid
+  gameId      String  @map("game_id") @db.Uuid
+  userId      String? @map("user_id") @db.Uuid
+  displayName String  @map("display_name") @db.VarChar(64)
+  rank        Int
+  points      Int     @default(0)
+  won         Boolean @default(false)
+
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([gameId])
+  @@map("game_players")
+}
+
+model GameRound {
+  id       String @id @default(uuid()) @db.Uuid
+  gameId   String @map("game_id") @db.Uuid
+  roundNo  Int    @map("round_no")
+  summary  Json?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@map("game_rounds")
+}
+
+model PlayerStatistics {
+  userId           String   @id @map("user_id") @db.Uuid
+  totalGames       Int      @default(0) @map("total_games")
+  gamesWon         Int      @default(0) @map("games_won")
+  gamesLost        Int      @default(0) @map("games_lost")
+  totalPoints      Int      @default(0) @map("total_points")
+  playTimeSec      Int      @default(0) @map("play_time_sec")
+  bestWinStreak    Int      @default(0) @map("best_win_streak")
+  currentWinStreak Int      @default(0) @map("current_win_streak")
+  rankSum          Int      @default(0) @map("rank_sum")
+  favoriteMode     String?  @map("favorite_mode") @db.VarChar(32)
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([totalPoints])
+  @@map("player_statistics")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(64)
+  title     String    @db.VarChar(160)
+  body      String?   @db.Text
+  payload   Json?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

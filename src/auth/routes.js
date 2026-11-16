@@ -39,6 +39,7 @@ const {
   linkEmailToUser
 } = require("./email-auth");
 const { ensureFriendCode, handleFriendsApi } = require("./friends");
+const { maybeGrantAdminFromOAuth } = require("./admin-bootstrap");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -245,6 +246,12 @@ async function finishOAuth(req, res, provider) {
           eventType: "provider_linked",
           metadata: { displayName: profile.displayName, avatarUrl: profile.avatarUrl }
         });
+        await maybeGrantAdminFromOAuth(prisma, {
+          userId: saved.userId,
+          email: profile.email,
+          provider,
+          providerUserId: profile.providerUserId
+        });
         const user = await prisma.user.findUnique({
           where: { id: saved.userId },
           include: { userRoles: { include: { role: true } } }
@@ -279,7 +286,17 @@ async function finishOAuth(req, res, provider) {
         guestUserId: saved.userId || null,
         currentUserId: sessionAuth.user && sessionAuth.user.status === "active" ? sessionAuth.user.id : null
       });
-      await rotateAndIssueSession(prisma, req, res, result.user);
+      await maybeGrantAdminFromOAuth(prisma, {
+        userId: result.user.id,
+        email: profile.email,
+        provider,
+        providerUserId: profile.providerUserId
+      });
+      const fresh = await prisma.user.findUnique({
+        where: { id: result.user.id },
+        include: { userRoles: { include: { role: true } } }
+      });
+      await rotateAndIssueSession(prisma, req, res, fresh || result.user);
       if (result.linked) {
         redirect(res, "/account.html?linked=" + provider);
         return true;

@@ -2,15 +2,68 @@
 
 เกมออนไลน์ทายเลข โฮสต์สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข 6 หลัก มีล็อบบี้สาธารณะและห้องส่วนตัว
 
+## โครงสร้างโฟลเดอร์
+
+```
+public/
+  index.html           # User Dashboard
+  play.html            # Game engine UI
+  css/dashboard.css    # Dashboard theme
+  css/style.css        # Game styles
+  js/dashboard/        # Dashboard modules
+  js/game.js           # Game client
+  images/ · audio/
+server.js              # HTTP + WebSocket game server
+src/auth/              # Auth / friends
+src/dashboard/         # Dashboard REST + persist
+prisma/                # schema + migrations (games history/stats)
+scripts/
+```
+
 ## วิธีเปิด (เกม)
 
 ต้องมี Node.js
 
 1. `npm install`
 2. `npm start`
-3. เปิด http://localhost:8787
+3. เปิด http://localhost:8787 → **User Dashboard**
+4. เล่นเกมที่ `/play.html` (สร้าง/เข้าห้องจาก Dashboard หรือหน้าเกม)
 
-ผู้เล่นคนอื่นในวงแลนเดียวกันเปิดที่อยู่ที่เซิร์ฟเวอร์พิมพ์ออกมา แล้วเข้าห้องด้วยรหัส
+### เปิดสาธารณะ แต่เข้าได้แค่โดเมน
+
+ตั้งใน `.env`:
+
+```env
+APP_BASE_URL=https://numverse.click
+ENFORCE_HOST=1
+ALLOWED_HOSTS=numverse.click,www.numverse.click
+```
+
+เมื่อเปิดแล้ว การเข้า `http://<IP>:<PORT>` จะถูกปฏิเสธ / ส่งต่อไปโดเมน — เล่นผ่าน `https://numverse.click` เท่านั้น  
+`localhost` ยังใช้ได้ตอนทดสอบบนเครื่อง
+
+### Public vs Admin
+
+| ช่องทาง | ที่อยู่ | ใครเข้าได้ |
+|---|---|---|
+| เกมสาธารณะ | โดเมน เช่น `https://numverse.click/` → `/play.html` | ผู้เล่นทั่วไป (เข้าผ่าน IP ถูกบล็อก) |
+| Admin Dashboard | `http://127.0.0.1:9100/` เท่านั้น | แอดมิน (bind localhost) |
+
+เข้า Admin จากเครื่องอื่นผ่าน SSH tunnel:
+
+```bash
+ssh -L 9100:127.0.0.1:9100 user@your-server
+```
+
+แล้วเปิด http://127.0.0.1:9100/ บนเครื่องคุณ
+
+ให้สิทธิ์แอดมิน:
+
+```bash
+node scripts/make-admin.js <username>
+```
+
+Dashboard API ต้องเป็น role `admin` / `super_admin` / `moderator`
 
 ## Auth (Guest-First + OAuth + Email)
 

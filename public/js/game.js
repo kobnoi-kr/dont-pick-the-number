@@ -6,13 +6,13 @@ let players=[], scores={}, order=[], alive=[], roundOrder=[], turn=0, nextOrder=
 let gameCat="secret", wheelMin=1, wheelMax=99, wheelOrder=[], picks={}, pickEach=1, pickCursor=0, pickFrom=1;
 let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
 const $=id=>document.getElementById(id);
-const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
-const SPIN_SOUND="spinner-sound.mp3";
-const BOMB_SOUND="roblox-death-sound_1.mp3";
-const COOLDOWN_SOUND="beep.mp3";
+const POP_SOUND="/audio/pop-sound-effect_AsEdnw2.mp3";
+const SPIN_SOUND="/audio/spinner-sound.mp3";
+const BOMB_SOUND="/audio/roblox-death-sound_1.mp3";
+const COOLDOWN_SOUND="/audio/beep.mp3";
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
-const BG_SRC=encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
+const BG_SRC=encodeURI("/audio/Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
 const bgAudio=new Audio();
 bgAudio.crossOrigin="anonymous";
 bgAudio.preload="auto";
@@ -208,6 +208,49 @@ let friendsCache=[];
 let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
+let spectating=false, pendingAction=null, pendingSetup=null;
+function readPlayParams(){
+  const q=new URLSearchParams(location.search);
+  const code=String(q.get("code")||"").replace(/\D/g,"").slice(0,6);
+  const create=q.get("create");
+  const watch=q.get("watch")==="1"||q.get("spectate");
+  const name=q.get("name");
+  if(name) try{ localStorage.setItem("dpn-name", name); }catch(e){}
+  let setup=null;
+  try{ if(q.get("setup")) setup=JSON.parse(q.get("setup")); }catch(e){}
+  pendingSetup=setup;
+  if(watch&&(/^\d{6}$/.test(code)||q.get("spectate"))){
+    spectating=true;
+    pendingAction={type:"watch",code:code||String(q.get("spectate")||"").replace(/\D/g,"").slice(0,6)};
+  }else if(/^\d{6}$/.test(code)) pendingAction={type:"join",code};
+  else if(create==="public"||create==="private") pendingAction={type:"create",visibility:create};
+}
+function runPendingAction(){
+  if(!pendingAction||!sock||sock.readyState!==1) return;
+  const name=typedName()||localStorage.getItem("dpn-name")||"Player";
+  if(pendingAction.type==="join"){
+    send({t:"join",code:pendingAction.code,name,token:myToken(),avatarUrl:myAvatar()});
+  }else if(pendingAction.type==="create"){
+    send({t:"create",visibility:pendingAction.visibility,name,token:myToken(),avatarUrl:myAvatar(),setup:pendingSetup||undefined});
+  }else if(pendingAction.type==="watch"){
+    send({t:"watch",code:pendingAction.code,token:myToken(),name,avatarUrl:myAvatar()});
+  }
+  pendingAction=null;
+  try{
+    const u=new URL(location.href);
+    ["code","create","watch","spectate","setup","name"].forEach(k=>u.searchParams.delete(k));
+    history.replaceState({}, "", u.pathname+(u.search||""));
+  }catch(e){}
+}
+function applySpectatorUi(){
+  if(!spectating) return;
+  document.body.classList.add("spectating");
+  const note=$("roomNote");
+  if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
+  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","renameRoomBtn"].forEach(id=>{
+    const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
+  });
+}
 function show(n){
   ["gate","start","play","pick","wheelGame","over"].forEach(s=>$(s).classList.toggle("hidden",s!==n));
   const inRoom=n!=="gate";
@@ -2266,15 +2309,20 @@ function connect(){
   ws.onopen=()=>{
     $("connMsg").textContent="";
     send({t:"hello",token:myToken(),name:localStorage.getItem("dpn-name")||typedName(),avatarUrl:myAvatar()});
+    setTimeout(runPendingAction, 50);
   };
   ws.onmessage=e=>{
     let msg;
     try{ msg=JSON.parse(e.data); }catch(err){ return; }
     if(!msg||typeof msg!=="object") return;
-    if(msg.t==="state") onSnap(msg);
+    if(msg.t==="state"){
+      if(msg.spectator){ spectating=true; applySpectatorUi(); }
+      onSnap(msg);
+    }
     else if(msg.t==="lobby"){
-      if(!wantRoom) showGate();
+      if(!wantRoom&&!spectating) showGate();
       renderLobby(msg);
+      if(pendingAction) runPendingAction();
     }else if(msg.t==="left"){
       roomVisibility="";
       paintInviteBtn();
@@ -2313,9 +2361,15 @@ function connect(){
   };
 }
 async function bootOnline(){
+  readPlayParams();
   await ensureAuth();
   const saved=localStorage.getItem("dpn-name");
-  if(saved) $("myName").value=saved;
+  if(saved&&$("myName")) $("myName").value=saved;
+  const dashLink=document.createElement("p");
+  dashLink.className="hint";
+  dashLink.innerHTML='<a href="/" style="color:inherit">← กลับ Dashboard</a>';
+  const gate=$("gate");
+  if(gate) gate.appendChild(dashLink);
   $("myName").addEventListener("change",typedName);
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   setInterval(paintTurnClock, 250);
@@ -2353,7 +2407,10 @@ async function bootOnline(){
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
-  $("leaveRoom").onclick=()=>send({t:"leave"});
+  $("leaveRoom").onclick=()=>{
+    if(spectating){ send({t:"unwatch"}); location.href="/"; return; }
+    send({t:"leave"});
+  };
   $("renameRoomBtn").onclick=()=>openRenameRoom();
   $("renameRoomCancel").onclick=()=>closeRenameRoom();
   $("renameRoomForm").onsubmit=e=>{

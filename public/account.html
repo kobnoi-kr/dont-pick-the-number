@@ -1,17 +1,21 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>บัญชี — NUMVERSE</title>
-<link rel="icon" href="numverse.png" type="image/png">
-<link rel="stylesheet" href="auth-pages.css">
+<link rel="icon" href="/images/numverse.png" type="image/png">
+<link rel="stylesheet" href="/css/auth-pages.css">
 </head>
 <body>
 <div class="wrap account-wrap">
-  <div class="brand"><img src="numverse.png" alt="NUMVERSE" width="240" height="135"></div>
+  <div class="brand"><img src="/images/numverse.png" alt="NUMVERSE" width="240" height="135"></div>
   <div class="account-grid">
     <div class="panel">
+      <div id="adminBar" class="admin-bar hidden">
+        <a class="btn admin-dash-btn" id="adminDashBtn" href="http://127.0.0.1:9100/">Admin Dashboard</a>
+        <span class="tiny" id="adminBarHint">สำหรับ admin / super admin</span>
+      </div>
       <h1>Account</h1>
       <p class="sub" id="sub">กำลังโหลด…</p>
 
@@ -133,7 +137,7 @@
   </div>
 </div>
 
-<script src="auth-client.js"></script>
+<script src="/js/auth-client.js"></script>
 <script>
 function $(id){return document.getElementById(id)}
 function show(el,on){el.classList.toggle("hidden",!on)}
@@ -295,9 +299,23 @@ async function refresh(){
     return;
   }
   const user=me.data.user;
-  const rankMap={player:"user",admin:"admin",super_admin:"super admin"};
-  const ranks=(user.roles&&user.roles.length?user.roles:["player"]).map(r=>rankMap[r]||r);
+  const rankMap={player:"user",moderator:"moderator",admin:"admin",super_admin:"super admin"};
+  const roles=user.roles&&user.roles.length?user.roles:["player"];
+  const ranks=roles.map(r=>rankMap[r]||r);
   $("sub").textContent=ranks.join(" · ");
+  const isAdmin=roles.some(r=>r==="admin"||r==="super_admin");
+  show($("adminBar"), isAdmin);
+  if(isAdmin){
+    const btn=$("adminDashBtn");
+    const hint=$("adminBarHint");
+    if(location.port==="9100"||location.pathname==="/"||document.body.dataset.adminDashboard==="1"){
+      btn.href="/";
+      if(hint) hint.textContent="เปิดศูนย์ควบคุมแอดมิน";
+    }else{
+      btn.href="http://127.0.0.1:9100/";
+      if(hint) hint.textContent="ต้องเปิด SSH tunnel ก่อน แล้วค่อยกด";
+    }
+  }
   show($("guestPrompt"), user.accountType==="guest");
   show($("profileForm"), true);
   $("displayName").value=user.displayName||"";

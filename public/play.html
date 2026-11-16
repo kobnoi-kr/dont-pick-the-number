@@ -1,13 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NUMVERSE</title>
 <meta name="application-name" content="NUMVERSE">
-<link rel="icon" href="numverse.png" type="image/png">
-<link rel="apple-touch-icon" href="numverse.png">
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="/images/numverse.png" type="image/png">
+<link rel="apple-touch-icon" href="/images/numverse.png">
+<link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 <div class="stage">
@@ -24,10 +24,10 @@
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
     <div class="brand" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
-    <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข</p>
+    <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข · <a href="/" style="color:inherit">Dashboard</a></p>
     <label class="field" id="nameFieldWrap">ชื่อของคุณ
       <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
     </label>
@@ -58,7 +58,7 @@
 
   <section id="start" class="hidden">
     <div class="brand" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
@@ -115,7 +115,7 @@
 
   <section id="play" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="modeLabel"></p>
@@ -139,7 +139,7 @@
 
   <section id="pick" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1>วงล้อสุ่มเลข</h1>
     <p class="sub" id="pickMode"></p>
@@ -165,7 +165,7 @@
 
   <section id="wheelGame" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1>วงล้อสุ่มเลข</h1>
     <p class="sub" id="wheelMode"></p>
@@ -184,7 +184,7 @@
 
   <section id="over" class="hidden lose">
     <div class="brand compact" aria-label="NUMVERSE">
-      <img class="brand-logo" src="numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h2 id="overTitle">คุณเลือกโดนเลขลับ!</h2>
     <p id="overNote" class="sub"></p>
@@ -219,7 +219,7 @@
 </aside>
 </div>
 <button type="button" id="helpBtn" class="helpbtn" aria-label="คู่มือการใช้งาน">
-  <img src="guide-book.png" alt="" width="28" height="28" decoding="async">
+  <img src="/images/guide-book.png" alt="" width="28" height="28" decoding="async">
 </button>
 <div id="codeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
   <div class="modal-card">
@@ -288,6 +288,6 @@
   <span id="volLabel" class="vollabel">100%</span>
   <button type="button" id="volUp" class="volbtn" aria-label="เพิ่มเสียง">+</button>
 </div>
-<script src="game.js"></script>
+<script src="/js/game.js"></script>
 </body>
 </html>
