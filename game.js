@@ -1334,7 +1334,6 @@ $("clearScores").onclick=()=>{
   if(!$("over").classList.contains("hidden")) renderScores($("finalScores"));
 };
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if(netPhase!=="gate") drawWheel(); });
-bootOnline();
 
 function myToken(){
   let token=sessionStorage.getItem("dpn-token");
@@ -1946,3 +1945,4 @@ function bootOnline(){
   show("gate");
   connect();
 }
+bootOnline();
