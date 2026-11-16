@@ -87,7 +87,8 @@
       <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
       <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
       <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
-      <p class="hint">0 = ปิด · หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</p>
+      <div class="row count-row"><label for="afkSec">AFK แล้วเปิดออโต้ (วินาที)</label><input id="afkSec" type="number" inputmode="numeric" value="25" min="0" max="180"></div>
+      <p class="hint">นับถอยหลัง 0 = ปิดนาฬิกา · AFK 0 = ปิด · หมดเวลาแล้วสุ่มเลขและเปิดออโต้ให้</p>
       <div id="wheelOnly" class="hidden">
         <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
       </div>
@@ -124,6 +125,7 @@
     </form>
     <p id="msg" class="msg"></p>
     <div class="hist">ประวัติการเลือก: <span id="hist">ยังไม่มี</span></div>
+    <button class="btn ghost" type="button" id="autoPlay" aria-pressed="false">เล่นอัตโนมัติ</button>
     <button class="btn ghost" type="button" id="leave">เปลี่ยนโหมด</button>
   </section>
 
@@ -147,6 +149,7 @@
     </form>
     <p id="pickMsg" class="msg"></p>
     <div class="hist">เลขที่เลือก: <span id="pickHist">ยังไม่มี</span></div>
+    <button class="btn ghost" type="button" id="autoPick" aria-pressed="false">เล่นอัตโนมัติ</button>
     <button class="btn hidden" type="button" id="pickGo">เริ่มหมุน →</button>
     <button class="btn ghost" type="button" id="pickUndo">ย้อนกลับ</button>
     <button class="btn ghost" type="button" id="pickLeave">เปลี่ยนโหมด</button>
@@ -202,6 +205,7 @@
   <ol class="board" id="board"></ol>
   <p class="hint" id="sideHint">โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ</p>
   <button class="btn" type="button" id="spin" disabled>สุ่มลำดับ</button>
+  <button class="btn ghost" type="button" id="addBot">เพิ่มบอท</button>
   <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
 </aside>
 </div>

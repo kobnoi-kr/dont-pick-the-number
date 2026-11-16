@@ -33,6 +33,8 @@ h2.side-title{margin:0;font-size:1.15rem;text-align:center}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
 .btn.ghost:hover{background:var(--chip)}
+.btn.auto-on{background:var(--mark);color:#fff;border-color:transparent}
+.btn.auto-on:hover{filter:brightness(.95)}
 .hidden{display:none !important}
 .range{text-align:center;font-size:1.1rem;margin-bottom:12px}
 .range b{color:var(--mark);font-size:1.4rem}

@@ -98,8 +98,20 @@ function orderReady(room) {
   }
   return true;
 }
+function isBot(player) {
+  return !!(player && player.bot);
+}
+function canTakeTurn(player) {
+  return !!(player && (player.bot || player.auto || player.connected));
+}
+function hasHumanOnline(room) {
+  return room.players.some((player) => !isBot(player) && player.connected);
+}
+function liveCount(room) {
+  return room.players.filter((player) => isBot(player) || player.connected).length;
+}
 function yourTurn(room, player) {
-  if (!player || !player.connected) return false;
+  if (!player || !canTakeTurn(player)) return false;
   if (room.phase === "play") return currentName(room) === player.name;
   if (room.phase === "pick") {
     const each = Math.max(room.pickEach, 1);
@@ -108,6 +120,31 @@ function yourTurn(room, player) {
     return room.wheelOrder[Math.floor(room.pickCursor / each)] === player.name;
   }
   return false;
+}
+function turnPlayer(room) {
+  if (room.phase === "play") return byName(room, currentName(room));
+  if (room.phase === "pick") {
+    const each = Math.max(room.pickEach, 1);
+    const total = room.wheelOrder.length * each;
+    if (room.pickCursor >= total) return null;
+    return byName(room, room.wheelOrder[Math.floor(room.pickCursor / each)]);
+  }
+  return null;
+}
+function makeBot(room) {
+  let n = 1;
+  while (room.players.some((player) => player.name === "บอท " + n)) n += 1;
+  return {
+    id: "bot-" + crypto.randomUUID(),
+    name: "บอท " + n,
+    bot: true,
+    auto: true,
+    ws: null,
+    connected: true,
+    scoreSecret: 0,
+    scoreWheel: 0,
+    lastSeen: Date.now()
+  };
 }
 function checkRange(min, max) {
   if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) return "กรอกจำนวนเต็มเท่านั้น";
@@ -172,6 +209,7 @@ function blankRoom(code, visibility, host) {
     secretCount: 1,
     pickEach: 1,
     turnSec: 0,
+    afkSec: 25,
     pointAll: true,
     order: [],
     rot: 0,
@@ -248,8 +286,12 @@ function snap(room, player) {
       name: item.name,
       score: scoreOf(room, item),
       connected: item.connected,
-      host: item.id === room.hostId
+      host: item.id === room.hostId,
+      bot: !!item.bot,
+      auto: !!(item.auto || item.bot)
     })),
+    afkSec: Number.isInteger(room.afkSec) ? room.afkSec : 25,
+    youAuto: !!(player && (player.auto || player.bot)),
     order: room.order,
     alive: room.alive,
     roundOrder: room.roundOrder,
@@ -348,15 +390,11 @@ function attach(ws, room, player) {
 }
 function skipToConnected(room) {
   if (room.phase !== "play" || room.alive.length < 2) return false;
-  if (!room.alive.some((name) => {
-    const player = byName(room, name);
-    return player && player.connected;
-  })) return false;
+  if (!room.alive.some((name) => canTakeTurn(byName(room, name)))) return false;
   const start = room.turn;
   let hops = 0;
   while (hops < room.alive.length) {
-    const player = byName(room, currentName(room));
-    if (player && player.connected) break;
+    if (canTakeTurn(byName(room, currentName(room)))) break;
     room.turn = (room.turn + 1) % room.alive.length;
     hops += 1;
   }
@@ -451,8 +489,6 @@ function applyPickChoice(room, name, n) {
 }
 function armTurnTimer(room) {
   clearTurnTimer(room);
-  const sec = Number.isInteger(room.turnSec) ? room.turnSec : 0;
-  if (sec < 1) return;
   if (room.phase === "play") {
     if (!currentName(room) || room.alive.length < 1) return;
   } else if (room.phase === "pick") {
@@ -460,15 +496,28 @@ function armTurnTimer(room) {
     const total = room.wheelOrder.length * each;
     if (room.pickCursor >= total) return;
   } else return;
-  const until = Date.now() + sec * 1000;
+  const player = turnPlayer(room);
+  if (!player || !canTakeTurn(player)) return;
+  const autoNow = !!(player.auto || player.bot);
+  const delays = [];
+  if (autoNow) delays.push(0.4);
+  else {
+    if (Number.isInteger(room.turnSec) && room.turnSec > 0) delays.push(room.turnSec);
+    if (Number.isInteger(room.afkSec) && room.afkSec > 0) delays.push(room.afkSec);
+  }
+  if (!delays.length) return;
+  const sec = Math.min(...delays);
+  const until = Date.now() + Math.round(sec * 1000);
   room.turnUntil = until;
   room.turnTimer = setTimeout(() => {
     if (room.turnUntil !== until) return;
-    onTurnTimeout(room);
-  }, sec * 1000);
+    onTurnTimeout(room, !autoNow);
+  }, Math.round(sec * 1000));
 }
-function onTurnTimeout(room) {
+function onTurnTimeout(room, markAuto) {
   clearTurnTimer(room);
+  const player = turnPlayer(room);
+  if (markAuto && player && !isBot(player)) player.auto = true;
   if (room.phase === "play") {
     const who = currentName(room);
     if (!who) return;
@@ -696,8 +745,8 @@ function dropFromRound(room, name) {
   }
 }
 function transferHost(room) {
-  if (room.players.some((player) => player.id === room.hostId)) return;
-  const next = room.players.find((player) => player.connected) || room.players[0];
+  if (room.players.some((player) => player.id === room.hostId && !isBot(player))) return;
+  const next = room.players.find((player) => !isBot(player) && player.connected) || room.players.find((player) => !isBot(player)) || null;
   room.hostId = next ? next.id : "";
 }
 function releaseSocket(ws, notify) {
@@ -713,7 +762,7 @@ function releaseSocket(ws, notify) {
   player.lastSeen = Date.now();
   player.ws = null;
   if (room.hostId === player.id) {
-    const next = room.players.find((item) => item.connected);
+    const next = room.players.find((item) => !isBot(item) && item.connected);
     if (next) room.hostId = next.id;
   }
   if (notify) {
@@ -724,9 +773,10 @@ function releaseSocket(ws, notify) {
   if (room.phase === "lobby") broadcast(room);
   else {
     if (room.phase === "play" && skipToConnected(room)) armTurnTimer(room);
+    else if ((room.phase === "play" || room.phase === "pick") && player.auto) armTurnTimer(room);
     broadcast(room);
   }
-  if (!room.players.some((item) => item.connected)) scheduleDelete(room);
+  if (!hasHumanOnline(room)) scheduleDelete(room);
 }
 function tellLobby(sock) {
   if (!sock || sock.readyState !== 1) return;
@@ -790,10 +840,12 @@ function onSetup(ws, msg) {
   const secretCount = setInt(patch, "secretCount", 1, 1000000);
   const pickEach = setInt(patch, "pickEach", 1, 99);
   const turnSec = setInt(patch, "turnSec", 0, 120);
+  const afkSec = setInt(patch, "afkSec", 0, 180);
   if (winTarget != null) room.winTarget = winTarget;
   if (secretCount != null) room.secretCount = secretCount;
   if (pickEach != null) room.pickEach = pickEach;
   if (turnSec != null) room.turnSec = turnSec;
+  if (afkSec != null) room.afkSec = afkSec;
   if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
   broadcast(room);
 }
@@ -802,7 +854,7 @@ function onSpinOrder(ws) {
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่สุ่มลำดับได้");
   const room = ctx.room;
   if (room.phase !== "lobby" || room.activeSpin) return;
-  if (room.players.filter((item) => item.connected).length < 2) return fail(ws, "ต้องมีผู้เล่นออนไลน์อย่างน้อย 2 คน");
+  if (liveCount(room) < 2) return fail(ws, "ต้องมีผู้เล่นอย่างน้อย 2 คน");
   beginOrderSpin(room);
 }
 function onStart(ws) {
@@ -810,8 +862,8 @@ function onStart(ws) {
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เริ่มเกมได้");
   const room = ctx.room;
   if (room.phase !== "lobby" || room.activeSpin) return;
-  if (room.players.filter((item) => item.connected).length < 2) return fail(ws, "ต้องมีผู้เล่นออนไลน์อย่างน้อย 2 คน");
-  if (room.players.some((item) => !item.connected)) return fail(ws, "มีผู้เล่นที่หลุดอยู่ รอให้กลับหรือเอาออกก่อน");
+  if (liveCount(room) < 2) return fail(ws, "ต้องมีผู้เล่นอย่างน้อย 2 คน");
+  if (room.players.some((item) => !isBot(item) && !item.connected)) return fail(ws, "มีผู้เล่นที่หลุดอยู่ รอให้กลับหรือเอาออกก่อน");
   if (!orderReady(room)) return fail(ws, "กดสุ่มลำดับก่อนเริ่มเกม");
   const rangeErr = checkRange(room.min, room.max);
   const winErr = checkWin(room.winTarget);
@@ -950,6 +1002,9 @@ function onAbort(ws) {
   room.wheelOrder = [];
   room.picks = {};
   room.pickCursor = 0;
+  room.players.forEach((player) => {
+    if (!isBot(player)) player.auto = false;
+  });
   broadcast(room);
 }
 function onClear(ws) {
@@ -977,10 +1032,34 @@ function onGiveHost(ws, msg) {
   if (!id || id === ctx.player.id) return fail(ws, "เลือกผู้เล่นอื่นเพื่อโอนโฮสต์");
   const target = ctx.room.players.find((player) => player.id === id);
   if (!target) return fail(ws, "ไม่พบผู้เล่น");
+  if (isBot(target)) return fail(ws, "โอนโฮสต์ให้บอทไม่ได้");
   if (!target.connected) return fail(ws, "ผู้เล่นหลุดการเชื่อมต่อ");
   ctx.room.hostId = target.id;
   broadcast(ctx.room);
   broadcastLobby();
+}
+function onAddBot(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เพิ่มบอทได้");
+  const room = ctx.room;
+  if (room.phase !== "lobby" || room.activeSpin) return fail(ws, "เพิ่มบอทได้เฉพาะตอนอยู่ในล็อบบี้");
+  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  room.players.push(makeBot(room));
+  cancelSpin(room);
+  room.order = [];
+  room.rot = 0;
+  broadcast(room);
+  broadcastLobby();
+}
+function onAuto(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx) return;
+  if (isBot(ctx.player)) return;
+  const room = ctx.room;
+  if (room.phase !== "play" && room.phase !== "pick") return fail(ws, "เปิดออโต้ได้ตอนกำลังเล่นเท่านั้น");
+  ctx.player.auto = !!msg.on;
+  if (ctx.player.auto && yourTurn(room, ctx.player)) armTurnTimer(room);
+  broadcast(room);
 }
 function swapName(list, from, to) {
   if (!Array.isArray(list)) return list;
@@ -1039,7 +1118,7 @@ function onCreate(ws, msg) {
   if (!code) return fail(ws, "สร้างห้องไม่สำเร็จ ลองใหม่");
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
-  const player = { id: token, name, ws: null, connected: true, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  const player = { id: token, name, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
   rooms.set(code, room);
   attach(ws, room, player);
@@ -1061,7 +1140,7 @@ function onJoin(ws, msg) {
   if (room.players.some((player) => player.name.toLowerCase() === name.toLowerCase())) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
-  const player = { id: token, name, ws: null, connected: true, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  const player = { id: token, name, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   room.players.push(player);
   if (room.phase === "lobby") {
     cancelSpin(room);
@@ -1117,6 +1196,8 @@ function onMessage(ws, raw) {
   if (msg.t === "clear") return onClear(ws);
   if (msg.t === "kick") return onKick(ws, msg);
   if (msg.t === "giveHost") return onGiveHost(ws, msg);
+  if (msg.t === "addBot") return onAddBot(ws);
+  if (msg.t === "auto") return onAuto(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
 }
@@ -1153,7 +1234,7 @@ setInterval(() => {
   const now = Date.now();
   for (const room of rooms.values()) {
     if (room.phase === "lobby") {
-      const keep = room.players.filter((player) => player.connected || now - player.lastSeen < SEAT_MS);
+      const keep = room.players.filter((player) => isBot(player) || player.connected || now - player.lastSeen < SEAT_MS);
       if (keep.length !== room.players.length) {
         room.players = keep;
         transferHost(room);
@@ -1168,7 +1249,7 @@ setInterval(() => {
       armTurnTimer(room);
       broadcast(room);
     }
-    if (room.players.length && !room.players.some((player) => player.connected)) scheduleDelete(room);
+    if (room.players.length && !hasHumanOnline(room)) scheduleDelete(room);
   }
 }, 1000);
 

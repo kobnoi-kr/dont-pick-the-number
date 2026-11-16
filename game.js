@@ -200,8 +200,8 @@ function stopSpinSound(){
   try{ spinNode.onended=null; spinNode.stop(); }catch(e){}
   spinNode=null;
 }
-let onlineMode=true, myId="", hostId="", myTurn=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
-let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
+let onlineMode=true, myId="", hostId="", myTurn=false, myAuto=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
+let turnSec=0, afkSec=25, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 function show(n){
@@ -682,9 +682,11 @@ function renderPlayers(){
       const tags=[];
       if(meta.id===myId) tags.push("คุณ");
       if(meta.host) tags.push("โฮสต์");
-      if(!meta.connected) tags.push("หลุด");
+      if(meta.bot) tags.push("บอท");
+      else if(meta.auto) tags.push("ออโต้");
+      if(!meta.connected&&!meta.bot) tags.push("หลุด");
       if(tags.length) nm.textContent=name+" · "+tags.join(" · ");
-      if(!meta.connected) row.classList.add("off");
+      if(!meta.connected&&!meta.bot) row.classList.add("off");
     }
     const sc=document.createElement("span");
     sc.className="pscore";
@@ -695,7 +697,7 @@ function renderPlayers(){
     const acts=document.createElement("span");
     acts.className="pacts";
     const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
-    if(onlineMode&&canHostAct&&meta.connected){
+    if(onlineMode&&canHostAct&&meta.connected&&!meta.bot){
       const give=document.createElement("button");
       give.type="button";
       give.className="givehost";
@@ -725,8 +727,26 @@ function renderPlayers(){
   $("spin").textContent="สุ่มลำดับ";
   $("spin").disabled=spinning||wheelSpinning||players.length<2||locked||(onlineMode&&!isHost());
   $("clearScores").disabled=spinning||wheelSpinning||picking||wheeling||players.length===0||(onlineMode&&!isHost());
+  const addBot=$("addBot");
+  if(addBot){
+    const canBot=onlineMode&&isHost()&&netPhase==="lobby"&&!spinning&&players.length<12;
+    addBot.classList.toggle("hidden",!onlineMode);
+    addBot.disabled=!canBot;
+  }
   $("pname").disabled=spinning||wheelSpinning||locked;
   $("addForm").querySelector("button").disabled=spinning||wheelSpinning||locked;
+  paintAutoButtons();
+}
+function paintAutoButtons(){
+  const show=onlineMode&&(netPhase==="play"||netPhase==="pick");
+  ["autoPlay","autoPick"].forEach(id=>{
+    const el=$(id);
+    if(!el) return;
+    el.classList.toggle("hidden",!show||(id==="autoPlay"?netPhase!=="play":netPhase!=="pick"));
+    el.classList.toggle("auto-on",!!myAuto);
+    el.setAttribute("aria-pressed",myAuto?"true":"false");
+    el.textContent=myAuto?"ปิดออโต้":"เล่นอัตโนมัติ";
+  });
 }
 function rosterChanged(){
   clearTimeout(spinTimer);
@@ -1482,7 +1502,8 @@ const GUIDE={
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
 <li>เลือกหมวดเกม: ห้ามโดนเลขลับ หรือ วงล้อสุ่มเลข</li>
-<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน และนับถอยหลังต่อตา (0 = ปิด)</li>
+<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน นับถอยหลัง และเวลา AFK</li>
+<li>กด <b>เพิ่มบอท</b> ได้ถ้าคนไม่ครบ (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
 <li>กด <b>โอน</b> ที่รายชื่อผู้เล่นเพื่อโอนโฮสต์ให้เพื่อน (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>สุ่มลำดับ</b> แล้วค่อยเริ่มเกม</li>
@@ -1509,7 +1530,8 @@ const GUIDE={
 <section><h4>เคล็ดลับ</h4><ul>
 <li>ดูรายชื่อและแต้มได้จากแผงผู้เล่นด้านข้าง</li>
 <li>วงล้อสุ่มลำดับและวงล้อเกมหมุนแบบ realtime ให้ทุกคนในห้องเห็นพร้อมกัน</li>
-<li>ถ้าเปิดนับถอยหลัง หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</li>
+<li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบสุ่มเลขแทนคุณได้ตลอดตา</li>
+<li>ถ้า AFK เกินเวลาที่ตั้ง ระบบจะเปิดออโต้และสุ่มเลขให้</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมขวาล่าง</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
@@ -1540,9 +1562,11 @@ function showGate(){
   myId="";
   hostId="";
   myTurn=false;
+  myAuto=false;
   turnEndsAt=0;
   lastCooldownSec=-1;
   paintTurnClock();
+  paintAutoButtons();
   closeRenameRoom();
   closeCodeModal();
   closeGuide();
@@ -1582,6 +1606,7 @@ function syncSetup(s){
   if(document.activeElement!==$("cmax")) $("cmax").value=s.max;
   if(document.activeElement!==$("winScore")) $("winScore").value=s.winTarget;
   if(document.activeElement!==$("turnSec")&&$("turnSec")) $("turnSec").value=Number.isInteger(s.turnSec)?s.turnSec:0;
+  if(document.activeElement!==$("afkSec")&&$("afkSec")) $("afkSec").value=Number.isInteger(s.afkSec)?s.afkSec:25;
   if(document.activeElement!==$("secretCount")) $("secretCount").value=s.secretCount;
   if(document.activeElement!==$("pickEach")) $("pickEach").value=s.pickEach;
   for(const x of $("restModes").children){
@@ -1594,7 +1619,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes"].forEach(id=>{
       for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
     });
@@ -1605,7 +1630,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
+  ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -1666,6 +1691,7 @@ function applySnap(s){
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
   myTurn=!!s.yourTurn;
+  myAuto=!!s.youAuto;
   playerMeta=Array.isArray(s.players)?s.players:[];
   players=playerMeta.map(p=>p.name);
   scores={};
@@ -1965,10 +1991,13 @@ function pushNums(){
   const win=parseIntStrict($("winScore").value);
   const turnEl=$("turnSec");
   const sec=turnEl?parseIntStrict(turnEl.value):null;
+  const afkEl=$("afkSec");
+  const afk=afkEl?parseIntStrict(afkEl.value):null;
   const count=parseIntStrict($("secretCount").value);
   const each=parseIntStrict($("pickEach").value);
   if(win!=null) patch.winTarget=win;
   if(sec!=null) patch.turnSec=Math.min(120, Math.max(0, sec));
+  if(afk!=null) patch.afkSec=Math.min(180, Math.max(0, afk));
   if(count!=null) patch.secretCount=count;
   if(each!=null) patch.pickEach=each;
   if(useCustom){
@@ -2024,8 +2053,18 @@ function bootOnline(){
   const saved=localStorage.getItem("dpn-name");
   if(saved) $("myName").value=saved;
   $("myName").addEventListener("change",typedName);
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
+  ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   setInterval(paintTurnClock, 250);
+  function toggleAuto(){
+    if(!onlineMode||(netPhase!=="play"&&netPhase!=="pick")) return;
+    send({t:"auto",on:!myAuto});
+  }
+  const autoPlay=$("autoPlay");
+  const autoPick=$("autoPick");
+  if(autoPlay) autoPlay.onclick=toggleAuto;
+  if(autoPick) autoPick.onclick=toggleAuto;
+  const addBot=$("addBot");
+  if(addBot) addBot.onclick=()=>{ if(isHost()&&netPhase==="lobby") send({t:"addBot"}); };
   $("jump").onsubmit=e=>{
     e.preventDefault();
     const n=parseIntStrict($("guess").value);
