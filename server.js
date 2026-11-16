@@ -534,7 +534,15 @@ function planOrderSpin(room) {
 function beginOrderSpin(room) {
   const plan = planOrderSpin(room);
   const id = crypto.randomUUID();
-  room.activeSpin = { id, kind: "order", dur: plan.dur, until: Date.now() + plan.dur, rot: plan.rot, next: plan.next };
+  room.activeSpin = {
+    id,
+    kind: "order",
+    dur: plan.dur,
+    until: Date.now() + plan.dur,
+    from: room.rot,
+    rot: plan.rot,
+    next: plan.next
+  };
   broadcast(room);
   room.timer = setTimeout(() => {
     if (!room.activeSpin || room.activeSpin.id !== id) return;

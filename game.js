@@ -200,6 +200,7 @@ function stopSpinSound(){
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
+let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 function show(n){
   ["gate","start","play","pick","wheelGame","over"].forEach(s=>$(s).classList.toggle("hidden",s!==n));
   const inRoom=n!=="gate";
@@ -1433,6 +1434,7 @@ const GUIDE={
 </ul></section>
 <section><h4>เคล็ดลับ</h4><ul>
 <li>ดูรายชื่อและแต้มได้จากแผงผู้เล่นด้านข้าง</li>
+<li>วงล้อสุ่มลำดับและวงล้อเกมหมุนแบบ realtime ให้ทุกคนในห้องเห็นพร้อมกัน</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมขวาล่าง</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
@@ -1557,11 +1559,24 @@ function paintRoom(s){
   const mine=(s.players||[]).find(p=>p.id===s.youId);
   if(mine&&mine.name) setLocalName(mine.name);
 }
+function spinProgress(spin){
+  const dur=Math.max(0, Number(spin&&spin.dur)||0);
+  const left=Math.max(0, Number(spin&&spin.left)||0);
+  const elapsed=dur?Math.min(dur, Math.max(0, dur-left)):0;
+  const t=dur?Math.min(1, elapsed/dur):1;
+  return {dur, left, elapsed, t, eased:1-Math.pow(1-t,3)};
+}
 function syncOrderWheel(s){
-  if(s.activeSpin&&s.activeSpin.kind==="order") return;
-  rot=s.orderRot||0;
   const canvas=$("wheel");
   canvas.style.transition="none";
+  if(s.activeSpin&&s.activeSpin.kind==="order"){
+    const from=Number.isFinite(s.activeSpin.from)?s.activeSpin.from:(s.orderRot||0);
+    const target=s.activeSpin.rot||0;
+    const {eased}=spinProgress(s.activeSpin);
+    rot=from+(target-from)*eased;
+  }else{
+    rot=s.orderRot||0;
+  }
   canvas.style.transform="rotate("+rot+"deg)";
 }
 function applySnap(s){
@@ -1603,13 +1618,20 @@ function applySnap(s){
   pickCursor=s.pickCursor||0;
   wheelAlive=Array.isArray(s.wheelAlive)?s.wheelAlive:[];
   wheelLog=Array.isArray(s.wheelLog)?s.wheelLog:[];
-  if(!(s.activeSpin&&s.activeSpin.kind==="num")) wheelRot=s.wheelRot||0;
+  if(s.activeSpin&&s.activeSpin.kind==="num"){
+    const from=Number.isFinite(s.activeSpin.from)?s.activeSpin.from:(s.wheelRot||0);
+    const target=Number.isFinite(s.activeSpin.target)?s.activeSpin.target:from;
+    const {eased}=spinProgress(s.activeSpin);
+    wheelRot=from+(target-from)*eased;
+  }else{
+    wheelRot=s.wheelRot||0;
+  }
   syncSetup(s);
   paintRoom(s);
   if(s.phase==="lobby"){
     show("start");
-    syncOrderWheel(s);
     drawWheel();
+    syncOrderWheel(s);
     renderPlayers();
     renderTurn();
     $("winner").textContent=s.activeSpin&&s.activeSpin.kind==="order"?"กำลังสุ่มลำดับ…":wheelMessage();
@@ -1631,16 +1653,17 @@ function applySnap(s){
     renderPlayers();
   }else if(s.phase==="wheel"){
     show("wheelGame");
+    drawNumWheel();
+    applyWheelRot();
     if(s.activeSpin&&s.activeSpin.kind==="num"){
-      wheelRot=s.activeSpin.from||0;
-      drawNumWheel();
       $("doSpin").disabled=true;
       $("doSpin").textContent="กำลังหมุน…";
       $("wheelRepick").disabled=true;
       $("wheelResult").classList.remove("bad");
       $("wheelResult").textContent="กำลังหมุน…";
+      $("numRead").classList.remove("hit");
+      $("numRead").textContent=String(numberAt(wheelRot));
     }else{
-      drawNumWheel();
       renderWheelInfo();
       const last=wheelLog[wheelLog.length-1];
       if(last){
@@ -1676,46 +1699,74 @@ function applySnap(s){
   hostLocks();
   applying=false;
 }
+function rememberSpin(spin){
+  liveSpin=spin?{...spin}:null;
+  liveSpinUntil=spin?Date.now()+Math.max(0, Number(spin.left)||0):0;
+}
+function spinLeftNow(){
+  return liveSpinUntil?Math.max(0, liveSpinUntil-Date.now()):0;
+}
+function finishLiveSpin(){
+  animId="";
+  liveSpin=null;
+  liveSpinUntil=0;
+  const next=pendingSnap;
+  pendingSnap=null;
+  if(next) onSnap(next);
+}
 function onSnap(s){
   if(animId){
-    if(s.activeSpin&&s.activeSpin.id===animId) return;
+    if(s.activeSpin&&s.activeSpin.id===animId){
+      rememberSpin(s.activeSpin);
+      return;
+    }
     pendingSnap=s;
     return;
   }
   applySnap(s);
   if(!s.activeSpin) return;
   animId=s.activeSpin.id;
-  const done=()=>{
-    animId="";
-    const next=pendingSnap;
-    pendingSnap=null;
-    if(next) onSnap(next);
-  };
-  if(s.activeSpin.kind==="order") startOrderAnim(s.activeSpin, done);
-  else startNumAnim(s.activeSpin, done);
+  rememberSpin(s.activeSpin);
+  if(s.activeSpin.kind==="order") startOrderAnim(s.activeSpin, ()=>finishLiveSpin());
+  else startNumAnim(s.activeSpin, ()=>finishLiveSpin());
 }
 function startOrderAnim(spin, done){
+  cancelAnimationFrame(orderAnim);
+  const spinKey=spin.id;
   spinning=true;
   renderPlayers();
   $("winner").textContent="กำลังสุ่มลำดับ…";
-  playSpinSound();
-  const left=Math.max(0, Number(spin.left)||0);
+  const from=Number.isFinite(spin.from)?spin.from:rot;
+  const target=spin.rot||0;
+  const {dur, elapsed}=spinProgress({dur:spin.dur, left:spin.left!=null?spin.left:spinLeftNow()});
   const canvas=$("wheel");
-  canvas.style.transition=left?"transform "+left+"ms cubic-bezier(.15,.85,.1,1)":"none";
-  canvas.style.transform="rotate("+spin.rot+"deg)";
-  setTimeout(()=>{
+  canvas.style.transition="none";
+  if(dur&&elapsed<400) playSpinSound();
+  const t0=performance.now()-elapsed;
+  function frame(now){
+    if(animId!==spinKey) return;
+    const t=dur?Math.min(1,(now-t0)/dur):1;
+    const eased=1-Math.pow(1-t,3);
+    rot=from+(target-from)*eased;
+    canvas.style.transform="rotate("+rot+"deg)";
+    if(t<1){
+      orderAnim=requestAnimationFrame(frame);
+      return;
+    }
     stopSpinSound();
     spinning=false;
-    rot=spin.rot;
+    rot=target;
+    canvas.style.transform="rotate("+rot+"deg)";
     done();
-  }, left+60);
+  }
+  orderAnim=requestAnimationFrame(frame);
 }
 function startNumAnim(spin, done){
   const gen=++animGen;
-  const from=spin.from||0;
-  const target=spin.target||0;
-  const dur=spin.dur||0;
-  const elapsed=Math.min(dur, Math.max(0, dur-(Number(spin.left)||0)));
+  const spinKey=spin.id;
+  const from=Number.isFinite(spin.from)?spin.from:wheelRot;
+  const target=Number.isFinite(spin.target)?spin.target:from;
+  const {dur, elapsed}=spinProgress({dur:spin.dur, left:spin.left!=null?spin.left:spinLeftNow()});
   wheelSpinning=true;
   $("doSpin").disabled=true;
   $("doSpin").textContent="กำลังหมุน…";
@@ -1727,7 +1778,7 @@ function startNumAnim(spin, done){
   if(dur&&elapsed<400) playSpinSound();
   const t0=performance.now()-elapsed;
   function frame(now){
-    if(gen!==animGen) return;
+    if(gen!==animGen||animId!==spinKey) return;
     const t=dur?Math.min(1,(now-t0)/dur):1;
     const eased=1-Math.pow(1-t,2);
     wheelRot=from+(target-from)*eased;
@@ -1758,6 +1809,14 @@ function startNumAnim(spin, done){
   }
   wheelAnim=requestAnimationFrame(frame);
 }
+function resumeLiveSpin(){
+  if(document.hidden||!animId||!liveSpin) return;
+  const spin={...liveSpin, left:spinLeftNow()};
+  rememberSpin(spin);
+  if(spin.kind==="order") startOrderAnim(spin, ()=>finishLiveSpin());
+  else startNumAnim(spin, ()=>finishLiveSpin());
+}
+document.addEventListener("visibilitychange", resumeLiveSpin);
 function renderLobby(msg){
   const list=$("roomList");
   list.textContent="";
