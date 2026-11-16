@@ -637,9 +637,16 @@ async function handleDeleteAccount(req, res) {
       where: { userId: auth.user.id, revokedAt: null },
       data: { revokedAt: new Date() }
     });
+    // Free Google/Discord so they can be linked on a new profile later.
+    await tx.authAccount.deleteMany({ where: { userId: auth.user.id } });
     await tx.user.update({
       where: { id: auth.user.id },
-      data: { status: "deleted", displayName: "Deleted", username: "deleted-" + auth.user.id.slice(0, 8) }
+      data: {
+        status: "deleted",
+        displayName: "Deleted",
+        username: "deleted-" + auth.user.id.slice(0, 8),
+        avatarUrl: null
+      }
     });
     await tx.accountEvent.create({
       data: { userId: auth.user.id, eventType: "account_suspended", metadata: { reason: "user_delete" } }

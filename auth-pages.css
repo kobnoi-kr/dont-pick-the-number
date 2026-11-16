@@ -43,6 +43,8 @@ input[type=email],input[type=password],input[type=text]{
 }
 .btn:hover{background:var(--blue2)}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);margin-top:10px}
+.btn.ghost.danger{border-color:#7f1d1d;color:#fca5a5}
+.btn.ghost.danger:hover{background:rgba(127,29,29,.25);border-color:#ef4444;color:#fecaca}
 .btn.oauth{background:#0B1424;border:1px solid var(--line);margin-top:10px}
 .oauth-row{display:flex;justify-content:center;align-items:center;gap:16px;margin:8px 0 4px}
 .oauth-icon{

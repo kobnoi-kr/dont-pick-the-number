@@ -50,7 +50,6 @@
     </form>
 
     <h1 style="margin-top:22px;font-size:1.05rem;text-align:left">Connected Accounts</h1>
-    <p class="tiny" style="margin:0 0 8px;text-align:left">เชื่อม Google และ Discord ได้ทั้งคู่ในโปรไฟล์เดียว</p>
     <ul class="list" id="providers"></ul>
     <div class="oauth-row" id="linkRow" style="justify-content:flex-start;margin-top:12px">
       <a class="oauth-icon google" id="linkGoogle" href="/api/v1/auth/link/google" aria-label="เชื่อม Google" title="เชื่อม Google">
@@ -73,6 +72,7 @@
 
     <button class="btn ghost" id="logout" type="button">Logout</button>
     <button class="btn ghost" id="logoutAll" type="button">Logout ทุกอุปกรณ์</button>
+    <button class="btn ghost danger" id="deleteAccount" type="button">ลบบัญชี</button>
     <p class="msg" id="msg"></p>
     <p class="links"><a href="/">กลับล็อบบี้</a></p>
   </div>
@@ -239,6 +239,18 @@ $("logout").onclick=async()=>{
 $("logoutAll").onclick=async()=>{
   await api("/api/v1/auth/logout-all",{method:"POST",body:"{}"});
   location.href="login.html";
+};
+$("deleteAccount").onclick=async()=>{
+  const ok=confirm("ลบบัญชีนี้ถาวร?\nการเชื่อม Google/Discord จะถูกยกเลิก และข้อมูลโปรไฟล์จะหาย");
+  if(!ok) return;
+  const again=confirm("ยืนยันอีกครั้ง — ลบบัญชีจริง ๆ ใช่ไหม?");
+  if(!again) return;
+  const {res,data}=await api("/api/v1/account/delete",{method:"DELETE",headers:{Accept:"application/json"}});
+  if(res.ok){
+    location.href="/";
+    return;
+  }
+  setMsg($("msg"), (data&&data.error)||"ลบบัญชีไม่สำเร็จ", false);
 };
 
 (async()=>{
