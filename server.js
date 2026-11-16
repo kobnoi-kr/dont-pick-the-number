@@ -209,7 +209,6 @@ function blankRoom(code, visibility, host) {
     secretCount: 1,
     pickEach: 1,
     turnSec: 0,
-    afkSec: 25,
     pointAll: true,
     order: [],
     rot: 0,
@@ -290,7 +289,6 @@ function snap(room, player) {
       bot: !!item.bot,
       auto: !!(item.auto || item.bot)
     })),
-    afkSec: Number.isInteger(room.afkSec) ? room.afkSec : 25,
     youAuto: !!(player && (player.auto || player.bot)),
     order: room.order,
     alive: room.alive,
@@ -499,14 +497,8 @@ function armTurnTimer(room) {
   const player = turnPlayer(room);
   if (!player || !canTakeTurn(player)) return;
   const autoNow = !!(player.auto || player.bot);
-  const delays = [];
-  if (autoNow) delays.push(0.4);
-  else {
-    if (Number.isInteger(room.turnSec) && room.turnSec > 0) delays.push(room.turnSec);
-    if (Number.isInteger(room.afkSec) && room.afkSec > 0) delays.push(room.afkSec);
-  }
-  if (!delays.length) return;
-  const sec = Math.min(...delays);
+  const sec = autoNow ? 0.4 : (Number.isInteger(room.turnSec) && room.turnSec > 0 ? room.turnSec : 0);
+  if (sec < 0.1) return;
   const until = Date.now() + Math.round(sec * 1000);
   room.turnUntil = until;
   room.turnTimer = setTimeout(() => {
@@ -840,12 +832,10 @@ function onSetup(ws, msg) {
   const secretCount = setInt(patch, "secretCount", 1, 1000000);
   const pickEach = setInt(patch, "pickEach", 1, 99);
   const turnSec = setInt(patch, "turnSec", 0, 120);
-  const afkSec = setInt(patch, "afkSec", 0, 180);
   if (winTarget != null) room.winTarget = winTarget;
   if (secretCount != null) room.secretCount = secretCount;
   if (pickEach != null) room.pickEach = pickEach;
   if (turnSec != null) room.turnSec = turnSec;
-  if (afkSec != null) room.afkSec = afkSec;
   if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
   broadcast(room);
 }

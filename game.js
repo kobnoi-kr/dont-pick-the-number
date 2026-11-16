@@ -201,7 +201,7 @@ function stopSpinSound(){
   spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, myAuto=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
-let turnSec=0, afkSec=25, turnEndsAt=0, lastCooldownSec=-1;
+let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 function show(n){
@@ -1502,7 +1502,7 @@ const GUIDE={
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
 <li>เลือกหมวดเกม: ห้ามโดนเลขลับ หรือ วงล้อสุ่มเลข</li>
-<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน นับถอยหลัง และเวลา AFK</li>
+<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน และนับถอยหลังต่อตา</li>
 <li>กด <b>เพิ่มบอท</b> ได้ถ้าคนไม่ครบ (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
 <li>กด <b>โอน</b> ที่รายชื่อผู้เล่นเพื่อโอนโฮสต์ให้เพื่อน (ล็อบบี้เท่านั้น)</li>
@@ -1531,7 +1531,7 @@ const GUIDE={
 <li>ดูรายชื่อและแต้มได้จากแผงผู้เล่นด้านข้าง</li>
 <li>วงล้อสุ่มลำดับและวงล้อเกมหมุนแบบ realtime ให้ทุกคนในห้องเห็นพร้อมกัน</li>
 <li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบสุ่มเลขแทนคุณได้ตลอดตา</li>
-<li>ถ้า AFK เกินเวลาที่ตั้ง ระบบจะเปิดออโต้และสุ่มเลขให้</li>
+<li>ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้และสุ่มเลขให้ผู้เล่นคนนั้น</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมขวาล่าง</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
@@ -1606,7 +1606,6 @@ function syncSetup(s){
   if(document.activeElement!==$("cmax")) $("cmax").value=s.max;
   if(document.activeElement!==$("winScore")) $("winScore").value=s.winTarget;
   if(document.activeElement!==$("turnSec")&&$("turnSec")) $("turnSec").value=Number.isInteger(s.turnSec)?s.turnSec:0;
-  if(document.activeElement!==$("afkSec")&&$("afkSec")) $("afkSec").value=Number.isInteger(s.afkSec)?s.afkSec:25;
   if(document.activeElement!==$("secretCount")) $("secretCount").value=s.secretCount;
   if(document.activeElement!==$("pickEach")) $("pickEach").value=s.pickEach;
   for(const x of $("restModes").children){
@@ -1619,7 +1618,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes"].forEach(id=>{
       for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
     });
@@ -1630,7 +1629,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -1991,13 +1990,10 @@ function pushNums(){
   const win=parseIntStrict($("winScore").value);
   const turnEl=$("turnSec");
   const sec=turnEl?parseIntStrict(turnEl.value):null;
-  const afkEl=$("afkSec");
-  const afk=afkEl?parseIntStrict(afkEl.value):null;
   const count=parseIntStrict($("secretCount").value);
   const each=parseIntStrict($("pickEach").value);
   if(win!=null) patch.winTarget=win;
   if(sec!=null) patch.turnSec=Math.min(120, Math.max(0, sec));
-  if(afk!=null) patch.afkSec=Math.min(180, Math.max(0, afk));
   if(count!=null) patch.secretCount=count;
   if(each!=null) patch.pickEach=each;
   if(useCustom){
@@ -2053,7 +2049,7 @@ function bootOnline(){
   const saved=localStorage.getItem("dpn-name");
   if(saved) $("myName").value=saved;
   $("myName").addEventListener("change",typedName);
-  ["winScore","turnSec","afkSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   setInterval(paintTurnClock, 250);
   function toggleAuto(){
     if(!onlineMode||(netPhase!=="play"&&netPhase!=="pick")) return;
