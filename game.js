@@ -9,6 +9,7 @@ const $=id=>document.getElementById(id);
 const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
+const COOLDOWN_SOUND="deny_cooldown.mp3";
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
@@ -88,7 +89,8 @@ function warmClips(){
   audioWarm=Promise.allSettled([
     loadClip(SPIN_SOUND),
     loadClip(POP_SOUND),
-    loadClip(BOMB_SOUND)
+    loadClip(BOMB_SOUND),
+    loadClip(COOLDOWN_SOUND)
   ]);
   return audioWarm;
 }
@@ -199,7 +201,7 @@ function stopSpinSound(){
   spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
-let turnSec=0, turnEndsAt=0;
+let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 function show(n){
@@ -398,8 +400,15 @@ function paintTurnClock(){
   const show=turnEndsAt>0&&(netPhase==="play"||netPhase==="pick");
   const left=show?Math.max(0, turnEndsAt-Date.now()):0;
   const on=show&&left>0;
-  const text=on?"เหลือ "+Math.ceil(left/1000)+" วิ":"";
+  const secLeft=on?Math.ceil(left/1000):0;
+  const text=on?"เหลือ "+secLeft+" วิ":"";
   const urgent=on&&left<=5000;
+  if(urgent&&secLeft>0&&secLeft!==lastCooldownSec){
+    lastCooldownSec=secLeft;
+    playClip(COOLDOWN_SOUND);
+  }else if(!on){
+    lastCooldownSec=-1;
+  }
   const turnEl=$("turnClock");
   if(turnEl){
     const showTurn=on&&netPhase==="play";
@@ -418,7 +427,9 @@ function paintTurnClock(){
 function syncTurnClock(s){
   turnSec=Number.isInteger(s.turnSec)?s.turnSec:Math.max(0, parseInt(s.turnSec,10)||0);
   const left=Math.max(0, Number(s.turnLeft)||0);
-  turnEndsAt=left>0?Date.now()+left:0;
+  const nextEnds=left>0?Date.now()+left:0;
+  if(Math.abs(nextEnds-turnEndsAt)>400) lastCooldownSec=-1;
+  turnEndsAt=nextEnds;
   paintTurnClock();
 }
 function renderTurn(){
@@ -1497,6 +1508,7 @@ function showGate(){
   hostId="";
   myTurn=false;
   turnEndsAt=0;
+  lastCooldownSec=-1;
   paintTurnClock();
   closeRenameRoom();
   closeCodeModal();
