@@ -9,7 +9,7 @@ const $=id=>document.getElementById(id);
 const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
 const BOMB_SOUND="roblox-death-sound_1.mp3";
-const COOLDOWN_SOUND="deny_cooldown.mp3";
+const COOLDOWN_SOUND="beep.mp3";
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
@@ -403,7 +403,7 @@ function paintTurnClock(){
   const secLeft=on?Math.ceil(left/1000):0;
   const text=on?"เหลือ "+secLeft+" วิ":"";
   const urgent=on&&left<=5000;
-  if(urgent&&secLeft>0&&secLeft!==lastCooldownSec){
+  if(on&&secLeft>0&&secLeft!==lastCooldownSec){
     lastCooldownSec=secLeft;
     playClip(COOLDOWN_SOUND);
   }else if(!on){
