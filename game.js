@@ -199,6 +199,7 @@ function stopSpinSound(){
   spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
+let turnSec=0, turnEndsAt=0;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 function show(n){
@@ -393,6 +394,33 @@ function render(){
   renderTurn();
   renderPlayers();
 }
+function paintTurnClock(){
+  const show=turnEndsAt>0&&(netPhase==="play"||netPhase==="pick");
+  const left=show?Math.max(0, turnEndsAt-Date.now()):0;
+  const on=show&&left>0;
+  const text=on?"เหลือ "+Math.ceil(left/1000)+" วิ":"";
+  const urgent=on&&left<=5000;
+  const turnEl=$("turnClock");
+  if(turnEl){
+    const showTurn=on&&netPhase==="play";
+    turnEl.classList.toggle("hidden",!showTurn);
+    turnEl.classList.toggle("urgent",showTurn&&urgent);
+    turnEl.textContent=showTurn?text:"";
+  }
+  const pickEl=$("pickClock");
+  if(pickEl){
+    const showPick=on&&netPhase==="pick";
+    pickEl.classList.toggle("hidden",!showPick);
+    pickEl.classList.toggle("urgent",showPick&&urgent);
+    pickEl.textContent=showPick?text:"";
+  }
+}
+function syncTurnClock(s){
+  turnSec=Number.isInteger(s.turnSec)?s.turnSec:Math.max(0, parseInt(s.turnSec,10)||0);
+  const left=Math.max(0, Number(s.turnLeft)||0);
+  turnEndsAt=left>0?Date.now()+left:0;
+  paintTurnClock();
+}
 function renderTurn(){
   const name=currentPlayer();
   const playing=!$("play").classList.contains("hidden");
@@ -402,6 +430,7 @@ function renderTurn(){
   const slot=alive.length?((turn%alive.length)+alive.length)%alive.length:-1;
   const rank=slot<0?0:roundOrder.indexOf(alive[slot])+1;
   $("turnRank").textContent=name?"อันดับ "+rank+" · เหลือ "+alive.length+" คน":"";
+  paintTurnClock();
 }
 function renderScores(el){
   el.textContent="";
@@ -862,6 +891,7 @@ function renderPick(){
   const slot=pickEach?pickCursor%pickEach:0;
   $("pickName").textContent=done?"เลือกครบแล้ว":"ตาของ "+name;
   $("pickProgress").textContent=done?"กดเริ่มหมุน":"เลขที่ "+(slot+1)+"/"+pickEach+" · รวม "+pickCursor+"/"+total;
+  paintTurnClock();
   $("pickLo").textContent=wheelMin;
   $("pickHi").textContent=wheelMax;
   $("pickGrid").classList.toggle("hidden", done);
@@ -1408,7 +1438,7 @@ const GUIDE={
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
 <li>เลือกหมวดเกม: ห้ามโดนเลขลับ หรือ วงล้อสุ่มเลข</li>
-<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน</li>
+<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน และนับถอยหลังต่อตา (0 = ปิด)</li>
 <li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
 <li>กด <b>โอน</b> ที่รายชื่อผู้เล่นเพื่อโอนโฮสต์ให้เพื่อน (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>สุ่มลำดับ</b> แล้วค่อยเริ่มเกม</li>
@@ -1435,6 +1465,7 @@ const GUIDE={
 <section><h4>เคล็ดลับ</h4><ul>
 <li>ดูรายชื่อและแต้มได้จากแผงผู้เล่นด้านข้าง</li>
 <li>วงล้อสุ่มลำดับและวงล้อเกมหมุนแบบ realtime ให้ทุกคนในห้องเห็นพร้อมกัน</li>
+<li>ถ้าเปิดนับถอยหลัง หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมขวาล่าง</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
@@ -1465,6 +1496,8 @@ function showGate(){
   myId="";
   hostId="";
   myTurn=false;
+  turnEndsAt=0;
+  paintTurnClock();
   closeRenameRoom();
   closeCodeModal();
   closeGuide();
@@ -1503,6 +1536,7 @@ function syncSetup(s){
   if(document.activeElement!==$("cmin")) $("cmin").value=s.min;
   if(document.activeElement!==$("cmax")) $("cmax").value=s.max;
   if(document.activeElement!==$("winScore")) $("winScore").value=s.winTarget;
+  if(document.activeElement!==$("turnSec")&&$("turnSec")) $("turnSec").value=Number.isInteger(s.turnSec)?s.turnSec:0;
   if(document.activeElement!==$("secretCount")) $("secretCount").value=s.secretCount;
   if(document.activeElement!==$("pickEach")) $("pickEach").value=s.pickEach;
   for(const x of $("restModes").children){
@@ -1515,7 +1549,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes"].forEach(id=>{
       for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
     });
@@ -1526,7 +1560,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","secretCount","pickEach","cmin","cmax"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -1618,6 +1652,7 @@ function applySnap(s){
   pickCursor=s.pickCursor||0;
   wheelAlive=Array.isArray(s.wheelAlive)?s.wheelAlive:[];
   wheelLog=Array.isArray(s.wheelLog)?s.wheelLog:[];
+  syncTurnClock(s);
   if(s.activeSpin&&s.activeSpin.kind==="num"){
     const from=Number.isFinite(s.activeSpin.from)?s.activeSpin.from:(s.wheelRot||0);
     const target=Number.isFinite(s.activeSpin.target)?s.activeSpin.target:from;
@@ -1882,9 +1917,12 @@ function pushNums(){
   if(applying||!isHost()) return;
   const patch={};
   const win=parseIntStrict($("winScore").value);
+  const turnEl=$("turnSec");
+  const sec=turnEl?parseIntStrict(turnEl.value):null;
   const count=parseIntStrict($("secretCount").value);
   const each=parseIntStrict($("pickEach").value);
   if(win!=null) patch.winTarget=win;
+  if(sec!=null) patch.turnSec=Math.min(120, Math.max(0, sec));
   if(count!=null) patch.secretCount=count;
   if(each!=null) patch.pickEach=each;
   if(useCustom){
@@ -1940,7 +1978,8 @@ function bootOnline(){
   const saved=localStorage.getItem("dpn-name");
   if(saved) $("myName").value=saved;
   $("myName").addEventListener("change",typedName);
-  ["winScore","secretCount","pickEach","cmin","cmax"].forEach(id=>$(id).addEventListener("input",pushNums));
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
+  setInterval(paintTurnClock, 250);
   $("jump").onsubmit=e=>{
     e.preventDefault();
     const n=parseIntStrict($("guess").value);

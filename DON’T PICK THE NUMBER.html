@@ -86,6 +86,8 @@
       <p id="err" class="msg"></p>
       <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
       <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
+      <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
+      <p class="hint">0 = ปิด · หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</p>
       <div id="wheelOnly" class="hidden">
         <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
       </div>
@@ -108,7 +110,7 @@
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub" id="modeLabel"></p>
-    <div id="turnbar" class="turnbar hidden" aria-live="polite">ตาของ <b id="turnName"></b><span id="turnRank"></span></div>
+    <div id="turnbar" class="turnbar hidden" aria-live="polite">ตาของ <b id="turnName"></b><span id="turnRank"></span><span id="turnClock" class="turnclock hidden"></span></div>
     <div class="range" id="rangeText">ตอนนี้เลขลับอยู่ระหว่าง <b id="lo"></b> – <b id="hi"></b></div>
     <div id="pager" class="pager hidden">
       <button type="button" id="prev">←</button>
@@ -131,7 +133,7 @@
     </div>
     <h1>วงล้อสุ่มเลข</h1>
     <p class="sub" id="pickMode"></p>
-    <div id="pickTurn" class="turnbar"><b id="pickName"></b><span id="pickProgress"></span></div>
+    <div id="pickTurn" class="turnbar"><b id="pickName"></b><span id="pickProgress"></span><span id="pickClock" class="turnclock hidden"></span></div>
     <div class="range">เลือกเลขในช่วง <b id="pickLo"></b> – <b id="pickHi"></b></div>
     <div id="pickPager" class="pager hidden">
       <button type="button" id="pickPrev">←</button>

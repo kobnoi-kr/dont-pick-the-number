@@ -80,6 +80,9 @@ h2.side-title{margin:0;font-size:1.15rem;text-align:center}
 .hint{margin:8px 0 0;text-align:center;color:var(--muted);font-size:.8rem}
 .turnbar{text-align:center;font-size:1.35rem;font-weight:800;margin:0 0 10px;color:var(--blue)}
 .turnbar span{display:block;margin-top:2px;font-size:.85rem;font-weight:650;color:var(--muted)}
+.turnclock{color:var(--mark)!important;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.turnclock.urgent{animation:pulseClock .7s ease-in-out infinite}
+@keyframes pulseClock{50%{opacity:.45}}
 .board{margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
 .prow{display:grid;grid-template-columns:28px 1fr auto auto;align-items:center;gap:6px;background:var(--chip);border-radius:10px;padding:7px 8px}
 .prow.on{background:var(--blue);color:#fff}

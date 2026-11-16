@@ -150,6 +150,11 @@ function cancelSpin(room) {
   room.timer = null;
   room.activeSpin = null;
 }
+function clearTurnTimer(room) {
+  if (room.turnTimer) clearTimeout(room.turnTimer);
+  room.turnTimer = null;
+  room.turnUntil = 0;
+}
 function blankRoom(code, visibility, host) {
   return {
     code,
@@ -166,6 +171,7 @@ function blankRoom(code, visibility, host) {
     winTarget: 3,
     secretCount: 1,
     pickEach: 1,
+    turnSec: 0,
     pointAll: true,
     order: [],
     rot: 0,
@@ -191,6 +197,8 @@ function blankRoom(code, visibility, host) {
     over: null,
     activeSpin: null,
     timer: null,
+    turnTimer: null,
+    turnUntil: 0,
     emptyTimer: null
   };
 }
@@ -264,6 +272,8 @@ function snap(room, player) {
     orderRot: room.rot,
     over: room.over,
     activeSpin: publicSpin(room.activeSpin),
+    turnSec: room.turnSec || 0,
+    turnLeft: room.turnUntil ? Math.max(0, room.turnUntil - Date.now()) : 0,
     yourTurn: yourTurn(room, player)
   };
 }
@@ -378,6 +388,7 @@ function finishRound(room) {
     title = gained[0] + " เป็นคนสุดท้าย";
     note = "ได้ 1 แต้ม";
   }
+  clearTurnTimer(room);
   room.phase = "over";
   room.activeSpin = null;
   room.over = {
@@ -391,6 +402,91 @@ function finishRound(room) {
     reset: won,
     mode: ""
   };
+}
+function openPlayNums(room) {
+  const used = new Set(room.picked.map((item) => item.n));
+  const nums = [];
+  for (let n = room.lo; n <= room.hi; n++) if (!used.has(n)) nums.push(n);
+  return nums;
+}
+function openPickNums(room) {
+  const used = taken(room);
+  const nums = [];
+  for (let n = room.wheelMin; n <= room.wheelMax; n++) if (!used.has(n)) nums.push(n);
+  return nums;
+}
+function applyPlayChoice(room, who, n) {
+  const hit = room.secrets.includes(n);
+  room.picked.push({ n, who, hit });
+  if (hit) {
+    room.secrets = room.secrets.filter((secret) => secret !== n);
+    const index = room.alive.indexOf(who);
+    if (index >= 0) room.alive.splice(index, 1);
+    room.turn = room.alive.length ? index % room.alive.length : 0;
+    if (room.alive.length <= 1 || !room.secrets.length) {
+      clearTurnTimer(room);
+      finishRound(room);
+      return;
+    }
+  } else if (room.alive.length) {
+    room.turn = (room.turn + 1) % room.alive.length;
+  }
+  const below = room.secrets.some((secret) => secret < n);
+  const above = room.secrets.some((secret) => secret > n);
+  if (!below) room.lo = n + 1;
+  if (!above) room.hi = n - 1;
+  skipToConnected(room);
+  armTurnTimer(room);
+}
+function applyPickChoice(room, name, n) {
+  if (!room.picks[name]) room.picks[name] = [];
+  room.picks[name].push(n);
+  room.pickCursor += 1;
+  const each = Math.max(room.pickEach, 1);
+  const total = room.wheelOrder.length * each;
+  if (room.pickCursor >= total) clearTurnTimer(room);
+  else armTurnTimer(room);
+}
+function armTurnTimer(room) {
+  clearTurnTimer(room);
+  const sec = Number.isInteger(room.turnSec) ? room.turnSec : 0;
+  if (sec < 1) return;
+  if (room.phase === "play") {
+    if (!currentName(room) || room.alive.length < 1) return;
+  } else if (room.phase === "pick") {
+    const each = Math.max(room.pickEach, 1);
+    const total = room.wheelOrder.length * each;
+    if (room.pickCursor >= total) return;
+  } else return;
+  const until = Date.now() + sec * 1000;
+  room.turnUntil = until;
+  room.turnTimer = setTimeout(() => {
+    if (room.turnUntil !== until) return;
+    onTurnTimeout(room);
+  }, sec * 1000);
+}
+function onTurnTimeout(room) {
+  clearTurnTimer(room);
+  if (room.phase === "play") {
+    const who = currentName(room);
+    if (!who) return;
+    const nums = openPlayNums(room);
+    if (!nums.length) return;
+    applyPlayChoice(room, who, nums[Math.floor(Math.random() * nums.length)]);
+    broadcast(room);
+    return;
+  }
+  if (room.phase === "pick") {
+    const each = Math.max(room.pickEach, 1);
+    const total = room.wheelOrder.length * each;
+    if (room.pickCursor >= total) return;
+    const name = room.wheelOrder[Math.floor(room.pickCursor / each)];
+    if (!name) return;
+    const nums = openPickNums(room);
+    if (!nums.length) return;
+    applyPickChoice(room, name, nums[Math.floor(Math.random() * nums.length)]);
+    broadcast(room);
+  }
 }
 function begin(room) {
   const count = room.secretCount;
@@ -408,9 +504,11 @@ function begin(room) {
   room.phase = "play";
   room.over = null;
   skipToConnected(room);
+  armTurnTimer(room);
 }
 function startPick(room) {
   cancelSpin(room);
+  clearTurnTimer(room);
   room.wheelMin = room.min;
   room.wheelMax = room.max;
   room.wheelOrder = room.order.slice();
@@ -421,8 +519,10 @@ function startPick(room) {
   room.wheelRot = 0;
   room.phase = "pick";
   room.over = null;
+  armTurnTimer(room);
 }
 function finishWheel(room) {
+  clearTurnTimer(room);
   const winner = room.wheelAlive[0] || "";
   if (winner) addPoint(room, winner);
   const won = !!(winner && scoreByName(room, winner) >= room.winTarget);
@@ -603,7 +703,7 @@ function releaseSocket(ws, notify) {
   }
   if (room.phase === "lobby") broadcast(room);
   else {
-    if (room.phase === "play") skipToConnected(room);
+    if (room.phase === "play" && skipToConnected(room)) armTurnTimer(room);
     broadcast(room);
   }
   if (!room.players.some((item) => item.connected)) scheduleDelete(room);
@@ -669,9 +769,11 @@ function onSetup(ws, msg) {
   const winTarget = setInt(patch, "winTarget", 1, 999);
   const secretCount = setInt(patch, "secretCount", 1, 1000000);
   const pickEach = setInt(patch, "pickEach", 1, 99);
+  const turnSec = setInt(patch, "turnSec", 0, 120);
   if (winTarget != null) room.winTarget = winTarget;
   if (secretCount != null) room.secretCount = secretCount;
   if (pickEach != null) room.pickEach = pickEach;
+  if (turnSec != null) room.turnSec = turnSec;
   if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
   broadcast(room);
 }
@@ -708,6 +810,11 @@ function onStart(ws) {
   begin(room);
   broadcast(room);
 }
+function taken(room) {
+  const set = new Set();
+  room.wheelOrder.forEach((name) => (room.picks[name] || []).forEach((n) => set.add(n)));
+  return set;
+}
 function onPick(ws, msg) {
   const ctx = seat(ws);
   if (!ctx || ctx.room.phase !== "play") return;
@@ -718,32 +825,8 @@ function onPick(ws, msg) {
   if (!Number.isSafeInteger(n)) return fail(ws, "ใส่เป็นจำนวนเต็ม");
   if (n < room.lo || n > room.hi) return fail(ws, "เลือกเลขระหว่าง " + room.lo + " ถึง " + room.hi);
   if (room.picked.some((item) => item.n === n)) return fail(ws, "เลขนี้ถูกเลือกแล้ว");
-  const hit = room.secrets.includes(n);
-  room.picked.push({ n, who, hit });
-  if (hit) {
-    room.secrets = room.secrets.filter((secret) => secret !== n);
-    const index = room.alive.indexOf(who);
-    if (index >= 0) room.alive.splice(index, 1);
-    room.turn = room.alive.length ? index % room.alive.length : 0;
-    if (room.alive.length <= 1 || !room.secrets.length) {
-      finishRound(room);
-      broadcast(room);
-      return;
-    }
-  } else if (room.alive.length) {
-    room.turn = (room.turn + 1) % room.alive.length;
-  }
-  const below = room.secrets.some((secret) => secret < n);
-  const above = room.secrets.some((secret) => secret > n);
-  if (!below) room.lo = n + 1;
-  if (!above) room.hi = n - 1;
-  skipToConnected(room);
+  applyPlayChoice(room, who, n);
   broadcast(room);
-}
-function taken(room) {
-  const set = new Set();
-  room.wheelOrder.forEach((name) => (room.picks[name] || []).forEach((n) => set.add(n)));
-  return set;
 }
 function onPickNum(ws, msg) {
   const ctx = seat(ws);
@@ -758,9 +841,7 @@ function onPickNum(ws, msg) {
   if (!Number.isSafeInteger(n)) return fail(ws, "ใส่เป็นจำนวนเต็ม");
   if (n < room.wheelMin || n > room.wheelMax) return fail(ws, "เลือกเลขระหว่าง " + room.wheelMin + " ถึง " + room.wheelMax);
   if (taken(room).has(n)) return fail(ws, "เลขนี้มีคนเลือกแล้ว");
-  if (!room.picks[name]) room.picks[name] = [];
-  room.picks[name].push(n);
-  room.pickCursor += 1;
+  applyPickChoice(room, name, n);
   broadcast(room);
 }
 function onUndo(ws) {
@@ -775,6 +856,7 @@ function onUndo(ws) {
   const list = room.picks[name] || [];
   list.pop();
   if (!list.length) delete room.picks[name];
+  armTurnTimer(room);
   broadcast(room);
 }
 function onOpenWheel(ws) {
@@ -785,6 +867,7 @@ function onOpenWheel(ws) {
   const total = room.wheelOrder.length * Math.max(room.pickEach, 1);
   if (!room.wheelOrder.length || room.pickCursor < total) return fail(ws, "ยังเลือกเลขไม่ครบ");
   cancelSpin(room);
+  clearTurnTimer(room);
   room.wheelAlive = room.wheelOrder.slice();
   room.wheelLog = [];
   room.wheelRot = 0;
@@ -807,6 +890,7 @@ function onRepick(ws) {
   room.picks = {};
   room.pickCursor = 0;
   room.phase = "pick";
+  armTurnTimer(room);
   broadcast(room);
 }
 function onAgain(ws) {
@@ -830,6 +914,7 @@ function onAbort(ws) {
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่พากลับห้องได้");
   const room = ctx.room;
   cancelSpin(room);
+  clearTurnTimer(room);
   room.phase = "lobby";
   room.over = null;
   room.picked = [];
@@ -1057,6 +1142,7 @@ setInterval(() => {
         broadcastLobby();
       }
     } else if (skipToConnected(room)) {
+      armTurnTimer(room);
       broadcast(room);
     }
     if (room.players.length && !room.players.some((player) => player.connected)) scheduleDelete(room);
