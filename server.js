@@ -426,12 +426,15 @@ function finishRound(room) {
     title = gained[0] + " เป็นคนสุดท้าย";
     note = "ได้ 1 แต้ม";
   }
+  const firstHit = room.picked.find((item) => item && item.hit && item.who);
+  const firstOut = firstHit ? firstHit.who : "";
   clearTurnTimer(room);
   room.phase = "over";
   room.activeSpin = null;
   room.over = {
     title,
     note,
+    firstOut,
     secretLabel: "เลขลับคือ",
     secretText: room.secretAll.join(", "),
     many: room.secretAll.length > 3,
@@ -572,11 +575,14 @@ function finishWheel(room) {
   const won = !!(winner && scoreByName(room, winner) >= room.winTarget);
   const nums = winner && Array.isArray(room.picks[winner]) ? room.picks[winner] : [];
   const text = nums.join(", ");
+  const firstHit = room.wheelLog.find((item) => item && item.who);
+  const firstOut = firstHit ? firstHit.who : "";
   room.phase = "over";
   room.activeSpin = null;
   room.over = {
     title: won ? winner + " ชนะแล้ว!" : winner ? winner + " เป็นคนสุดท้าย" : "ไม่มีผู้ชนะ",
     note: won ? "ถึง " + room.winTarget + " แต้ม" : winner ? "ได้ 1 แต้ม" : "",
+    firstOut,
     secretLabel: winner ? "เลขที่เลือก" : "",
     secretText: text,
     many: nums.length > 1 || text.length > 4,
