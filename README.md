@@ -29,7 +29,7 @@ npm start
 
 - `/` ล็อบบี้เกม (สร้าง Guest อัตโนมัติ)
 - `/login.html` `/register.html` `/account.html`
-- `/forgot-password.html` `/reset-password.html` `/verify-email.html`
+- `/reset-password.html` `/verify-email.html`
 
 API หลัก:
 

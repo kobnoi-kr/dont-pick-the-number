@@ -24,7 +24,7 @@ const ROOM_MS = 60000;
 const ROOT = __dirname;
 const PAGE =
   fs.readdirSync(ROOT).find((name) => /^don.?t pick the number\.html$/i.test(name)) ||
-  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|forgot-password|reset-password|verify-email|friends)\.html$/i.test(name)) ||
+  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|reset-password|verify-email|friends)\.html$/i.test(name)) ||
   "index.html";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
