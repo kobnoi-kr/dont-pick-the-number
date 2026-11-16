@@ -445,6 +445,21 @@ async function handleResetPassword(req, res) {
   return true;
 }
 
+function cleanAvatarUrl(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (raw.length > 24000) return false;
+  if (/^https:\/\/[^\s]{1,2000}$/i.test(raw)) return raw.slice(0, 2000);
+  if (
+    /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(raw) &&
+    raw.length <= 24000
+  ) {
+    return raw.replace(/\s+/g, "");
+  }
+  return false;
+}
+
 async function handleAccountProfile(req, res) {
   const m = method(req);
   if (m === "GET") {
@@ -463,9 +478,18 @@ async function handleAccountProfile(req, res) {
         sendJson(res, 400, { error: "invalid_input" });
         return true;
       }
+      const data = { displayName, username: displayName.slice(0, 64) };
+      if (Object.prototype.hasOwnProperty.call(body, "avatarUrl")) {
+        const av = cleanAvatarUrl(body.avatarUrl);
+        if (av === false) {
+          sendJson(res, 400, { error: "invalid_avatar" });
+          return true;
+        }
+        data.avatarUrl = av;
+      }
       const user = await auth.prisma.user.update({
         where: { id: auth.user.id },
-        data: { displayName, username: displayName.slice(0, 64) },
+        data,
         include: { userRoles: { include: { role: true } } }
       });
       sendJson(res, 200, { user: publicUser(user) });

@@ -699,6 +699,18 @@ function renderPlayers(){
     const showRank=(playing&&roundOrder.length>0)||((picking||wheeling)&&wheelOrder.length>0)||ranked;
     rank.textContent=showRank?String(i+1):"•";
     const meta=onlineMode?playerByName(name):null;
+    const avWrap=document.createElement(meta&&meta.avatarUrl?"img":"span");
+    if(meta&&meta.avatarUrl){
+      avWrap.className="pavatar";
+      avWrap.src=meta.avatarUrl;
+      avWrap.alt="";
+      avWrap.width=28;
+      avWrap.height=28;
+      avWrap.referrerPolicy="no-referrer";
+    }else{
+      avWrap.className="pavatar ph";
+      avWrap.textContent=(name||"?").slice(0,1).toUpperCase();
+    }
     const nm=document.createElement("span");
     nm.className="pname";
     nm.textContent=name;
@@ -745,7 +757,7 @@ function renderPlayers(){
       removePlayer(players.indexOf(name));
     };
     acts.appendChild(rm);
-    row.append(rank,nm,sc,acts);
+    row.append(rank,avWrap,nm,sc,acts);
     box.appendChild(row);
   });
   $("spin").textContent="สุ่มลำดับ";
@@ -1471,19 +1483,36 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if(n
 
 let authUser=null;
 let authBoot=null;
+function myAvatar(){
+  return (authUser&&authUser.avatarUrl)||localStorage.getItem("dpn-avatar")||"";
+}
 function paintAuthBar(user){
   const label=$("authLabel");
   const loginLink=$("loginLink");
   const registerLink=$("registerLink");
+  const avatar=$("authAvatar");
   if(!label) return;
   if(!user){
     label.textContent="Auth ปิดอยู่ — เล่นได้ตามปกติ";
     if(loginLink) loginLink.classList.add("hidden");
     if(registerLink) registerLink.classList.add("hidden");
+    if(avatar){ avatar.classList.remove("on"); avatar.removeAttribute("src"); }
     return;
   }
   const kind=user.accountType==="registered"?"สมาชิก":"Guest";
   label.textContent=kind+" · "+(user.displayName||user.username||"");
+  if(avatar){
+    if(user.avatarUrl){
+      avatar.src=user.avatarUrl;
+      avatar.classList.add("on");
+      avatar.alt=user.displayName||"avatar";
+      localStorage.setItem("dpn-avatar", user.avatarUrl);
+    }else{
+      avatar.classList.remove("on");
+      avatar.removeAttribute("src");
+      localStorage.removeItem("dpn-avatar");
+    }
+  }
   if(loginLink) loginLink.classList.toggle("hidden", user.accountType==="registered");
   if(registerLink){
     registerLink.textContent="ผูกบัญชี";
@@ -2048,7 +2077,7 @@ function joinCode(code){
     return false;
   }
   $("gateMsg").textContent="";
-  send({t:"join",code:clean,name,token:myToken()});
+  send({t:"join",code:clean,name,token:myToken(),avatarUrl:myAvatar()});
   closeCodeModal();
   return true;
 }
@@ -2056,7 +2085,7 @@ function makeRoom(visibility){
   const name=typedName();
   if(!name){ $("gateMsg").textContent="ใส่ชื่อก่อน"; return; }
   $("gateMsg").textContent="";
-  send({t:"create",visibility,name,token:myToken()});
+  send({t:"create",visibility,name,token:myToken(),avatarUrl:myAvatar()});
 }
 function pushNums(){
   if(applying||!isHost()) return;
@@ -2091,7 +2120,7 @@ function connect(){
   sock=ws;
   ws.onopen=()=>{
     $("connMsg").textContent="";
-    send({t:"hello",token:myToken(),name:localStorage.getItem("dpn-name")||typedName()});
+    send({t:"hello",token:myToken(),name:localStorage.getItem("dpn-name")||typedName(),avatarUrl:myAvatar()});
   };
   ws.onmessage=e=>{
     let msg;

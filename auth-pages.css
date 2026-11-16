@@ -68,4 +68,13 @@ input[type=email],input[type=password],input[type=text]{
 .badge{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
 .badge.on{color:#bbf7d0;border-color:#166534}
 .tiny{font-size:.8rem;color:var(--muted)}
+.avatar-block{display:flex;align-items:center;gap:14px;margin:0 0 16px}
+.avatar-preview{
+  width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--bg2);
+  border:1px solid var(--line);flex:0 0 auto;display:none;
+}
+.avatar-preview.on{display:block}
+.avatar-actions{display:flex;flex-direction:column;gap:6px;min-width:0}
+.avatar-file-label{margin:0;width:auto;padding:10px 14px;text-align:center;cursor:pointer}
+.avatar-actions .btn.ghost{margin:0;width:auto;padding:10px 14px}
 .hidden{display:none !important}

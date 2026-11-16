@@ -73,7 +73,11 @@ async function linkProviderToUser(prisma, {
           ? user.emailVerifiedAt || new Date()
           : user.emailVerifiedAt,
         lastLoginAt: new Date(),
-        avatarUrl: metadata && metadata.avatarUrl ? metadata.avatarUrl : undefined,
+        // Keep a custom avatar; only fill from OAuth when the user has none yet.
+        avatarUrl:
+          !user.avatarUrl && metadata && metadata.avatarUrl
+            ? metadata.avatarUrl
+            : undefined,
         displayName:
           metadata && metadata.displayName && user.accountType === "guest"
             ? String(metadata.displayName).slice(0, 64)

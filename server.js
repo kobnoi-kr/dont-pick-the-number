@@ -43,6 +43,19 @@ function cleanName(value) {
 function cleanRoomTitle(value) {
   return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().replace(/\s+/g, " ").slice(0, 32);
 }
+function cleanAvatar(value) {
+  if (value == null || value === "") return "";
+  const raw = String(value).trim();
+  if (!raw || raw.length > 24000) return "";
+  if (/^https:\/\/[^\s]{1,2000}$/i.test(raw)) return raw.slice(0, 2000);
+  if (
+    /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(raw) &&
+    raw.length <= 24000
+  ) {
+    return raw.replace(/\s+/g, "");
+  }
+  return "";
+}
 function validToken(value) {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
@@ -144,6 +157,7 @@ function makeBot(room) {
   return {
     id: "bot-" + crypto.randomUUID(),
     name: "บอท " + n,
+    avatarUrl: "",
     bot: true,
     auto: true,
     ws: null,
@@ -290,6 +304,7 @@ function snap(room, player) {
     players: room.players.map((item) => ({
       id: item.id,
       name: item.name,
+      avatarUrl: item.avatarUrl || "",
       score: scoreOf(room, item),
       connected: item.connected,
       host: item.id === room.hostId,
@@ -1114,18 +1129,19 @@ function onRenameRoom(ws, msg) {
 function identity(ws, msg) {
   const name = cleanName(msg.name) || ws.pendingName;
   const token = validToken(msg.token) ? msg.token : validToken(ws.token) ? ws.token : crypto.randomUUID();
+  const avatarUrl = cleanAvatar(msg.avatarUrl);
   ws.token = token;
-  return { name, token };
+  return { name, token, avatarUrl };
 }
 function onCreate(ws, msg) {
-  const { name, token } = identity(ws, msg);
+  const { name, token, avatarUrl } = identity(ws, msg);
   if (!name) return fail(ws, "ใส่ชื่อก่อน");
   if (rooms.size >= MAX_ROOMS) return fail(ws, "เซิร์ฟเวอร์เต็ม ลองใหม่ภายหลัง");
   const code = makeCode();
   if (!code) return fail(ws, "สร้างห้องไม่สำเร็จ ลองใหม่");
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
-  const player = { id: token, name, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
   rooms.set(code, room);
   attach(ws, room, player);
@@ -1135,9 +1151,11 @@ function onJoin(ws, msg) {
   if (!/^\d{6}$/.test(code)) return fail(ws, "รหัสต้องเป็นตัวเลข 6 หลัก");
   const room = rooms.get(code);
   if (!room) return fail(ws, "ไม่พบห้องนี้");
-  const { name, token } = identity(ws, msg);
+  const { name, token, avatarUrl } = identity(ws, msg);
   const existing = room.players.find((player) => player.id === token);
   if (existing) {
+    if (avatarUrl) existing.avatarUrl = avatarUrl;
+    if (name) existing.name = name;
     attach(ws, room, existing);
     return;
   }
@@ -1147,7 +1165,7 @@ function onJoin(ws, msg) {
   if (room.players.some((player) => player.name.toLowerCase() === name.toLowerCase())) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
-  const player = { id: token, name, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   room.players.push(player);
   if (room.phase === "lobby") {
     cancelSpin(room);
@@ -1160,9 +1178,11 @@ function onHello(ws, msg) {
   const token = validToken(msg.token) ? msg.token : "";
   ws.token = token;
   ws.pendingName = cleanName(msg.name);
+  const avatarUrl = cleanAvatar(msg.avatarUrl);
   if (token) {
     const found = findSeat(token);
     if (found) {
+      if (avatarUrl) found.player.avatarUrl = avatarUrl;
       attach(ws, found.room, found.player);
       return;
     }
