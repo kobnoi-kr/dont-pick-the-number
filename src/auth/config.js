@@ -14,7 +14,7 @@ function enabledProviders() {
   if (process.env.AUTH_GUEST_ENABLED !== "0") list.push("guest");
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) list.push("google");
   if (process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET) list.push("discord");
-  if (process.env.AUTH_EMAIL_ENABLED !== "0") list.push("email");
+  if (process.env.AUTH_EMAIL_ENABLED === "1") list.push("email");
   return list;
 }
 

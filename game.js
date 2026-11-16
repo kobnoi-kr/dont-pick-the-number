@@ -1486,7 +1486,7 @@ function paintAuthBar(user){
   label.textContent=kind+" · "+(user.displayName||user.username||"");
   if(loginLink) loginLink.classList.toggle("hidden", user.accountType==="registered");
   if(registerLink){
-    registerLink.textContent=user.accountType==="guest"?"ผูกบัญชี":"สมัครเพิ่ม";
+    registerLink.textContent="ผูกบัญชี";
     registerLink.classList.toggle("hidden", user.accountType==="registered");
   }
 }
