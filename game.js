@@ -1536,7 +1536,7 @@ function paintRoom(s){
   $("visBadge").classList.toggle("private",priv);
   const count=(s.players||[]).filter(p=>p.connected).length;
   $("roomCount").textContent=count+"/"+(s.maxPlayers||12);
-  $("roomNote").textContent=priv?"ห้องส่วนตัว · ต้องใส่รหัสถึงจะเข้าได้ · แชร์รหัสให้เพื่อน":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
+  $("roomNote").textContent=priv?"":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
   $("roomTitleText").textContent=s.roomLabel||s.title||(priv?"ห้องส่วนตัว":"ห้องสาธารณะ");
   document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
   const mine=(s.players||[]).find(p=>p.id===s.youId);
