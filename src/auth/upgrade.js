@@ -155,7 +155,9 @@ async function createRegisteredWithProvider(prisma, {
 
 /**
  * Resolve login-or-upgrade for OAuth / email.
- * Prefer guest session user id when upgrading.
+ * If the provider is new and the browser already has an active user session
+ * (guest or registered), attach the provider to that same profile instead of
+ * creating a second account (which made the first provider "disappear").
  */
 async function resolveProviderLogin(prisma, {
   provider,
@@ -165,7 +167,8 @@ async function resolveProviderLogin(prisma, {
   displayName,
   avatarUrl,
   markEmailVerified,
-  guestUserId
+  guestUserId,
+  currentUserId
 }) {
   const existing = await prisma.authAccount.findUnique({
     where: { provider_providerUserId: { provider, providerUserId } },
@@ -180,6 +183,17 @@ async function resolveProviderLogin(prisma, {
       err.code = "account_blocked";
       throw err;
     }
+    // Already signed into a different registered profile → don't silently switch
+    // (that looked like "linking one provider kicks the other off").
+    const sessionId = currentUserId || guestUserId || null;
+    if (sessionId && existing.userId !== sessionId) {
+      const sessionUser = await prisma.user.findUnique({ where: { id: sessionId } });
+      if (sessionUser && sessionUser.accountType === "registered" && sessionUser.status === "active") {
+        const err = new Error("provider_already_linked");
+        err.code = "provider_already_linked";
+        throw err;
+      }
+    }
     await prisma.user.update({
       where: { id: existing.userId },
       data: { lastLoginAt: new Date() }
@@ -188,20 +202,29 @@ async function resolveProviderLogin(prisma, {
     return { user, linked: false, upgraded: false };
   }
 
-  if (guestUserId) {
-    const guest = await prisma.user.findUnique({ where: { id: guestUserId } });
-    if (guest && guest.accountType === "guest" && guest.status === "active") {
+  const attachToId = currentUserId || guestUserId || null;
+  if (attachToId) {
+    const current = await prisma.user.findUnique({ where: { id: attachToId } });
+    if (
+      current &&
+      current.status === "active" &&
+      (current.accountType === "guest" || current.accountType === "registered")
+    ) {
       const result = await linkProviderToUser(prisma, {
-        userId: guestUserId,
+        userId: attachToId,
         provider,
         providerUserId,
         providerEmail,
         passwordHash,
         markEmailVerified,
-        eventType: "account_upgraded",
+        eventType: current.accountType === "guest" ? "account_upgraded" : "provider_linked",
         metadata: { displayName, avatarUrl }
       });
-      return { user: result.user, linked: true, upgraded: true };
+      return {
+        user: result.user,
+        linked: true,
+        upgraded: current.accountType === "guest"
+      };
     }
   }
 

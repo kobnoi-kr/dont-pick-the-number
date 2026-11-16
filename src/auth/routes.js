@@ -171,8 +171,10 @@ async function startOAuth(req, res, provider, mode) {
     if (!auth) return true;
     userId = auth.user.id;
   } else {
+    // Remember any active session (guest or registered) so a second OAuth
+    // login attaches to the same profile instead of spawning a new one.
     const auth = await resolveAuth(req);
-    if (auth.user && auth.user.accountType === "guest") userId = auth.user.id;
+    if (auth.user && auth.user.status === "active") userId = auth.user.id;
   }
 
   try {
@@ -249,36 +251,48 @@ async function finishOAuth(req, res, provider) {
         redirect(res, "/account.html?linked=" + provider);
         return true;
       } catch (linkErr) {
-        // Provider already belongs to another account → just sign in as that account.
+        // Keep the current profile — do not jump to the other account.
         if (linkErr && linkErr.code === "provider_already_linked") {
-          const result = await resolveProviderLogin(prisma, {
-            provider,
-            providerUserId: profile.providerUserId,
-            providerEmail: profile.email,
-            displayName: profile.displayName,
-            avatarUrl: profile.avatarUrl,
-            markEmailVerified: !!profile.emailVerified,
-            guestUserId: null
-          });
-          await rotateAndIssueSession(prisma, req, res, result.user);
-          redirect(res, lobbyRedirect());
+          redirect(
+            res,
+            "/account.html?error=provider_already_linked&provider=" + encodeURIComponent(provider)
+          );
           return true;
         }
         throw linkErr;
       }
     }
 
-    const result = await resolveProviderLogin(prisma, {
-      provider,
-      providerUserId: profile.providerUserId,
-      providerEmail: profile.email,
-      displayName: profile.displayName,
-      avatarUrl: profile.avatarUrl,
-      markEmailVerified: !!profile.emailVerified,
-      guestUserId: saved.userId || null
-    });
-    await rotateAndIssueSession(prisma, req, res, result.user);
-    redirect(res, lobbyRedirect());
+    // Prefer attaching a brand-new provider onto the signed-in profile
+    // (guest upgrade or add Google/Discord to the same registered user).
+    const sessionAuth = await resolveAuth(req);
+    try {
+      const result = await resolveProviderLogin(prisma, {
+        provider,
+        providerUserId: profile.providerUserId,
+        providerEmail: profile.email,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        markEmailVerified: !!profile.emailVerified,
+        guestUserId: saved.userId || null,
+        currentUserId: sessionAuth.user && sessionAuth.user.status === "active" ? sessionAuth.user.id : null
+      });
+      await rotateAndIssueSession(prisma, req, res, result.user);
+      if (result.linked) {
+        redirect(res, "/account.html?linked=" + provider);
+        return true;
+      }
+      redirect(res, lobbyRedirect());
+    } catch (loginErr) {
+      if (loginErr && loginErr.code === "provider_already_linked") {
+        redirect(
+          res,
+          "/account.html?error=provider_already_linked&provider=" + encodeURIComponent(provider)
+        );
+        return true;
+      }
+      throw loginErr;
+    }
   } catch (err) {
     console.error("[oauth:" + provider + "]", err);
     redirect(res, loginErrorRedirect(err.code || "oauth_failed"));
