@@ -651,20 +651,34 @@ function renderPlayers(){
     if(out) sc.textContent=wheeling&&list.length?"ออก · "+list.join(", "):"ออก";
     else if(list.length) sc.textContent=list.join(", ")+" · "+(scores[name]||0)+" แต้ม";
     else sc.textContent=(scores[name]||0)+" แต้ม";
+    const acts=document.createElement("span");
+    acts.className="pacts";
+    const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
+    if(onlineMode&&canHostAct&&meta.connected){
+      const give=document.createElement("button");
+      give.type="button";
+      give.className="givehost";
+      give.textContent="โอน";
+      give.setAttribute("aria-label","โอนโฮสต์ให้ "+name);
+      give.title="โอนโฮสต์ให้ "+name;
+      give.onclick=()=>send({t:"giveHost",id:meta.id});
+      acts.appendChild(give);
+    }
     const rm=document.createElement("button");
     rm.type="button";
     rm.textContent="×";
-    rm.disabled=onlineMode?(!isHost()||!meta||meta.id===myId||netPhase!=="lobby"||spinning):(spinning||wheelSpinning||locked);
-    if(onlineMode&&(!isHost()||(meta&&meta.id===myId))) rm.classList.add("hidden");
+    rm.disabled=onlineMode?(!canHostAct):(spinning||wheelSpinning||locked);
+    if(onlineMode&&!canHostAct) rm.classList.add("hidden");
     rm.setAttribute("aria-label","เอา "+name+" ออก");
     rm.onclick=()=>{
       if(onlineMode){
-        if(meta&&isHost()&&meta.id!==myId) send({t:"kick",id:meta.id});
+        if(canHostAct) send({t:"kick",id:meta.id});
         return;
       }
       removePlayer(players.indexOf(name));
     };
-    row.append(rank,nm,sc,rm);
+    acts.appendChild(rm);
+    row.append(rank,nm,sc,acts);
     box.appendChild(row);
   });
   $("spin").textContent="สุ่มลำดับ";
@@ -1395,6 +1409,7 @@ const GUIDE={
 <li>เลือกหมวดเกม: ห้ามโดนเลขลับ หรือ วงล้อสุ่มเลข</li>
 <li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน</li>
 <li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
+<li>กด <b>โอน</b> ที่รายชื่อผู้เล่นเพื่อโอนโฮสต์ให้เพื่อน (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>สุ่มลำดับ</b> แล้วค่อยเริ่มเกม</li>
 </ul></section>
 <section><h4>ห้องส่วนตัว</h4><ul>

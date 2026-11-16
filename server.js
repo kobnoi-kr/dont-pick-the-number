@@ -853,6 +853,19 @@ function onKick(ws, msg) {
   if (!target) return;
   takeOut(ctx.room, target, target.ws, true);
 }
+function onGiveHost(ws, msg) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่โอนโฮสต์ได้");
+  if (ctx.room.phase !== "lobby") return fail(ws, "โอนโฮสต์ได้เฉพาะตอนอยู่ในล็อบบี้");
+  const id = typeof msg.id === "string" ? msg.id : "";
+  if (!id || id === ctx.player.id) return fail(ws, "เลือกผู้เล่นอื่นเพื่อโอนโฮสต์");
+  const target = ctx.room.players.find((player) => player.id === id);
+  if (!target) return fail(ws, "ไม่พบผู้เล่น");
+  if (!target.connected) return fail(ws, "ผู้เล่นหลุดการเชื่อมต่อ");
+  ctx.room.hostId = target.id;
+  broadcast(ctx.room);
+  broadcastLobby();
+}
 function swapName(list, from, to) {
   if (!Array.isArray(list)) return list;
   return list.map((item) => (item === from ? to : item));
@@ -987,6 +1000,7 @@ function onMessage(ws, raw) {
   if (msg.t === "abort") return onAbort(ws);
   if (msg.t === "clear") return onClear(ws);
   if (msg.t === "kick") return onKick(ws, msg);
+  if (msg.t === "giveHost") return onGiveHost(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
 }
