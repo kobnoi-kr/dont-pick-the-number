@@ -443,20 +443,42 @@ function renderTurn(){
   $("turnRank").textContent=name?"อันดับ "+rank+" · เหลือ "+alive.length+" คน":"";
   paintTurnClock();
 }
+let overOutOrder=[];
+function deathLabel(rank){
+  if(rank===1) return "ตายคนแรก";
+  return "ตายคนที่ "+rank;
+}
+function outOrderFrom(items, needHit){
+  const order=[];
+  (items||[]).forEach(item=>{
+    if(!item||!item.who) return;
+    if(needHit&&!item.hit) return;
+    if(!order.includes(item.who)) order.push(item.who);
+  });
+  return order;
+}
+function setOverOutOrder(list){
+  overOutOrder=Array.isArray(list)?list.filter(Boolean):[];
+}
 function renderScores(el){
   el.textContent="";
   if(!players.length){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
   const ranked=players.slice().sort((a,b)=>(scores[b]||0)-(scores[a]||0));
   const best=scores[ranked[0]]||0;
+  const outRank=new Map(overOutOrder.map((name,i)=>[name,i+1]));
   ranked.forEach((name,i)=>{
     const li=document.createElement("li");
     if((scores[name]||0)===best&&best>0) li.classList.add("top");
     const label=document.createElement("span");
     label.textContent=(i+1)+". "+name;
+    const out=document.createElement("span");
+    out.className="out";
+    const rank=outRank.get(name);
+    out.textContent=rank?deathLabel(rank):"";
     const pts=document.createElement("b");
     pts.textContent=(scores[name]||0)+" แต้ม";
-    li.append(label,pts);
+    li.append(label,out,pts);
     el.appendChild(li);
   });
 }
@@ -466,8 +488,9 @@ function pick(raw){
   if(n<lo||n>hi){ $("msg").textContent="เลือกเลขระหว่าง "+lo+" ถึง "+hi; return; }
   if(picked.some(p=>p.n===n)){ $("msg").textContent="เลขนี้ถูกเลือกแล้ว"; return; }
   const who=currentPlayer();
-  picked.push({n,who});
-  if(secrets.includes(n)){
+  const hit=secrets.includes(n);
+  picked.push({n,who,hit});
+  if(hit){
     playClip(BOMB_SOUND);
     secrets=secrets.filter(s=>s!==n);
     if(who){
@@ -525,8 +548,7 @@ function finishRound(){
   $("again").dataset.reset=won?"1":"";
   $("again").dataset.mode="";
   $("secretLabel").textContent="เลขลับคือ";
-  const firstHit=picked.find(item=>item&&item.hit&&item.who);
-  paintFirstOut(firstHit?firstHit.who:"");
+  setOverOutOrder(outOrderFrom(picked,true));
   renderOverHist(null);
   const shown=$("secret");
   shown.textContent=secretAll.join(", ");
@@ -903,13 +925,6 @@ function renderOverHist(items){
     h.appendChild(s);
   });
 }
-function paintFirstOut(name){
-  const el=$("firstOut");
-  if(!el) return;
-  const who=String(name||"").trim();
-  el.classList.toggle("hidden",!who);
-  el.textContent=who?"ตายคนแรก: "+who:"";
-}
 function renderNameHist(el, rows){
   el.textContent="";
   if(!rows.length){ el.textContent="ยังไม่มี"; return; }
@@ -1229,8 +1244,7 @@ function finishWheel(){
   const num=winner?pickList(winner).join(", "):"";
   shown.textContent=num;
   shown.classList.toggle("many", pickList(winner).length>1||num.length>4);
-  const firstHit=wheelLog.find(item=>item&&item.who);
-  paintFirstOut(firstHit?firstHit.who:"");
+  setOverOutOrder(outOrderFrom(wheelLog,false));
   renderOverHist(wheelLog);
   $("again").textContent=won?"เริ่มแมตช์ใหม่":"รอบถัดไป";
   $("again").dataset.reset=won?"1":"";
@@ -1802,7 +1816,7 @@ function applySnap(s){
   }else if(s.phase==="over"&&s.over){
     $("overTitle").textContent=s.over.title||"";
     $("overNote").textContent=s.over.note||"";
-    paintFirstOut(s.over.firstOut||"");
+    setOverOutOrder(s.over.outOrder||[]);
     $("secretLabel").textContent=s.over.secretLabel||"";
     const shown=$("secret");
     shown.textContent=s.over.secretText||"";
