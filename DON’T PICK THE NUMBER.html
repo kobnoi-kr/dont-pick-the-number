@@ -35,6 +35,7 @@
       <img id="authAvatar" class="auth-avatar" alt="" width="28" height="28">
       <span id="authLabel" class="hint">Guest</span>
       <a class="textbtn" id="accountLink" href="account.html">บัญชี</a>
+      <a class="textbtn" id="friendsLink" href="friends.html">เพื่อน</a>
       <a class="textbtn" id="loginLink" href="login.html">เข้าสู่ระบบ</a>
       <a class="textbtn" id="registerLink" href="register.html">ผูกบัญชี</a>
     </div>
@@ -212,6 +213,7 @@
   <p class="hint" id="sideHint">โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ</p>
   <button class="btn" type="button" id="spin" disabled>สุ่มลำดับ</button>
   <button class="btn ghost" type="button" id="addBot">เพิ่มบอท</button>
+  <button class="btn ghost" type="button" id="inviteFriendsBtn">เชิญเพื่อน</button>
   <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
 </aside>
 </div>
@@ -228,6 +230,32 @@
     </form>
     <button type="button" id="codeModalCancel" class="btn ghost">ยกเลิก</button>
     <p id="codeModalMsg" class="msg"></p>
+  </div>
+</div>
+<div id="inviteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">
+  <div class="modal-card">
+    <h3 id="inviteModalTitle">เชิญเพื่อน</h3>
+    <p class="sub">เพื่อนที่ออนไลน์ — กดเชิญเพื่อเข้าห้องโดยไม่ต้องใส่รหัส</p>
+    <ul class="invite-list" id="inviteFriendList"></ul>
+    <p class="hint" id="inviteEmpty">ไม่มีเพื่อนออนไลน์</p>
+    <button type="button" id="inviteModalClose" class="btn ghost">ปิด</button>
+    <p id="inviteModalMsg" class="msg"></p>
+  </div>
+</div>
+<div id="roomInviteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="roomInviteTitle">
+  <div class="modal-card">
+    <h3 id="roomInviteTitle">คำเชิญเข้าห้อง</h3>
+    <div class="invite-from">
+      <img id="roomInviteAvatar" class="auth-avatar on" alt="" width="40" height="40">
+      <div>
+        <p id="roomInviteFrom" class="invite-from-name"></p>
+        <p id="roomInviteRoom" class="sub" style="margin:0;text-align:left"></p>
+      </div>
+    </div>
+    <div class="invite-actions">
+      <button type="button" id="roomInviteAccept" class="btn">เข้าห้อง</button>
+      <button type="button" id="roomInviteDecline" class="btn ghost">ปฏิเสธ</button>
+    </div>
   </div>
 </div>
 <div id="guideModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="guideTitle">

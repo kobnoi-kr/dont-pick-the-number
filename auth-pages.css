@@ -79,4 +79,15 @@ input[type=email],input[type=password],input[type=text]{
 .avatar-actions{display:flex;flex-direction:column;gap:6px;min-width:0}
 .avatar-file-label{margin:0;width:auto;padding:10px 14px;text-align:center;cursor:pointer}
 .avatar-actions .btn.ghost{margin:0;width:auto;padding:10px 14px}
+.friend-code-row{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.friend-code-row code{
+  flex:1;font-size:1.05rem;font-weight:700;letter-spacing:.06em;
+  background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+}
+.friend-meta{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.friend-av{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
+.friend-av.ph{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--bg2);font-size:.75rem;font-weight:800;color:var(--muted);
+}
 .hidden{display:none !important}

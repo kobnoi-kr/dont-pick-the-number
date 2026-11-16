@@ -38,6 +38,7 @@ const {
   resetPassword,
   linkEmailToUser
 } = require("./email-auth");
+const { ensureFriendCode, handleFriendsApi } = require("./friends");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -103,7 +104,8 @@ async function handleMe(req, res) {
     sendJson(res, 401, { error: "unauthorized" });
     return true;
   }
-  sendJson(res, 200, sessionResponse(auth.session, auth.user));
+  const user = await ensureFriendCode(auth.prisma, auth.user);
+  sendJson(res, 200, sessionResponse(auth.session, user));
   return true;
 }
 
@@ -479,7 +481,8 @@ async function handleAccountProfile(req, res) {
   if (m === "GET") {
     const auth = await requireAuth(req, res);
     if (!auth) return true;
-    sendJson(res, 200, { user: publicUser(auth.user) });
+    const user = await ensureFriendCode(auth.prisma, auth.user);
+    sendJson(res, 200, { user: publicUser(user) });
     return true;
   }
   if (m === "PATCH") {
@@ -684,6 +687,9 @@ async function handleAuthApi(req, res, pathname) {
     if (pathname === "/api/v1/account/link/email") return await handleLinkEmail(req, res);
     if (pathname === "/api/v1/account/sessions") return await handleAccountSessions(req, res);
     if (pathname === "/api/v1/account/delete") return await handleDeleteAccount(req, res);
+
+    const friendsHandled = await handleFriendsApi(req, res, pathname);
+    if (friendsHandled) return true;
 
     const unlink = pathname.match(/^\/api\/v1\/account\/unlink\/(google|discord|email)$/);
     if (unlink) return await handleUnlink(req, res, unlink[1]);

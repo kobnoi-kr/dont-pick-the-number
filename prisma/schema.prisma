@@ -25,11 +25,18 @@ enum AuthProvider {
   email
 }
 
+enum FriendshipStatus {
+  pending
+  accepted
+  declined
+}
+
 model User {
   id              String       @id @default(uuid()) @db.Uuid
   username        String       @db.VarChar(64)
   displayName     String       @map("display_name") @db.VarChar(64)
   avatarUrl       String?      @map("avatar_url") @db.Text
+  friendCode      String?      @unique @map("friend_code") @db.VarChar(16)
   accountType     AccountType  @default(guest) @map("account_type")
   status          UserStatus   @default(active)
   emailVerifiedAt DateTime?    @map("email_verified_at")
@@ -45,8 +52,27 @@ model User {
   settings           UserSettings?
   accountEvents      AccountEvent[]
   adminLogs          AdminLog[]          @relation("AdminActor")
+  friendshipsSent     Friendship[]       @relation("FriendshipRequester")
+  friendshipsReceived Friendship[]       @relation("FriendshipAddressee")
 
   @@map("users")
+}
+
+model Friendship {
+  id          String           @id @default(uuid()) @db.Uuid
+  requesterId String           @map("requester_id") @db.Uuid
+  addresseeId String           @map("addressee_id") @db.Uuid
+  status      FriendshipStatus @default(pending)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@index([requesterId, status])
+  @@map("friendships")
 }
 
 model AuthAccount {

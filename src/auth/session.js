@@ -105,6 +105,7 @@ function publicUser(user) {
     username: user.username,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl || null,
+    friendCode: user.friendCode || null,
     accountType: user.accountType,
     status: user.status,
     emailVerified: !!user.emailVerifiedAt,

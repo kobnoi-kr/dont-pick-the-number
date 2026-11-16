@@ -201,6 +201,10 @@ function stopSpinSound(){
   spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, myAuto=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
+let roomVisibility="";
+let onlineFriendIds=new Set();
+let pendingRoomInvite=null;
+let friendsCache=[];
 let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
@@ -1490,12 +1494,14 @@ function paintAuthBar(user){
   const label=$("authLabel");
   const loginLink=$("loginLink");
   const registerLink=$("registerLink");
+  const friendsLink=$("friendsLink");
   const avatar=$("authAvatar");
   if(!label) return;
   if(!user){
     label.textContent="Auth ปิดอยู่ — เล่นได้ตามปกติ";
     if(loginLink) loginLink.classList.add("hidden");
     if(registerLink) registerLink.classList.add("hidden");
+    if(friendsLink) friendsLink.classList.add("hidden");
     if(avatar){ avatar.classList.remove("on"); avatar.removeAttribute("src"); }
     return;
   }
@@ -1518,6 +1524,97 @@ function paintAuthBar(user){
     registerLink.textContent="ผูกบัญชี";
     registerLink.classList.toggle("hidden", user.accountType==="registered");
   }
+  if(friendsLink) friendsLink.classList.toggle("hidden", user.accountType!=="registered");
+}
+function canUseFriends(){
+  return !!(authUser&&authUser.accountType==="registered");
+}
+function paintInviteBtn(){
+  const btn=$("inviteFriendsBtn");
+  if(!btn) return;
+  const show=onlineMode&&canUseFriends()&&roomVisibility==="private"&&netPhase==="lobby";
+  btn.classList.toggle("hidden",!show);
+}
+async function loadFriendsCache(){
+  if(!canUseFriends()){ friendsCache=[]; return []; }
+  try{
+    const res=await fetch("/api/v1/friends",{method:"GET",credentials:"same-origin",headers:{Accept:"application/json"}});
+    if(!res.ok){ friendsCache=[]; return []; }
+    const data=await res.json();
+    friendsCache=(data.friends||[]).map(f=>f.user).filter(Boolean);
+    return friendsCache;
+  }catch(e){
+    friendsCache=[];
+    return [];
+  }
+}
+function openInviteModal(){
+  if(!canUseFriends()||roomVisibility!=="private"||netPhase!=="lobby") return;
+  $("inviteModalMsg").textContent="";
+  $("inviteModal").classList.remove("hidden");
+  renderInviteFriendList();
+  send({t:"friendsOnline"});
+  loadFriendsCache().then(()=>renderInviteFriendList());
+}
+function closeInviteModal(){
+  $("inviteModal").classList.add("hidden");
+}
+function renderInviteFriendList(){
+  const box=$("inviteFriendList");
+  const empty=$("inviteEmpty");
+  if(!box) return;
+  box.textContent="";
+  const online=friendsCache.filter(u=>onlineFriendIds.has(u.id)&&!playerMeta.some(p=>p.id===u.id));
+  if(empty) empty.classList.toggle("hidden", online.length>0);
+  online.forEach(u=>{
+    const li=document.createElement("li");
+    const meta=document.createElement("div");
+    meta.className="meta";
+    if(u.avatarUrl){
+      const img=document.createElement("img");
+      img.src=u.avatarUrl;
+      img.alt="";
+      img.referrerPolicy="no-referrer";
+      meta.appendChild(img);
+    }else{
+      const ph=document.createElement("span");
+      ph.className="ph";
+      ph.textContent=(u.displayName||"?").slice(0,1).toUpperCase();
+      meta.appendChild(ph);
+    }
+    const nm=document.createElement("span");
+    nm.className="name";
+    nm.textContent=u.displayName||"";
+    meta.appendChild(nm);
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="btn";
+    btn.textContent="เชิญ";
+    btn.onclick=()=>{
+      send({t:"inviteFriend",friendUserId:u.id});
+      $("inviteModalMsg").textContent="ส่งคำเชิญแล้ว";
+    };
+    li.append(meta,btn);
+    box.appendChild(li);
+  });
+}
+function showRoomInvite(msg){
+  pendingRoomInvite=msg;
+  const av=$("roomInviteAvatar");
+  if(msg.fromAvatar){
+    av.src=msg.fromAvatar;
+    av.classList.add("on");
+  }else{
+    av.removeAttribute("src");
+    av.classList.remove("on");
+  }
+  $("roomInviteFrom").textContent=(msg.fromName||"เพื่อน")+" เชิญคุณ";
+  $("roomInviteRoom").textContent=msg.roomTitle||"ห้องส่วนตัว";
+  $("roomInviteModal").classList.remove("hidden");
+}
+function hideRoomInvite(){
+  pendingRoomInvite=null;
+  $("roomInviteModal").classList.add("hidden");
 }
 async function ensureAuth(){
   if(authBoot) return authBoot;
@@ -1754,6 +1851,7 @@ function hostLocks(){
 function paintRoom(s){
   $("roomCode").textContent=s.code||"";
   const priv=s.visibility==="private";
+  roomVisibility=priv?"private":"public";
   $("visBadge").textContent=priv?"🔒 ส่วนตัว":"สาธารณะ";
   $("visBadge").classList.toggle("private",priv);
   const count=(s.players||[]).filter(p=>p.connected).length;
@@ -1763,6 +1861,7 @@ function paintRoom(s){
   document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
   const mine=(s.players||[]).find(p=>p.id===s.youId);
   if(mine&&mine.name) setLocalName(mine.name);
+  paintInviteBtn();
 }
 function spinProgress(spin){
   const dur=Math.max(0, Number(spin&&spin.dur)||0);
@@ -1906,6 +2005,7 @@ function applySnap(s){
     renderPlayers();
   }
   hostLocks();
+  paintInviteBtn();
   applying=false;
 }
 function rememberSpin(spin){
@@ -2130,11 +2230,30 @@ function connect(){
     else if(msg.t==="lobby"){
       if(!wantRoom) showGate();
       renderLobby(msg);
-    }    else if(msg.t==="left") showGate();
-    else if(msg.t==="renamed"){
+    }else if(msg.t==="left"){
+      roomVisibility="";
+      paintInviteBtn();
+      showGate();
+    }else if(msg.t==="renamed"){
       if(msg.name) setLocalName(msg.name);
+    }else if(msg.t==="friendsOnline"){
+      onlineFriendIds=new Set(Array.isArray(msg.online)?msg.online:[]);
+      if(!$("inviteModal").classList.contains("hidden")) renderInviteFriendList();
+    }else if(msg.t==="friendPresence"){
+      if(msg.online) onlineFriendIds.add(msg.userId);
+      else onlineFriendIds.delete(msg.userId);
+      if(!$("inviteModal").classList.contains("hidden")) renderInviteFriendList();
+    }else if(msg.t==="roomInvite"){
+      showRoomInvite(msg);
+    }else if(msg.t==="inviteSent"){
+      if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="ส่งคำเชิญแล้ว";
+    }else if(msg.t==="inviteAccepted"){
+      if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนรับคำเชิญแล้ว";
+    }else if(msg.t==="inviteDeclined"){
+      if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
     }else if(msg.t==="err"){
       if(!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent=msg.message||"";
+      else if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent=msg.message||"";
       else showErr(msg.message||"");
     }
   };
@@ -2223,6 +2342,34 @@ async function bootOnline(){
   $("makePrivate").onclick=()=>makeRoom("private");
   $("joinForm").onsubmit=e=>{ e.preventDefault(); joinCode($("joinCode").value); };
   $("joinCode").addEventListener("input",()=>{ $("joinCode").value=$("joinCode").value.replace(/\D/g,"").slice(0,6); });
+  const inviteBtn=$("inviteFriendsBtn");
+  if(inviteBtn){
+    inviteBtn.classList.add("hidden");
+    inviteBtn.onclick=()=>openInviteModal();
+  }
+  $("inviteModalClose").onclick=()=>closeInviteModal();
+  $("inviteModal").addEventListener("click",e=>{ if(e.target===$("inviteModal")) closeInviteModal(); });
+  $("roomInviteAccept").onclick=()=>{
+    if(!pendingRoomInvite) return;
+    const inviteId=pendingRoomInvite.inviteId;
+    hideRoomInvite();
+    send({
+      t:"acceptInvite",
+      inviteId,
+      name:typedName()||localStorage.getItem("dpn-name")||"",
+      avatarUrl:myAvatar()
+    });
+  };
+  $("roomInviteDecline").onclick=()=>{
+    if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
+    hideRoomInvite();
+  };
+  $("roomInviteModal").addEventListener("click",e=>{
+    if(e.target===$("roomInviteModal")){
+      if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
+      hideRoomInvite();
+    }
+  });
   const bindVol=(id, delta)=>{
     const el=$(id);
     let armed=false;

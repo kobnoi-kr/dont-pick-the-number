@@ -6,7 +6,8 @@ const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 const { handleAuthApi } = require("./src/auth/routes");
-const { authEnabled } = require("./src/db");
+const { authEnabled, getPrisma } = require("./src/db");
+const { areFriends, listAcceptedFriendIds } = require("./src/auth/friends");
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_PLAYERS = 12;
@@ -16,7 +17,7 @@ const ROOM_MS = 60000;
 const ROOT = __dirname;
 const PAGE =
   fs.readdirSync(ROOT).find((name) => /^don.?t pick the number\.html$/i.test(name)) ||
-  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|forgot-password|reset-password|verify-email)\.html$/i.test(name)) ||
+  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|forgot-password|reset-password|verify-email|friends)\.html$/i.test(name)) ||
   "index.html";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -33,9 +34,78 @@ const BLOCKED_DIRS = new Set(["src", "prisma", "node_modules", ".git"]);
 const rooms = new Map();
 const byWs = new Map();
 const watchers = new Set();
+/** @type {Map<string, Set<import("ws").WebSocket>>} */
+const presence = new Map();
+/** @type {Map<string, { id: string, code: string, fromUserId: string, toUserId: string, fromName: string, fromAvatar: string, roomTitle: string, expires: number }>} */
+const roomInvites = new Map();
+/** one pending invite per invitee */
+const inviteByUser = new Map();
+const INVITE_MS = 60000;
 
 function send(ws, obj) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+function trackPresence(ws, userId) {
+  if (!validToken(userId)) return;
+  const prev = ws.userId;
+  if (prev && prev !== userId) untrackPresence(ws);
+  ws.userId = userId;
+  let set = presence.get(userId);
+  if (!set) {
+    set = new Set();
+    presence.set(userId, set);
+  }
+  const wasOffline = set.size === 0;
+  set.add(ws);
+  if (wasOffline) notifyFriendPresence(userId, true).catch(() => {});
+}
+function untrackPresence(ws) {
+  const userId = ws.userId;
+  if (!userId) return;
+  const set = presence.get(userId);
+  if (set) {
+    set.delete(ws);
+    if (set.size === 0) {
+      presence.delete(userId);
+      notifyFriendPresence(userId, false).catch(() => {});
+    }
+  }
+  ws.userId = "";
+}
+function isUserOnline(userId) {
+  const set = presence.get(userId);
+  return !!(set && set.size);
+}
+function sendToUser(userId, obj) {
+  const set = presence.get(userId);
+  if (!set) return 0;
+  let n = 0;
+  for (const sock of set) {
+    send(sock, obj);
+    n += 1;
+  }
+  return n;
+}
+async function notifyFriendPresence(userId, online) {
+  if (!authEnabled()) return;
+  try {
+    const prisma = await getPrisma();
+    const friendIds = await listAcceptedFriendIds(prisma, userId);
+    const msg = { t: "friendPresence", userId, online: !!online };
+    for (const fid of friendIds) sendToUser(fid, msg);
+  } catch (err) {
+    /* ignore presence fanout errors */
+  }
+}
+function purgeInvite(inviteId) {
+  const inv = roomInvites.get(inviteId);
+  if (!inv) return;
+  roomInvites.delete(inviteId);
+  if (inviteByUser.get(inv.toUserId) === inviteId) inviteByUser.delete(inv.toUserId);
+}
+function clearInviteForUser(userId) {
+  const id = inviteByUser.get(userId);
+  if (id) purgeInvite(id);
 }
 function cleanName(value) {
   return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().replace(/\s+/g, " ").slice(0, 24);
@@ -775,6 +845,7 @@ function transferHost(room) {
 }
 function releaseSocket(ws, notify) {
   watchers.delete(ws);
+  untrackPresence(ws);
   const ctx = byWs.get(ws);
   if (!ctx || ctx.player.ws !== ws) {
     byWs.delete(ws);
@@ -1131,6 +1202,7 @@ function identity(ws, msg) {
   const token = validToken(msg.token) ? msg.token : validToken(ws.token) ? ws.token : crypto.randomUUID();
   const avatarUrl = cleanAvatar(msg.avatarUrl);
   ws.token = token;
+  trackPresence(ws, token);
   return { name, token, avatarUrl };
 }
 function onCreate(ws, msg) {
@@ -1178,6 +1250,7 @@ function onHello(ws, msg) {
   const token = validToken(msg.token) ? msg.token : "";
   ws.token = token;
   ws.pendingName = cleanName(msg.name);
+  if (token) trackPresence(ws, token);
   const avatarUrl = cleanAvatar(msg.avatarUrl);
   if (token) {
     const found = findSeat(token);
@@ -1200,6 +1273,102 @@ function onLeave(ws) {
   }
   takeOut(ctx.room, ctx.player, ws, true);
 }
+async function onFriendsOnline(ws) {
+  const userId = validToken(ws.token) ? ws.token : "";
+  if (!userId || !authEnabled()) {
+    send(ws, { t: "friendsOnline", online: [] });
+    return;
+  }
+  try {
+    const prisma = await getPrisma();
+    const ids = await listAcceptedFriendIds(prisma, userId);
+    send(ws, { t: "friendsOnline", online: ids.filter(isUserOnline) });
+  } catch (err) {
+    send(ws, { t: "friendsOnline", online: [] });
+  }
+}
+async function onInviteFriend(ws, msg) {
+  if (!authEnabled()) return fail(ws, "ระบบเพื่อนยังไม่พร้อม");
+  const ctx = seat(ws);
+  if (!ctx) return fail(ws, "ต้องอยู่ในห้องก่อน");
+  if (ctx.room.visibility !== "private") return fail(ws, "เชิญเพื่อนได้เฉพาะห้องส่วนตัว");
+  if (ctx.room.phase !== "lobby") return fail(ws, "เชิญได้เฉพาะตอนล็อบบี้");
+  const fromUserId = ctx.player.id;
+  const friendUserId = validToken(msg.friendUserId) ? msg.friendUserId : "";
+  if (!friendUserId) return fail(ws, "ไม่พบเพื่อน");
+  if (friendUserId === fromUserId) return fail(ws, "เชิญตัวเองไม่ได้");
+  if (ctx.room.players.some((p) => p.id === friendUserId)) return fail(ws, "เพื่อนอยู่ในห้องแล้ว");
+  if (ctx.room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (!isUserOnline(friendUserId)) return fail(ws, "เพื่อนออฟไลน์อยู่");
+  if (findSeat(friendUserId)) return fail(ws, "เพื่อนอยู่ในห้องอื่นอยู่");
+
+  try {
+    const prisma = await getPrisma();
+    const ok = await areFriends(prisma, fromUserId, friendUserId);
+    if (!ok) return fail(ws, "ยังไม่ได้เป็นเพื่อนกัน");
+  } catch (err) {
+    return fail(ws, "เชิญไม่สำเร็จ");
+  }
+
+  clearInviteForUser(friendUserId);
+  const inviteId = crypto.randomUUID();
+  const inv = {
+    id: inviteId,
+    code: ctx.room.code,
+    fromUserId,
+    toUserId: friendUserId,
+    fromName: ctx.player.name,
+    fromAvatar: ctx.player.avatarUrl || "",
+    roomTitle: roomLabel(ctx.room),
+    expires: Date.now() + INVITE_MS
+  };
+  roomInvites.set(inviteId, inv);
+  inviteByUser.set(friendUserId, inviteId);
+  const n = sendToUser(friendUserId, {
+    t: "roomInvite",
+    inviteId,
+    fromUserId,
+    fromName: inv.fromName,
+    fromAvatar: inv.fromAvatar,
+    roomTitle: inv.roomTitle,
+    expiresIn: INVITE_MS
+  });
+  if (!n) {
+    purgeInvite(inviteId);
+    return fail(ws, "เพื่อนออฟไลน์อยู่");
+  }
+  send(ws, { t: "inviteSent", friendUserId, inviteId });
+}
+function onDeclineInvite(ws, msg) {
+  const inviteId = String(msg.inviteId || "");
+  const inv = roomInvites.get(inviteId);
+  if (!inv) return;
+  if (ws.token !== inv.toUserId) return;
+  purgeInvite(inviteId);
+  sendToUser(inv.fromUserId, { t: "inviteDeclined", inviteId, friendUserId: inv.toUserId });
+}
+function onAcceptInvite(ws, msg) {
+  const inviteId = String(msg.inviteId || "");
+  const inv = roomInvites.get(inviteId);
+  if (!inv || inv.expires < Date.now()) {
+    purgeInvite(inviteId);
+    return fail(ws, "คำเชิญหมดอายุแล้ว");
+  }
+  if (ws.token !== inv.toUserId) return fail(ws, "คำเชิญนี้ไม่ใช่ของคุณ");
+  const room = rooms.get(inv.code);
+  purgeInvite(inviteId);
+  if (!room) return fail(ws, "ห้องนี้ไม่มีแล้ว");
+  if (room.phase !== "lobby") return fail(ws, "ห้องนี้เริ่มเกมแล้ว");
+  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  onJoin(ws, {
+    t: "join",
+    code: inv.code,
+    name: cleanName(msg.name) || ws.pendingName || "",
+    token: ws.token,
+    avatarUrl: msg.avatarUrl || ""
+  });
+  sendToUser(inv.fromUserId, { t: "inviteAccepted", inviteId, friendUserId: inv.toUserId });
+}
 function onMessage(ws, raw) {
   if (!allow(ws)) return;
   let msg;
@@ -1209,6 +1378,10 @@ function onMessage(ws, raw) {
   if (msg.t === "create") return onCreate(ws, msg);
   if (msg.t === "join") return onJoin(ws, msg);
   if (msg.t === "leave") return onLeave(ws);
+  if (msg.t === "friendsOnline") return void onFriendsOnline(ws);
+  if (msg.t === "inviteFriend") return void onInviteFriend(ws, msg);
+  if (msg.t === "acceptInvite") return onAcceptInvite(ws, msg);
+  if (msg.t === "declineInvite") return onDeclineInvite(ws, msg);
   if (msg.t === "setup") return onSetup(ws, msg);
   if (msg.t === "spinOrder") return onSpinOrder(ws);
   if (msg.t === "start") return onStart(ws);
@@ -1298,9 +1471,18 @@ const server = http.createServer(serve);
 const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 8000 });
 wss.on("connection", (ws) => {
   ws.on("message", (buf) => onMessage(ws, buf));
-  ws.on("close", () => releaseSocket(ws, false));
+  ws.on("close", () => {
+    untrackPresence(ws);
+    releaseSocket(ws, false);
+  });
   ws.on("error", () => {});
 });
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, inv] of roomInvites) {
+    if (inv.expires < now) purgeInvite(id);
+  }
+}, 5000);
 server.listen(PORT, "0.0.0.0", () => {
   console.log("เปิดเกมที่ http://localhost:" + PORT);
   console.log("Auth V1: " + (authEnabled() ? "on" : "off (ตั้ง DATABASE_URL เพื่อเปิด)"));
