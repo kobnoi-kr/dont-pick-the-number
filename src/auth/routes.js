@@ -231,22 +231,41 @@ async function finishOAuth(req, res, provider) {
 
     if (saved.mode === "link" && saved.userId) {
       const { linkProviderToUser } = require("./upgrade");
-      await linkProviderToUser(prisma, {
-        userId: saved.userId,
-        provider,
-        providerUserId: profile.providerUserId,
-        providerEmail: profile.email,
-        markEmailVerified: !!profile.emailVerified,
-        eventType: "provider_linked",
-        metadata: { displayName: profile.displayName, avatarUrl: profile.avatarUrl }
-      });
-      const user = await prisma.user.findUnique({
-        where: { id: saved.userId },
-        include: { userRoles: { include: { role: true } } }
-      });
-      await rotateAndIssueSession(prisma, req, res, user);
-      redirect(res, "/account.html?linked=" + provider);
-      return true;
+      try {
+        await linkProviderToUser(prisma, {
+          userId: saved.userId,
+          provider,
+          providerUserId: profile.providerUserId,
+          providerEmail: profile.email,
+          markEmailVerified: !!profile.emailVerified,
+          eventType: "provider_linked",
+          metadata: { displayName: profile.displayName, avatarUrl: profile.avatarUrl }
+        });
+        const user = await prisma.user.findUnique({
+          where: { id: saved.userId },
+          include: { userRoles: { include: { role: true } } }
+        });
+        await rotateAndIssueSession(prisma, req, res, user);
+        redirect(res, "/account.html?linked=" + provider);
+        return true;
+      } catch (linkErr) {
+        // Provider already belongs to another account → just sign in as that account.
+        if (linkErr && linkErr.code === "provider_already_linked") {
+          const result = await resolveProviderLogin(prisma, {
+            provider,
+            providerUserId: profile.providerUserId,
+            providerEmail: profile.email,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            markEmailVerified: !!profile.emailVerified,
+            guestUserId: null
+          });
+          await rotateAndIssueSession(prisma, req, res, result.user);
+          redirect(res, lobbyRedirect());
+          return true;
+        }
+        throw linkErr;
+      }
     }
 
     const result = await resolveProviderLogin(prisma, {

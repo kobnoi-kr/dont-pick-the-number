@@ -38,7 +38,16 @@
   function $(id){ return document.getElementById(id); }
   const msg=$("msg");
   const err=qs("error");
-  if(err) setMsg(msg, "เข้าสู่ระบบไม่สำเร็จ: "+err, false);
+  if(err){
+    const map={
+      provider_already_linked:"บัญชี Google/Discord นี้ถูกผูกกับบัญชีอื่นแล้ว — กดโลโก้อีกครั้งเพื่อเข้าบัญชีนั้น หรือเล่น Guest ใหม่แล้วลองใหม่",
+      last_provider:"ถอดไม่ได้ — นี่คือวิธีล็อกอินสุดท้าย",
+      oauth_exchange_failed:"แลกสิทธิ์ล้มเหลว ลองใหม่",
+      invalid_oauth_state:"เซสชันหมดอายุ ลองกดโลโก้อีกครั้ง",
+      account_blocked:"บัญชีถูกระงับ"
+    };
+    setMsg(msg, map[err]||("เข้าสู่ระบบไม่สำเร็จ: "+err), false);
+  }
 
   const providers=await loadProviders();
   if(!providers.authEnabled){
