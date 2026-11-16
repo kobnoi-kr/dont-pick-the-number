@@ -1469,6 +1469,54 @@ $("clearScores").onclick=()=>{
 };
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if(netPhase!=="gate") drawWheel(); });
 
+let authUser=null;
+let authBoot=null;
+function paintAuthBar(user){
+  const label=$("authLabel");
+  const loginLink=$("loginLink");
+  const registerLink=$("registerLink");
+  if(!label) return;
+  if(!user){
+    label.textContent="Auth ปิดอยู่ — เล่นได้ตามปกติ";
+    if(loginLink) loginLink.classList.add("hidden");
+    if(registerLink) registerLink.classList.add("hidden");
+    return;
+  }
+  const kind=user.accountType==="registered"?"สมาชิก":"Guest";
+  label.textContent=kind+" · "+(user.displayName||user.username||"");
+  if(loginLink) loginLink.classList.toggle("hidden", user.accountType==="registered");
+  if(registerLink){
+    registerLink.textContent=user.accountType==="guest"?"ผูกบัญชี":"สมัครเพิ่ม";
+    registerLink.classList.toggle("hidden", user.accountType==="registered");
+  }
+}
+async function ensureAuth(){
+  if(authBoot) return authBoot;
+  authBoot=(async()=>{
+    try{
+      const res=await fetch("/api/v1/auth/guest",{method:"POST",credentials:"same-origin",headers:{"Accept":"application/json"}});
+      if(!res.ok){
+        paintAuthBar(null);
+        return null;
+      }
+      const data=await res.json();
+      authUser=data&&data.user?data.user:null;
+      paintAuthBar(authUser);
+      if(authUser&&authUser.id){
+        sessionStorage.setItem("dpn-token", authUser.id);
+        if(authUser.displayName&&!localStorage.getItem("dpn-name")){
+          localStorage.setItem("dpn-name", authUser.displayName);
+          if($("myName")&&!$("myName").value) $("myName").value=authUser.displayName;
+        }
+      }
+      return authUser;
+    }catch(e){
+      paintAuthBar(null);
+      return null;
+    }
+  })();
+  return authBoot;
+}
 function myToken(){
   let token=sessionStorage.getItem("dpn-token");
   if(!token){
@@ -2071,7 +2119,8 @@ function connect(){
     connTimer=setTimeout(connect,800);
   };
 }
-function bootOnline(){
+async function bootOnline(){
+  await ensureAuth();
   const saved=localStorage.getItem("dpn-name");
   if(saved) $("myName").value=saved;
   $("myName").addEventListener("change",typedName);

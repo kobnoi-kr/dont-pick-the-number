@@ -1,0 +1,63 @@
+:root{
+  --bg:#080F1D;
+  --bg2:#0B1424;
+  --card:#111C30;
+  --blue:#2563EB;
+  --blue2:#3B82F6;
+  --line:#263B5A;
+  --text:#F5F7FF;
+  --muted:#94A3B8;
+  --ok:#22C55E;
+  --bad:#EF4444;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;min-height:100dvh;
+  background:
+    radial-gradient(900px 420px at 50% -10%, rgba(37,99,235,.28), transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  color:var(--text);
+  font-family:"Segoe UI","Noto Sans Thai",Tahoma,sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.wrap{width:min(420px,100%)}
+.brand{display:flex;justify-content:center;margin:0 0 14px}
+.brand img{width:min(100%,240px);height:auto}
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:24px 22px;box-shadow:0 18px 50px rgba(0,0,0,.35);
+}
+h1{margin:0 0 6px;font-size:1.35rem;text-align:center;font-weight:750}
+.sub{margin:0 0 18px;text-align:center;color:var(--muted);font-size:.92rem}
+label{display:block;margin:0 0 12px;color:var(--muted);font-size:.85rem}
+input[type=email],input[type=password],input[type=text]{
+  width:100%;margin-top:6px;border:1px solid var(--line);background:var(--bg2);
+  color:var(--text);border-radius:12px;padding:12px 14px;font-size:1rem;
+}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0 14px;font-size:.85rem;color:var(--muted)}
+.row a,.links a{color:var(--blue2);text-decoration:none}
+.btn{
+  width:100%;border:0;border-radius:12px;background:var(--blue);color:#fff;
+  font-size:1rem;padding:13px;cursor:pointer;font-weight:700;margin-top:4px;
+}
+.btn:hover{background:var(--blue2)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);margin-top:10px}
+.btn.oauth{background:#0B1424;border:1px solid var(--line);margin-top:10px}
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0 8px;color:var(--muted);font-size:.8rem}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.msg{min-height:1.2em;margin:10px 0 0;text-align:center;color:var(--bad);font-size:.9rem}
+.msg.ok{color:var(--ok)}
+.links{margin-top:16px;text-align:center;font-size:.9rem;color:var(--muted)}
+.legal{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
+.legal a{color:var(--muted)}
+.list{list-style:none;padding:0;margin:0}
+.list li{
+  display:flex;justify-content:space-between;gap:10px;align-items:center;
+  padding:12px 0;border-bottom:1px solid var(--line);font-size:.92rem;
+}
+.list li:last-child{border-bottom:0}
+.badge{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.badge.on{color:#bbf7d0;border-color:#166534}
+.tiny{font-size:.8rem;color:var(--muted)}
+.hidden{display:none !important}

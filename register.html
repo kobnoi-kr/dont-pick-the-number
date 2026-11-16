@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สมัครสมาชิก — NUMVERSE</title>
+<link rel="icon" href="numverse.png" type="image/png">
+<link rel="stylesheet" href="auth-pages.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="numverse.png" alt="NUMVERSE" width="240" height="135"></div>
+  <div class="panel">
+    <h1>Create Account</h1>
+    <p class="sub">ผูกบัญชีเพื่อเก็บประวัติและล็อกอินข้ามเครื่อง<br><span class="tiny">ถ้ากำลังเล่นแบบ Guest อยู่ ระบบจะอัปเกรดบัญชีเดิมให้อัตโนมัติ</span></p>
+    <form id="form">
+      <label>อีเมล
+        <input id="email" type="email" autocomplete="email" required>
+      </label>
+      <label>รหัสผ่าน (อย่างน้อย 8 ตัว มีตัวอักษรและตัวเลข)
+        <input id="password" type="password" autocomplete="new-password" required minlength="8">
+      </label>
+      <button class="btn" type="submit">สร้างบัญชี</button>
+    </form>
+    <div class="divider">หรืออัปเกรดด้วย</div>
+    <a class="btn oauth" id="googleBtn" href="/api/v1/auth/google">Continue with Google</a>
+    <a class="btn oauth" id="discordBtn" href="/api/v1/auth/discord">Continue with Discord</a>
+    <p class="msg" id="msg"></p>
+    <p class="links">มีบัญชีแล้ว? <a href="login.html">Sign In</a> · <a href="/">กลับไปเล่น</a></p>
+  </div>
+</div>
+<script src="auth-client.js"></script>
+<script>
+(async function(){
+  const msg=document.getElementById("msg");
+  const providers=await loadProviders();
+  if(!(providers.providers||[]).includes("google")) document.getElementById("googleBtn").style.display="none";
+  if(!(providers.providers||[]).includes("discord")) document.getElementById("discordBtn").style.display="none";
+
+  document.getElementById("form").onsubmit=async (e)=>{
+    e.preventDefault();
+    setMsg(msg,"กำลังสมัคร…",true);
+    const {res,data}=await api("/api/v1/auth/register",{
+      method:"POST",
+      body:JSON.stringify({
+        email:document.getElementById("email").value,
+        password:document.getElementById("password").value
+      })
+    });
+    if(!res.ok){
+      const map={email_taken:"อีเมลนี้ถูกใช้แล้ว",weak_password:"รหัสผ่านไม่ปลอดภัยพอ",invalid_input:"ข้อมูลไม่ถูกต้อง"};
+      setMsg(msg, map[data&&data.error]||"สมัครไม่สำเร็จ", false);
+      return;
+    }
+    let text="สมัครสำเร็จ — กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ";
+    if(data.previewLink) text+="\n(dev) "+data.previewLink;
+    setMsg(msg, text, true);
+    if(data.previewLink) location.href=data.previewLink;
+  };
+})();
+</script>
+</body>
+</html>

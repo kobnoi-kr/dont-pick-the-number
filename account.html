@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บัญชี — NUMVERSE</title>
+<link rel="icon" href="numverse.png" type="image/png">
+<link rel="stylesheet" href="auth-pages.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="numverse.png" alt="NUMVERSE" width="240" height="135"></div>
+  <div class="panel">
+    <h1>Account</h1>
+    <p class="sub" id="sub">กำลังโหลด…</p>
+
+    <div id="guestPrompt" class="hidden">
+      <p class="sub" style="text-align:left">คุณกำลังเล่นแบบ Guest — ผูกบัญชีเพื่อไม่ให้ข้อมูลหายเมื่อล้างคุกกี้</p>
+      <a class="btn oauth" href="/api/v1/auth/link/google">อัปเกรดด้วย Google</a>
+      <a class="btn oauth" href="/api/v1/auth/link/discord">อัปเกรดด้วย Discord</a>
+      <a class="btn ghost" href="register.html">อัปเกรดด้วย Email</a>
+    </div>
+
+    <form id="profileForm" class="hidden">
+      <label>ชื่อที่แสดง
+        <input id="displayName" type="text" maxlength="64" required>
+      </label>
+      <button class="btn" type="submit">บันทึกโปรไฟล์</button>
+    </form>
+
+    <h1 style="margin-top:22px;font-size:1.05rem;text-align:left">Connected Accounts</h1>
+    <ul class="list" id="providers"></ul>
+    <a class="btn oauth" href="/api/v1/auth/link/google">เชื่อม Google</a>
+    <a class="btn oauth" href="/api/v1/auth/link/discord">เชื่อม Discord</a>
+
+    <h1 style="margin-top:22px;font-size:1.05rem;text-align:left">Sessions</h1>
+    <ul class="list" id="sessions"></ul>
+
+    <button class="btn ghost" id="logout" type="button">Logout</button>
+    <button class="btn ghost" id="logoutAll" type="button">Logout ทุกอุปกรณ์</button>
+    <p class="msg" id="msg"></p>
+    <p class="links"><a href="/">กลับล็อบบี้</a></p>
+  </div>
+</div>
+<script src="auth-client.js"></script>
+<script>
+function $(id){return document.getElementById(id)}
+function show(el,on){el.classList.toggle("hidden",!on)}
+
+async function refresh(){
+  const me=await api("/api/v1/auth/me",{method:"GET",headers:{Accept:"application/json"}});
+  if(!me.res.ok){
+    $("sub").textContent="ยังไม่ได้เข้าสู่ระบบ";
+    location.href="login.html";
+    return;
+  }
+  const user=me.data.user;
+  $("sub").textContent=user.displayName+" · "+user.accountType+(user.roles&&user.roles.length?" · "+user.roles.join(","):"");
+  show($("guestPrompt"), user.accountType==="guest");
+  show($("profileForm"), true);
+  $("displayName").value=user.displayName||"";
+
+  const prov=await api("/api/v1/account/providers",{method:"GET",headers:{Accept:"application/json"}});
+  $("providers").innerHTML="";
+  (prov.data&&prov.data.providers||[]).forEach(p=>{
+    const li=document.createElement("li");
+    li.innerHTML="<span>"+p.provider+(p.providerEmail?" · "+p.providerEmail:"")+"</span>";
+    const btn=document.createElement("button");
+    btn.className="btn ghost";
+    btn.style.width="auto";
+    btn.style.margin=0;
+    btn.style.padding="8px 12px";
+    btn.textContent="ยกเลิกเชื่อม";
+    btn.onclick=async()=>{
+      const r=await api("/api/v1/account/unlink/"+p.provider,{method:"DELETE",headers:{Accept:"application/json"}});
+      setMsg($("msg"), r.res.ok?"ยกเลิกแล้ว":(r.data&&r.data.error)||"ล้มเหลว", r.res.ok);
+      refresh();
+    };
+    li.appendChild(btn);
+    $("providers").appendChild(li);
+  });
+
+  const sess=await api("/api/v1/account/sessions",{method:"GET",headers:{Accept:"application/json"}});
+  $("sessions").innerHTML="";
+  (sess.data&&sess.data.sessions||[]).forEach(s=>{
+    const li=document.createElement("li");
+    li.innerHTML="<div><div>"+(s.userAgent||"device").slice(0,48)+"</div><div class='tiny'>"+(s.ipAddress||"")+" · "+new Date(s.lastSeenAt).toLocaleString()+"</div></div>";
+    if(s.current){
+      const b=document.createElement("span");
+      b.className="badge on";
+      b.textContent="เครื่องนี้";
+      li.appendChild(b);
+    }else{
+      const btn=document.createElement("button");
+      btn.className="btn ghost";
+      btn.style.width="auto";
+      btn.style.margin=0;
+      btn.style.padding="8px 12px";
+      btn.textContent="revoke";
+      btn.onclick=async()=>{
+        await api("/api/v1/account/sessions/"+s.id,{method:"DELETE",headers:{Accept:"application/json"}});
+        refresh();
+      };
+      li.appendChild(btn);
+    }
+    $("sessions").appendChild(li);
+  });
+}
+
+$("profileForm").onsubmit=async(e)=>{
+  e.preventDefault();
+  const {res,data}=await api("/api/v1/account/profile",{
+    method:"PATCH",
+    body:JSON.stringify({displayName:$("displayName").value})
+  });
+  setMsg($("msg"), res.ok?"บันทึกแล้ว":"บันทึกไม่สำเร็จ", res.ok);
+  if(res.ok) refresh();
+};
+$("logout").onclick=async()=>{
+  await api("/api/v1/auth/logout",{method:"POST",body:"{}"});
+  location.href="/";
+};
+$("logoutAll").onclick=async()=>{
+  await api("/api/v1/auth/logout-all",{method:"POST",body:"{}"});
+  location.href="login.html";
+};
+refresh();
+</script>
+</body>
+</html>

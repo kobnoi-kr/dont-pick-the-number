@@ -1,9 +1,12 @@
+require("dotenv").config();
 const http = require("http");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
+const { handleAuthApi } = require("./src/auth/routes");
+const { authEnabled } = require("./src/db");
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_PLAYERS = 12;
@@ -11,7 +14,10 @@ const MAX_ROOMS = 200;
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
 const ROOT = __dirname;
-const PAGE = fs.readdirSync(ROOT).find((name) => name.endsWith(".html")) || "index.html";
+const PAGE =
+  fs.readdirSync(ROOT).find((name) => /^don.?t pick the number\.html$/i.test(name)) ||
+  fs.readdirSync(ROOT).find((name) => name.endsWith(".html") && !/^(login|register|account|forgot-password|reset-password|verify-email)\.html$/i.test(name)) ||
+  "index.html";
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -22,6 +28,7 @@ const TYPES = {
   ".svg": "image/svg+xml"
 };
 const BLOCKED = new Set(["server.js", "package.json", "package-lock.json"]);
+const BLOCKED_DIRS = new Set(["src", "prisma", "node_modules", ".git"]);
 
 const rooms = new Map();
 const byWs = new Map();
@@ -1201,13 +1208,27 @@ function onMessage(ws, raw) {
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
 }
-function serve(req, res) {
+async function serve(req, res) {
   const url = new URL(req.url || "/", "http://localhost");
-  let name = decodeURIComponent(url.pathname);
+  const pathname = decodeURIComponent(url.pathname);
+  if (pathname.startsWith("/api/")) {
+    const handled = await handleAuthApi(req, res, pathname);
+    if (handled) return;
+    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    return;
+  }
+  let name = pathname;
   if (name === "/") name = "/" + PAGE;
   const file = path.normalize(path.join(ROOT, name));
   const rel = path.relative(ROOT, file);
-  if (rel.startsWith("..") || path.isAbsolute(rel) || rel.split(path.sep).includes("node_modules") || BLOCKED.has(path.basename(file))) {
+  const parts = rel.split(path.sep);
+  if (
+    rel.startsWith("..") ||
+    path.isAbsolute(rel) ||
+    parts.some((part) => BLOCKED_DIRS.has(part)) ||
+    BLOCKED.has(path.basename(file))
+  ) {
     res.writeHead(404);
     res.end("not found");
     return;
@@ -1262,6 +1283,7 @@ wss.on("connection", (ws) => {
 });
 server.listen(PORT, "0.0.0.0", () => {
   console.log("เปิดเกมที่ http://localhost:" + PORT);
+  console.log("Auth V1: " + (authEnabled() ? "on" : "off (ตั้ง DATABASE_URL เพื่อเปิด)"));
   const nets = os.networkInterfaces();
   for (const list of Object.values(nets)) {
     for (const item of list || []) {

@@ -9,3 +9,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: APP_BASE_URL
+        value: https://numverse.click
+      - key: AUTH_SECRET
+        generateValue: true
+      # Optional: set DATABASE_URL in Render dashboard to enable Auth
+      # - key: DATABASE_URL
+      #   sync: false

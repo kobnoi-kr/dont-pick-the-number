@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ — NUMVERSE</title>
+<link rel="icon" href="numverse.png" type="image/png">
+<link rel="stylesheet" href="auth-pages.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="numverse.png" alt="NUMVERSE" width="240" height="135"></div>
+  <div class="panel">
+    <h1>Welcome Back</h1>
+    <p class="sub">เข้าสู่ระบบบัญชี NUMVERSE</p>
+    <form id="form">
+      <label>อีเมล
+        <input id="email" type="email" autocomplete="email" required placeholder="you@email.com">
+      </label>
+      <label>รหัสผ่าน
+        <input id="password" type="password" autocomplete="current-password" required minlength="8">
+      </label>
+      <div class="row">
+        <label style="margin:0"><input type="checkbox" id="remember"> Remember me</label>
+        <a href="forgot-password.html">ลืมรหัสผ่าน?</a>
+      </div>
+      <button class="btn" type="submit">Sign In</button>
+    </form>
+    <div class="divider">หรือ</div>
+    <a class="btn oauth" id="googleBtn" href="/api/v1/auth/google">Continue with Google</a>
+    <a class="btn oauth" id="discordBtn" href="/api/v1/auth/discord">Continue with Discord</a>
+    <p class="msg" id="msg"></p>
+    <p class="links">ยังไม่มีบัญชี? <a href="register.html">Create Account</a> · <a href="/">เล่นแบบ Guest</a></p>
+    <p class="legal"><a href="#">Terms of Service</a> · <a href="#">Privacy Policy</a></p>
+  </div>
+</div>
+<script src="auth-client.js"></script>
+<script>
+(async function(){
+  function $(id){ return document.getElementById(id); }
+  const msg=$("msg");
+  const err=qs("error");
+  if(err) setMsg(msg, "เข้าสู่ระบบไม่สำเร็จ: "+err, false);
+
+  const providers=await loadProviders();
+  if(!providers.authEnabled){
+    setMsg(msg, "Auth ยังไม่เปิด (ตั้ง DATABASE_URL)", false);
+  }
+  if(!(providers.providers||[]).includes("google")) $("googleBtn").style.display="none";
+  if(!(providers.providers||[]).includes("discord")) $("discordBtn").style.display="none";
+
+  $("form").onsubmit=async (e)=>{
+    e.preventDefault();
+    setMsg(msg, "กำลังเข้าสู่ระบบ…", true);
+    const {res,data}=await api("/api/v1/auth/login",{
+      method:"POST",
+      body:JSON.stringify({email:$("email").value, password:$("password").value})
+    });
+    if(!res.ok){
+      const map={
+        invalid_credentials:"อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+        email_unverified:"ยังไม่ได้ยืนยันอีเมล",
+        account_blocked:"บัญชีถูกระงับ",
+        rate_limited:"ลองใหม่ภายหลัง"
+      };
+      setMsg(msg, map[data&&data.error]||"เข้าสู่ระบบไม่สำเร็จ", false);
+      return;
+    }
+    location.href="/";
+  };
+})();
+</script>
+</body>
+</html>

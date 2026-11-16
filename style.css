@@ -162,6 +162,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .volbtn:hover{background:var(--blue);color:#fff}
 .volbtn:disabled{opacity:.4;cursor:not-allowed}
 .vollabel{min-width:3.2em;text-align:center;font-size:.85rem;font-weight:700;color:var(--muted);pointer-events:none}
+.auth-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip)}
+.auth-bar .hint{margin:0;color:var(--muted);font-size:.85rem}
+.auth-bar .textbtn{font-size:.85rem}
 .grid button.wait:disabled{opacity:1;background:var(--chip);color:var(--text);cursor:not-allowed}
 .prow.off{opacity:.45}
 .turnbar.you{color:var(--mark)}
