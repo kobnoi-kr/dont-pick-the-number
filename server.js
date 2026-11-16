@@ -193,6 +193,7 @@ function blankRoom(code, visibility, host) {
     pickCursor: 0,
     wheelAlive: [],
     wheelLog: [],
+    wheelGone: [],
     wheelRot: 0,
     over: null,
     activeSpin: null,
@@ -268,6 +269,7 @@ function snap(room, player) {
     pickCursor: room.pickCursor,
     wheelAlive: room.wheelAlive,
     wheelLog: room.wheelLog.map((item) => ({ n: item.n, who: item.who })),
+    wheelGone: Array.isArray(room.wheelGone) ? room.wheelGone.slice() : [],
     wheelRot: room.wheelRot,
     orderRot: room.rot,
     over: room.over,
@@ -516,6 +518,7 @@ function startPick(room) {
   room.pickCursor = 0;
   room.wheelAlive = [];
   room.wheelLog = [];
+  room.wheelGone = [];
   room.wheelRot = 0;
   room.phase = "pick";
   room.over = null;
@@ -549,13 +552,21 @@ function ownerOf(room, n) {
   }
   return "";
 }
+function wheelPool(room) {
+  const gone = new Set(Array.isArray(room.wheelGone) ? room.wheelGone : []);
+  const pool = [];
+  for (let n = room.wheelMin; n <= room.wheelMax; n++) if (!gone.has(n)) pool.push(n);
+  return pool;
+}
 function planNumSpin(room) {
-  const span = room.wheelMax - room.wheelMin + 1;
-  const n = room.wheelMin + Math.floor(Math.random() * span);
+  const pool = wheelPool(room);
+  if (!pool.length) return null;
+  const index = Math.floor(Math.random() * pool.length);
+  const n = pool[index];
   const owner = ownerOf(room, n);
   const hit = !!(owner && room.wheelAlive.includes(owner));
+  const span = pool.length;
   const slice = 360 / span;
-  const index = n - room.wheelMin;
   const margin = slice * 0.18;
   const roomj = Math.max(slice / 2 - margin, 0);
   const jitter = (Math.random() * 2 - 1) * roomj;
@@ -569,20 +580,29 @@ function planNumSpin(room) {
 function applyLand(room, plan) {
   room.wheelRot = plan.target;
   room.activeSpin = null;
+  if (!Array.isArray(room.wheelGone)) room.wheelGone = [];
+  if (!room.wheelGone.includes(plan.n)) room.wheelGone.push(plan.n);
   if (plan.hit) {
     const index = room.wheelAlive.indexOf(plan.owner);
     if (index >= 0) room.wheelAlive.splice(index, 1);
     room.wheelLog.push({ n: plan.n, who: plan.owner });
+  } else {
+    room.wheelLog.push({ n: plan.n, who: "" });
   }
 }
 function beginNumSpin(room) {
   if (room.phase !== "wheel") return;
-  if (room.wheelAlive.length < 2) {
+  if (room.wheelAlive.length < 2 || !wheelPool(room).length) {
     finishWheel(room);
     broadcast(room);
     return;
   }
   const plan = planNumSpin(room);
+  if (!plan) {
+    finishWheel(room);
+    broadcast(room);
+    return;
+  }
   const id = crypto.randomUUID();
   room.activeSpin = {
     id,
@@ -870,6 +890,7 @@ function onOpenWheel(ws) {
   clearTurnTimer(room);
   room.wheelAlive = room.wheelOrder.slice();
   room.wheelLog = [];
+  room.wheelGone = [];
   room.wheelRot = 0;
   room.phase = "wheel";
   broadcast(room);
@@ -889,6 +910,7 @@ function onRepick(ws) {
   if (room.phase !== "wheel" || room.activeSpin || room.wheelLog.length) return;
   room.picks = {};
   room.pickCursor = 0;
+  room.wheelGone = [];
   room.phase = "pick";
   armTurnTimer(room);
   broadcast(room);
@@ -923,6 +945,7 @@ function onAbort(ws) {
   room.secrets = [];
   room.secretAll = [];
   room.wheelLog = [];
+  room.wheelGone = [];
   room.wheelAlive = [];
   room.wheelOrder = [];
   room.picks = {};

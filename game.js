@@ -4,7 +4,7 @@ const BAND_A="#9f1239", BAND_B="#111827", DEAD_SLICE="#475569";
 let gameMin=1, gameMax=99, secrets=[], secretAll=[], secretTotal=1, winTarget=3, pointAll=true, lo, hi, picked, pageFrom=1, useCustom=false, pickMin=1, pickMax=99;
 let players=[], scores={}, order=[], alive=[], roundOrder=[], turn=0, nextOrder=[], spinning=false, rot=0, spinTimer=0;
 let gameCat="secret", wheelMin=1, wheelMax=99, wheelOrder=[], picks={}, pickEach=1, pickCursor=0, pickFrom=1;
-let wheelAlive=[], wheelLog=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
+let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
 const $=id=>document.getElementById(id);
 const POP_SOUND="pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="spinner-sound.mp3";
@@ -825,14 +825,27 @@ function playerColor(name){
 function wheelSpan(){
   return wheelMax-wheelMin+1;
 }
+function liveWheelNums(){
+  if(!wheelGone.length){
+    const all=[];
+    for(let n=wheelMin;n<=wheelMax;n++) all.push(n);
+    return all;
+  }
+  const gone=new Set(wheelGone);
+  const all=[];
+  for(let n=wheelMin;n<=wheelMax;n++) if(!gone.has(n)) all.push(n);
+  return all;
+}
 function numberAt(deg){
-  const span=wheelSpan();
+  const pool=liveWheelNums();
+  const span=pool.length;
+  if(span<1) return wheelMin;
   const slice=360/span;
   const norm=((-deg%360)+360)%360;
   let index=Math.round(norm/slice);
   if(index===span) index=0;
   index=((index%span)+span)%span;
-  return wheelMin+index;
+  return pool[index];
 }
 function applyWheelRot(){
   const canvas=$("numWheel");
@@ -990,8 +1003,9 @@ function startPick(min, max){
   pickFrom=min;
   wheelAlive=[];
   wheelLog=[];
+  wheelGone=[];
   show("pick");
-  $("pickMode").textContent="ช่วง "+min+"–"+max+" · คนละ "+pickEach+" เลข · ถึง "+winTarget+" แต้มชนะ · เลขที่ไม่มีคนเลือกคือรอด";
+  $("pickMode").textContent="ช่วง "+min+"–"+max+" · คนละ "+pickEach+" เลข · ถึง "+winTarget+" แต้มชนะ · เลขที่ออกจะถูกตัดจากวงล้อ";
   $("pickMsg").textContent="";
   renderPick();
   renderPlayers();
@@ -1020,15 +1034,26 @@ function drawNumWheel(){
   const ctx=canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
   const cx=size/2, cy=size/2, r=size/2-8;
-  const span=wheelSpan();
-  const slice=(Math.PI*2)/span;
-  const start=-Math.PI/2-slice/2;
+  const pool=liveWheelNums();
+  const span=pool.length;
   const ownerOf=Object.create(null);
   wheelOrder.forEach(name=>pickList(name).forEach(n=>{ ownerOf[n]=name; }));
   ctx.clearRect(0,0,size,size);
+  if(span<1){
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=BAND_B;
+    ctx.fill();
+    applyWheelRot();
+    return;
+  }
+  const slice=(Math.PI*2)/span;
+  const start=-Math.PI/2-slice/2;
+  const indexOf=Object.create(null);
+  pool.forEach((num,i)=>{ indexOf[num]=i; });
   if(span<=200){
     for(let i=0;i<span;i++){
-      const num=wheelMin+i;
+      const num=pool[i];
       const owner=ownerOf[num]||"";
       const living=owner&&wheelAlive.includes(owner);
       ctx.beginPath();
@@ -1059,7 +1084,8 @@ function drawNumWheel(){
     wheelOrder.forEach(name=>{
       const living=wheelAlive.includes(name);
       pickList(name).forEach(num=>{
-        const i=num-wheelMin;
+        if(!(num in indexOf)) return;
+        const i=indexOf[num];
         const mid=-Math.PI/2+i*slice;
         ctx.beginPath();
         ctx.arc(cx+Math.cos(mid)*r*0.78, cy+Math.sin(mid)*r*0.78, span>800?4:7, 0, Math.PI*2);
@@ -1077,15 +1103,14 @@ function drawNumWheel(){
     const step=span<=30?1:span<=60?5:10;
     if(step===1){
       for(let i=0;i<span;i++){
-        const num=wheelMin+i;
+        const num=pool[i];
         if(ownerOf[num]) continue;
         drawRimText(ctx,cx,cy,String(num),start+(i+0.5)*slice,r*0.78,"rgba(255,255,255,.82)",span>20?10:13);
       }
     }else{
-      const first=Math.ceil(wheelMin/step)*step;
-      for(let num=first;num<=wheelMax;num+=step){
-        if(ownerOf[num]) continue;
-        const i=num-wheelMin;
+      for(let i=0;i<span;i++){
+        const num=pool[i];
+        if(ownerOf[num]||num%step!==0) continue;
         drawRimText(ctx,cx,cy,String(num),start+(i+0.5)*slice,r*0.84,"rgba(255,255,255,.8)",11);
       }
     }
@@ -1095,13 +1120,15 @@ function drawNumWheel(){
   wheelOrder.forEach(name=>{
     const living=wheelAlive.includes(name);
     pickList(name).forEach(num=>{
+      if(!(num in indexOf)) return;
       const close=labeled.some(n=>{
-        const d=Math.abs(n-num);
+        const a=indexOf[n], b=indexOf[num];
+        const d=Math.abs(a-b);
         return Math.min(d, span-d)<minGap;
       });
       if(close) return;
       labeled.push(num);
-      const i=num-wheelMin;
+      const i=indexOf[num];
       drawRimText(ctx,cx,cy,String(num),start+(i+0.5)*slice,r*(span<=30?0.58:0.66),living?"#fff":"rgba(255,255,255,.7)",span<=40?16:13);
     });
   });
@@ -1113,7 +1140,8 @@ function drawNumWheel(){
   applyWheelRot();
 }
 function renderWheelInfo(){
-  $("wheelMode").textContent="ช่วง "+wheelMin+"–"+wheelMax+" · เหลือ "+wheelAlive.length+" คน · ถึง "+winTarget+" แต้มชนะ";
+  const leftNums=liveWheelNums().length;
+  $("wheelMode").textContent="ช่วง "+wheelMin+"–"+wheelMax+" · เหลือ "+leftNums+" เลข · "+wheelAlive.length+" คน · ถึง "+winTarget+" แต้มชนะ";
   const box=$("wheelChips");
   box.textContent="";
   wheelOrder.forEach(name=>{
@@ -1130,6 +1158,7 @@ function openWheel(){
   invalidateWheel();
   wheelAlive=wheelOrder.slice();
   wheelLog=[];
+  wheelGone=[];
   show("wheelGame");
   $("numRead").classList.remove("hit");
   $("numRead").textContent="—";
@@ -1186,6 +1215,7 @@ function finishLand(n, gen){
   $("numRead").textContent=String(n);
   const owner=ownerOfNumber(n);
   const hit=!!(owner&&wheelAlive.includes(owner));
+  if(!wheelGone.includes(n)) wheelGone.push(n);
   if(hit){
     playClip(BOMB_SOUND);
     const idx=wheelAlive.indexOf(owner);
@@ -1197,30 +1227,33 @@ function finishLand(n, gen){
   }else{
     $("numRead").classList.remove("hit");
     $("wheelResult").classList.remove("bad");
-    $("wheelResult").textContent=owner?"เลข "+n+" ของ "+owner+" ออกไปแล้ว":"เลข "+n+" ไม่มีใครโดน";
+    $("wheelResult").textContent=owner?"เลข "+n+" ของ "+owner+" ถูกตัดออก":"เลข "+n+" ถูกตัดออก";
+    wheelLog.push({n:n, who:""});
   }
   drawNumWheel();
   renderWheelInfo();
   renderPlayers();
+  const left=liveWheelNums().length;
   const delay=motionOff()?40:!hit?450:wheelAlive.length<=1?1100:1400;
   $("doSpin").disabled=true;
-  $("doSpin").textContent=wheelAlive.length<=1?"จบรอบ":"กำลังจะหมุนต่อ…";
+  $("doSpin").textContent=wheelAlive.length<=1||left<1?"จบรอบ":"กำลังจะหมุนต่อ…";
   wheelEndTimer=setTimeout(()=>{
     if(gen!==wheelGen) return;
-    if(wheelAlive.length<=1) finishWheel();
+    if(wheelAlive.length<=1||liveWheelNums().length<1) finishWheel();
     else spinNumber();
   }, delay);
 }
 function spinNumber(){
   if(wheelSpinning||wheelAlive.length<2) return;
-  const span=wheelSpan();
+  const pool=liveWheelNums();
+  const span=pool.length;
   if(span<1) return;
   const gen=wheelGen;
-  const n=wheelMin+Math.floor(Math.random()*span);
+  const index=Math.floor(Math.random()*span);
+  const n=pool[index];
   const owner=ownerOfNumber(n);
   const hit=!!(owner&&wheelAlive.includes(owner));
   const slice=360/span;
-  const index=n-wheelMin;
   const margin=slice*0.18;
   const room=Math.max(slice/2-margin, 0);
   const jitter=(Math.random()*2-1)*room;
@@ -1268,7 +1301,7 @@ function applyCat(next){
   $("wheelOnly").classList.toggle("hidden", !wheel);
   $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
   $("sideHint").textContent=wheel
-    ?"แต่ละคนเลือกได้หลายเลข · วงล้อสุ่มทั้งช่วง เลขที่ไม่มีคนเลือกคือรอด · โดนเลขตัวไหนคนนั้นออก · คนสุดท้ายได้ 1 แต้ม"
+    ?"แต่ละคนเลือกได้หลายเลข · วงล้อสุ่มแล้วตัดเลขที่ออกออกไปเรื่อยๆ · โดนเลขตัวไหนคนนั้นออก · คนสุดท้ายได้ 1 แต้ม"
     :"โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ";
   loadScores();
   renderPlayers();
@@ -1468,9 +1501,9 @@ const GUIDE={
 </ul></section>
 <section><h4>วงล้อสุ่มเลข</h4><ul>
 <li>แต่ละคนเลือกเลขของตัวเองตามจำนวนที่กำหนด</li>
-<li>โฮสต์เริ่มหมุนวงล้อ สุ่มเลขจากทั้งช่วง</li>
+<li>โฮสต์เริ่มหมุนวงล้อ สุ่มเลขจากที่ยังเหลือบนวงล้อ</li>
+<li>เลขที่ออกจะถูกตัดออกจากวงล้อทันที แล้วหมุนต่อ</li>
 <li>ถ้าวงล้อลงเลขของใคร คนนั้นออก</li>
-<li>เลขที่ไม่มีใครเลือกถือว่ารอด</li>
 <li>คนสุดท้ายที่เหลือได้แต้ม</li>
 </ul></section>
 <section><h4>เคล็ดลับ</h4><ul>
@@ -1664,6 +1697,7 @@ function applySnap(s){
   pickCursor=s.pickCursor||0;
   wheelAlive=Array.isArray(s.wheelAlive)?s.wheelAlive:[];
   wheelLog=Array.isArray(s.wheelLog)?s.wheelLog:[];
+  wheelGone=Array.isArray(s.wheelGone)?s.wheelGone:[];
   syncTurnClock(s);
   if(s.activeSpin&&s.activeSpin.kind==="num"){
     const from=Number.isFinite(s.activeSpin.from)?s.activeSpin.from:(s.wheelRot||0);
@@ -1690,7 +1724,7 @@ function applySnap(s){
     render();
   }else if(s.phase==="pick"){
     show("pick");
-    $("pickMode").textContent="ช่วง "+wheelMin+"–"+wheelMax+" · คนละ "+pickEach+" เลข · ถึง "+winTarget+" แต้มชนะ · เลขที่ไม่มีคนเลือกคือรอด";
+    $("pickMode").textContent="ช่วง "+wheelMin+"–"+wheelMax+" · คนละ "+pickEach+" เลข · ถึง "+winTarget+" แต้มชนะ · เลขที่ออกจะถูกตัดจากวงล้อ";
     $("pickMsg").textContent="";
     renderPick();
     const each=Math.max(pickEach,1);
@@ -1850,7 +1884,7 @@ function startNumAnim(spin, done){
     }else{
       $("numRead").classList.remove("hit");
       $("wheelResult").classList.remove("bad");
-      $("wheelResult").textContent=spin.owner?"เลข "+spin.n+" ของ "+spin.owner+" ออกไปแล้ว":"เลข "+spin.n+" ไม่มีใครโดน";
+      $("wheelResult").textContent=spin.owner?"เลข "+spin.n+" ของ "+spin.owner+" ถูกตัดออก":"เลข "+spin.n+" ถูกตัดออก";
     }
     done();
   }
