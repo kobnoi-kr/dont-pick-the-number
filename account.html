@@ -283,7 +283,9 @@ async function refresh(){
     return;
   }
   const user=me.data.user;
-  $("sub").textContent=user.displayName+" · "+user.accountType+(user.roles&&user.roles.length?" · "+user.roles.join(","):"");
+  const rankMap={player:"user",admin:"admin",super_admin:"super admin"};
+  const ranks=(user.roles&&user.roles.length?user.roles:["player"]).map(r=>rankMap[r]||r);
+  $("sub").textContent=ranks.join(" · ");
   show($("guestPrompt"), user.accountType==="guest");
   show($("profileForm"), true);
   $("displayName").value=user.displayName||"";
