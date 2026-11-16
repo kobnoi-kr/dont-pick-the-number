@@ -98,7 +98,13 @@ async function refresh(){
     btn.textContent="ยกเลิกเชื่อม";
     btn.onclick=async()=>{
       const r=await api("/api/v1/account/unlink/"+p.provider,{method:"DELETE",headers:{Accept:"application/json"}});
-      setMsg($("msg"), r.res.ok?"ยกเลิกแล้ว":(r.data&&r.data.error)||"ล้มเหลว", r.res.ok);
+      const map={
+        last_provider:"ถอดไม่ได้ — นี่คือวิธีล็อกอินสุดท้าย เชื่อม Discord/Google อีกอันก่อน",
+        provider_not_linked:"ยังไม่ได้เชื่อมวิธีนี้",
+        cannot_unlink:"ถอดการเชื่อมไม่สำเร็จ"
+      };
+      const err=r.data&&r.data.error;
+      setMsg($("msg"), r.res.ok?"ยกเลิกแล้ว":(map[err]||err||"ล้มเหลว"), r.res.ok);
       refresh();
     };
     li.appendChild(btn);
