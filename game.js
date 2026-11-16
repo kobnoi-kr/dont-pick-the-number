@@ -1228,7 +1228,7 @@ document.addEventListener("keydown",onUserGesture);
 document.addEventListener("click",e=>{
   onUserGesture();
   const btn=e.target.closest("button");
-  if(btn&&!btn.closest("#volBar")) playClip(POP_SOUND);
+  if(btn&&!btn.closest("#volBar")&&!btn.closest("#helpBtn")) playClip(POP_SOUND);
 });
 $("restModes").onclick=e=>{
   if(onlineMode&&!isHost()) return;
@@ -1385,6 +1385,60 @@ function closeCodeModal(){
   $("codeModal").classList.add("hidden");
   $("codeModalMsg").textContent="";
 }
+const GUIDE={
+  room:`<section><h4>เริ่มต้นใช้งาน</h4><ul>
+<li>ใส่ชื่อของคุณก่อนสร้างหรือเข้าห้อง</li>
+<li>สร้าง <b>ห้องสาธารณะ</b> เพื่อโชว์ในล็อบบี้ออนไลน์ หรือ <b>ห้องส่วนตัว</b> ที่ต้องใส่รหัสถึงจะเข้าได้</li>
+<li>เข้าห้องด้วยรหัส 6 หลัก หรือกดเข้าจากลิสต์ล็อบบี้</li>
+</ul></section>
+<section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
+<li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
+<li>เลือกหมวดเกม: ห้ามโดนเลขลับ หรือ วงล้อสุ่มเลข</li>
+<li>เลือกช่วงตัวเลข แต้มที่ชนะ จำนวนเลขลับ / จำนวนเลขต่อคน</li>
+<li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
+<li>กด <b>สุ่มลำดับ</b> แล้วค่อยเริ่มเกม</li>
+</ul></section>
+<section><h4>ห้องส่วนตัว</h4><ul>
+<li>โชว์ในล็อบบี้ออนไลน์แบบล็อก 🔒 แต่ไม่โชว์รหัส</li>
+<li>เพื่อนต้องกด “ใส่รหัส” แล้วกรอกรหัส 6 หลัก</li>
+<li>โฮสต์แชร์รหัสจากแถบบนของห้องได้</li>
+</ul></section>`,
+  play:`<section><h4>ห้ามโดนเลขลับ</h4><ul>
+<li>ระบบสุ่มเลขลับตามจำนวนที่ตั้งไว้</li>
+<li>ผู้เล่นผลัดกันเลือกเลขในช่วงที่เหลือ</li>
+<li>ใครโดนเลขลับจะหลุดจากเทิร์น</li>
+<li>คนที่อยู่รอดจนจบรอบได้แต้ม ตามกติกาที่โฮสต์ตั้ง</li>
+<li>ใครถึงแต้มที่ชนะก่อนเป็นผู้ชนะ</li>
+</ul></section>
+<section><h4>วงล้อสุ่มเลข</h4><ul>
+<li>แต่ละคนเลือกเลขของตัวเองตามจำนวนที่กำหนด</li>
+<li>โฮสต์เริ่มหมุนวงล้อ สุ่มเลขจากทั้งช่วง</li>
+<li>ถ้าวงล้อลงเลขของใคร คนนั้นออก</li>
+<li>เลขที่ไม่มีใครเลือกถือว่ารอด</li>
+<li>คนสุดท้ายที่เหลือได้แต้ม</li>
+</ul></section>
+<section><h4>เคล็ดลับ</h4><ul>
+<li>ดูรายชื่อและแต้มได้จากแผงผู้เล่นด้านข้าง</li>
+<li>ปรับเสียงได้ที่ปุ่ม − / + มุมขวาล่าง</li>
+<li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
+</ul></section>`
+};
+function renderGuide(cat){
+  const key=cat==="play"?"play":"room";
+  $("guideBody").innerHTML=GUIDE[key];
+  for(const btn of $("guideTabs").children){
+    const on=btn.dataset.guide===key;
+    btn.classList.toggle("on",on);
+    btn.setAttribute("aria-pressed",on?"true":"false");
+  }
+}
+function openGuide(cat){
+  renderGuide(cat||"room");
+  $("guideModal").classList.remove("hidden");
+}
+function closeGuide(){
+  $("guideModal").classList.add("hidden");
+}
 function send(obj){
   if(sock&&sock.readyState===1) sock.send(JSON.stringify(obj));
 }
@@ -1397,6 +1451,7 @@ function showGate(){
   myTurn=false;
   closeRenameRoom();
   closeCodeModal();
+  closeGuide();
   document.title="NUMVERSE";
   show("gate");
 }
@@ -1850,6 +1905,15 @@ function bootOnline(){
     joinCode($("codeModalInput").value);
   };
   $("codeModalInput").addEventListener("input",()=>{ $("codeModalInput").value=$("codeModalInput").value.replace(/\D/g,"").slice(0,6); });
+  $("helpBtn").onclick=()=>openGuide("room");
+  $("guideClose").onclick=()=>closeGuide();
+  $("guideModal").addEventListener("click",e=>{ if(e.target===$("guideModal")) closeGuide(); });
+  $("guideTabs").onclick=e=>{
+    const btn=e.target.closest("button[data-guide]");
+    if(!btn) return;
+    renderGuide(btn.dataset.guide);
+  };
+  renderGuide("room");
   $("copyCode").onclick=async()=>{
     try{
       await navigator.clipboard.writeText(roomCode);

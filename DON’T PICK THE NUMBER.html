@@ -204,6 +204,9 @@
   <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
 </aside>
 </div>
+<button type="button" id="helpBtn" class="helpbtn" aria-label="คู่มือการใช้งาน">
+  <img src="guide-book.png" alt="" width="28" height="28" decoding="async">
+</button>
 <div id="codeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
   <div class="modal-card">
     <h3 id="codeModalTitle">ห้องส่วนตัว</h3>
@@ -214,6 +217,20 @@
     </form>
     <button type="button" id="codeModalCancel" class="btn ghost">ยกเลิก</button>
     <p id="codeModalMsg" class="msg"></p>
+  </div>
+</div>
+<div id="guideModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+  <div class="modal-card guide-card">
+    <div class="guide-head">
+      <h3 id="guideTitle">คู่มือ NUMVERSE</h3>
+      <button type="button" id="guideClose" class="textbtn" aria-label="ปิด">ปิด</button>
+    </div>
+    <div class="modes cats guide-tabs" id="guideTabs" role="tablist">
+      <button type="button" class="mode on" data-guide="room" aria-pressed="true">การใช้งานตั้งค่าห้อง</button>
+      <button type="button" class="mode" data-guide="play" aria-pressed="false">คู่มือการเล่น</button>
+    </div>
+    <div id="guideBody" class="guide-body"></div>
+    <p class="guide-credit">ไอคอนหนังสือจาก <a href="https://www.flaticon.com/free-icon/book_14501715" target="_blank" rel="noopener noreferrer">Flaticon</a></p>
   </div>
 </div>
 <div class="volbar" id="volBar" aria-label="ปรับเสียง">
