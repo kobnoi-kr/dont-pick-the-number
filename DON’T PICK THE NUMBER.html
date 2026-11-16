@@ -28,14 +28,16 @@
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
     <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข</p>
-    <label class="field">ชื่อของคุณ
+    <label class="field" id="nameFieldWrap">ชื่อของคุณ
       <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
     </label>
     <div class="auth-bar" id="authBar">
-      <img id="authAvatar" class="auth-avatar" alt="" width="28" height="28">
-      <span id="authLabel" class="hint">Guest</span>
-      <a class="textbtn" id="accountLink" href="account.html">บัญชี</a>
-      <a class="textbtn" id="friendsLink" href="friends.html">เพื่อน</a>
+      <div id="authAvatar" class="auth-avatar" aria-hidden="true"></div>
+      <div class="auth-meta">
+        <span id="authLabel" class="hint">Guest</span>
+        <span id="authName" class="auth-name hidden"></span>
+      </div>
+      <a class="btn auth-account-btn hidden" id="accountLink" href="account.html">บัญชี</a>
       <a class="textbtn" id="loginLink" href="login.html">เข้าสู่ระบบ</a>
       <a class="textbtn" id="registerLink" href="register.html">ผูกบัญชี</a>
     </div>

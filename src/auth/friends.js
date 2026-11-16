@@ -5,6 +5,7 @@ const { sendJson, readJsonBody } = require("./http");
 const { requireAuth } = require("./middleware");
 const { publicUser } = require("./users");
 const { rateLimit } = require("./rate-limit");
+const { filterOnline } = require("../presence");
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -370,10 +371,24 @@ async function listAcceptedFriendIds(prisma, userId) {
   return ids;
 }
 
+async function handleFriendsOnline(req, res) {
+  if (method(req) !== "GET") {
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+  const auth = await requireAuth(req, res);
+  if (!auth) return true;
+  if (!requireRegistered(auth, res)) return true;
+  const ids = await listAcceptedFriendIds(auth.prisma, auth.user.id);
+  sendJson(res, 200, { online: filterOnline(ids) });
+  return true;
+}
+
 async function handleFriendsApi(req, res, pathname) {
   if (pathname === "/api/v1/friends") return handleFriendsList(req, res);
   if (pathname === "/api/v1/friends/search") return handleFriendsSearch(req, res);
   if (pathname === "/api/v1/friends/request") return handleFriendRequest(req, res);
+  if (pathname === "/api/v1/friends/online") return handleFriendsOnline(req, res);
 
   const accept = pathname.match(/^\/api\/v1\/friends\/([0-9a-f-]{36})\/accept$/i);
   if (accept) return handleFriendAccept(req, res, accept[1]);

@@ -1492,39 +1492,82 @@ function myAvatar(){
 }
 function paintAuthBar(user){
   const label=$("authLabel");
+  const authName=$("authName");
   const loginLink=$("loginLink");
   const registerLink=$("registerLink");
-  const friendsLink=$("friendsLink");
+  const accountLink=$("accountLink");
   const avatar=$("authAvatar");
+  const nameWrap=$("nameFieldWrap");
+  const bar=$("authBar");
   if(!label) return;
+  const registered=!!(user&&user.accountType==="registered");
   if(!user){
     label.textContent="Auth ปิดอยู่ — เล่นได้ตามปกติ";
+    if(authName) authName.classList.add("hidden");
     if(loginLink) loginLink.classList.add("hidden");
     if(registerLink) registerLink.classList.add("hidden");
-    if(friendsLink) friendsLink.classList.add("hidden");
-    if(avatar){ avatar.classList.remove("on"); avatar.removeAttribute("src"); }
+    if(accountLink) accountLink.classList.add("hidden");
+    if(nameWrap) nameWrap.classList.remove("hidden");
+    if(bar) bar.classList.remove("profile");
+    if(avatar){
+      avatar.classList.remove("on","ph");
+      avatar.textContent="";
+    }
     return;
   }
-  const kind=user.accountType==="registered"?"สมาชิก":"Guest";
-  label.textContent=kind+" · "+(user.displayName||user.username||"");
+  if(registered){
+    label.textContent="สมาชิก";
+    if(authName){
+      authName.textContent=user.displayName||user.username||"";
+      authName.classList.remove("hidden");
+    }
+    if(nameWrap) nameWrap.classList.add("hidden");
+    if(bar) bar.classList.add("profile");
+    if(accountLink){
+      accountLink.classList.remove("hidden");
+      accountLink.classList.add("btn","auth-account-btn");
+      accountLink.classList.remove("textbtn");
+    }
+    setLocalName(user.displayName||user.username||"");
+  }else{
+    label.textContent="Guest · "+(user.displayName||user.username||"");
+    if(authName) authName.classList.add("hidden");
+    if(nameWrap) nameWrap.classList.remove("hidden");
+    if(bar) bar.classList.remove("profile");
+    if(accountLink){
+      accountLink.classList.remove("hidden","btn","auth-account-btn");
+      accountLink.classList.add("textbtn");
+    }
+  }
   if(avatar){
     if(user.avatarUrl){
-      avatar.src=user.avatarUrl;
       avatar.classList.add("on");
-      avatar.alt=user.displayName||"avatar";
+      avatar.classList.remove("ph");
+      avatar.innerHTML="";
+      const img=document.createElement("img");
+      img.src=user.avatarUrl;
+      img.alt=user.displayName||"avatar";
+      img.width=40;
+      img.height=40;
+      img.referrerPolicy="no-referrer";
+      avatar.appendChild(img);
       localStorage.setItem("dpn-avatar", user.avatarUrl);
+    }else if(registered){
+      avatar.innerHTML="";
+      avatar.classList.add("on","ph");
+      avatar.textContent=(user.displayName||"?").slice(0,1).toUpperCase();
+      localStorage.removeItem("dpn-avatar");
     }else{
-      avatar.classList.remove("on");
-      avatar.removeAttribute("src");
+      avatar.classList.remove("on","ph");
+      avatar.innerHTML="";
       localStorage.removeItem("dpn-avatar");
     }
   }
-  if(loginLink) loginLink.classList.toggle("hidden", user.accountType==="registered");
+  if(loginLink) loginLink.classList.toggle("hidden", registered);
   if(registerLink){
     registerLink.textContent="ผูกบัญชี";
-    registerLink.classList.toggle("hidden", user.accountType==="registered");
+    registerLink.classList.toggle("hidden", registered);
   }
-  if(friendsLink) friendsLink.classList.toggle("hidden", user.accountType!=="registered");
 }
 function canUseFriends(){
   return !!(authUser&&authUser.accountType==="registered");
@@ -1652,6 +1695,13 @@ function myToken(){
   return token;
 }
 function typedName(){
+  if(authUser&&authUser.accountType==="registered"){
+    const profile=String(authUser.displayName||authUser.username||"").trim().replace(/\s+/g," ").slice(0,24);
+    if(profile){
+      setLocalName(profile);
+      return profile;
+    }
+  }
   const name=$("myName").value.trim().replace(/\s+/g," ").slice(0,24);
   if(name) localStorage.setItem("dpn-name", name);
   return name;
@@ -2284,6 +2334,8 @@ async function bootOnline(){
   if(autoPick) autoPick.onclick=toggleAuto;
   const addBot=$("addBot");
   if(addBot) addBot.onclick=()=>{ if(isHost()&&netPhase==="lobby") send({t:"addBot"}); };
+  // keep profile name synced for registered players
+  if(authUser&&authUser.accountType==="registered") paintAuthBar(authUser);
   $("jump").onsubmit=e=>{
     e.preventDefault();
     const n=parseIntStrict($("guess").value);

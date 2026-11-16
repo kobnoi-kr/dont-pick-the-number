@@ -8,6 +8,13 @@ const { WebSocketServer } = require("ws");
 const { handleAuthApi } = require("./src/auth/routes");
 const { authEnabled, getPrisma } = require("./src/db");
 const { areFriends, listAcceptedFriendIds } = require("./src/auth/friends");
+const {
+  trackPresence: trackPresenceCore,
+  untrackPresence: untrackPresenceCore,
+  isUserOnline,
+  sendToUser: sendToUserCore,
+  filterOnline
+} = require("./src/presence");
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_PLAYERS = 12;
@@ -34,8 +41,6 @@ const BLOCKED_DIRS = new Set(["src", "prisma", "node_modules", ".git"]);
 const rooms = new Map();
 const byWs = new Map();
 const watchers = new Set();
-/** @type {Map<string, Set<import("ws").WebSocket>>} */
-const presence = new Map();
 /** @type {Map<string, { id: string, code: string, fromUserId: string, toUserId: string, fromName: string, fromAvatar: string, roomTitle: string, expires: number }>} */
 const roomInvites = new Map();
 /** one pending invite per invitee */
@@ -44,47 +49,6 @@ const INVITE_MS = 60000;
 
 function send(ws, obj) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-}
-function trackPresence(ws, userId) {
-  if (!validToken(userId)) return;
-  const prev = ws.userId;
-  if (prev && prev !== userId) untrackPresence(ws);
-  ws.userId = userId;
-  let set = presence.get(userId);
-  if (!set) {
-    set = new Set();
-    presence.set(userId, set);
-  }
-  const wasOffline = set.size === 0;
-  set.add(ws);
-  if (wasOffline) notifyFriendPresence(userId, true).catch(() => {});
-}
-function untrackPresence(ws) {
-  const userId = ws.userId;
-  if (!userId) return;
-  const set = presence.get(userId);
-  if (set) {
-    set.delete(ws);
-    if (set.size === 0) {
-      presence.delete(userId);
-      notifyFriendPresence(userId, false).catch(() => {});
-    }
-  }
-  ws.userId = "";
-}
-function isUserOnline(userId) {
-  const set = presence.get(userId);
-  return !!(set && set.size);
-}
-function sendToUser(userId, obj) {
-  const set = presence.get(userId);
-  if (!set) return 0;
-  let n = 0;
-  for (const sock of set) {
-    send(sock, obj);
-    n += 1;
-  }
-  return n;
 }
 async function notifyFriendPresence(userId, online) {
   if (!authEnabled()) return;
@@ -96,6 +60,19 @@ async function notifyFriendPresence(userId, online) {
   } catch (err) {
     /* ignore presence fanout errors */
   }
+}
+function trackPresence(ws, userId) {
+  trackPresenceCore(ws, userId, (id, on) => {
+    notifyFriendPresence(id, on).catch(() => {});
+  });
+}
+function untrackPresence(ws) {
+  untrackPresenceCore(ws, (id, on) => {
+    notifyFriendPresence(id, on).catch(() => {});
+  });
+}
+function sendToUser(userId, obj) {
+  return sendToUserCore(userId, obj, send);
 }
 function purgeInvite(inviteId) {
   const inv = roomInvites.get(inviteId);
@@ -1282,7 +1259,7 @@ async function onFriendsOnline(ws) {
   try {
     const prisma = await getPrisma();
     const ids = await listAcceptedFriendIds(prisma, userId);
-    send(ws, { t: "friendsOnline", online: ids.filter(isUserOnline) });
+    send(ws, { t: "friendsOnline", online: filterOnline(ids) });
   } catch (err) {
     send(ws, { t: "friendsOnline", online: [] });
   }
