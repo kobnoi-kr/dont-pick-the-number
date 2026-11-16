@@ -38,8 +38,7 @@
         <span id="authName" class="auth-name hidden"></span>
       </div>
       <a class="btn auth-account-btn hidden" id="accountLink" href="account.html">บัญชี</a>
-      <a class="textbtn" id="loginLink" href="login.html">เข้าสู่ระบบ</a>
-      <a class="textbtn" id="registerLink" href="register.html">ผูกบัญชี</a>
+      <button type="button" class="textbtn" id="loginLink">เข้าสู่ระบบ</button>
     </div>
     <p class="label">สร้างห้อง</p>
     <div class="modes cats">
@@ -257,6 +256,17 @@
     <div class="invite-actions">
       <button type="button" id="roomInviteAccept" class="btn">เข้าห้อง</button>
       <button type="button" id="roomInviteDecline" class="btn ghost">ปฏิเสธ</button>
+    </div>
+  </div>
+</div>
+<div id="authChoiceModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authChoiceTitle">
+  <div class="modal-card">
+    <h3 id="authChoiceTitle">เข้าสู่ระบบ</h3>
+    <p class="sub">คุณกำลังเล่นแบบ Guest — ต้องการผูกบัญชีนี้ไว้ หรือเข้าบัญชีอื่น?</p>
+    <div class="invite-actions">
+      <button type="button" id="authChoiceLink" class="btn">ผูกบัญชีนี้</button>
+      <button type="button" id="authChoiceLogin" class="btn ghost">เข้าสู่ระบบเฉย ๆ</button>
+      <button type="button" id="authChoiceCancel" class="btn ghost">ยกเลิก</button>
     </div>
   </div>
 </div>

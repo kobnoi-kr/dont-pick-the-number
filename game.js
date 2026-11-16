@@ -1490,11 +1490,18 @@ let authBoot=null;
 function myAvatar(){
   return (authUser&&authUser.avatarUrl)||localStorage.getItem("dpn-avatar")||"";
 }
+function openAuthChoiceModal(){
+  const modal=$("authChoiceModal");
+  if(modal) modal.classList.remove("hidden");
+}
+function closeAuthChoiceModal(){
+  const modal=$("authChoiceModal");
+  if(modal) modal.classList.add("hidden");
+}
 function paintAuthBar(user){
   const label=$("authLabel");
   const authName=$("authName");
   const loginLink=$("loginLink");
-  const registerLink=$("registerLink");
   const accountLink=$("accountLink");
   const avatar=$("authAvatar");
   const nameWrap=$("nameFieldWrap");
@@ -1505,7 +1512,6 @@ function paintAuthBar(user){
     label.textContent="Auth ปิดอยู่ — เล่นได้ตามปกติ";
     if(authName) authName.classList.add("hidden");
     if(loginLink) loginLink.classList.add("hidden");
-    if(registerLink) registerLink.classList.add("hidden");
     if(accountLink) accountLink.classList.add("hidden");
     if(nameWrap) nameWrap.classList.remove("hidden");
     if(bar) bar.classList.remove("profile");
@@ -1523,21 +1529,14 @@ function paintAuthBar(user){
     }
     if(nameWrap) nameWrap.classList.add("hidden");
     if(bar) bar.classList.add("profile");
-    if(accountLink){
-      accountLink.classList.remove("hidden");
-      accountLink.classList.add("btn","auth-account-btn");
-      accountLink.classList.remove("textbtn");
-    }
+    if(accountLink) accountLink.classList.remove("hidden");
     setLocalName(user.displayName||user.username||"");
   }else{
     label.textContent="Guest · "+(user.displayName||user.username||"");
     if(authName) authName.classList.add("hidden");
     if(nameWrap) nameWrap.classList.remove("hidden");
     if(bar) bar.classList.remove("profile");
-    if(accountLink){
-      accountLink.classList.remove("hidden","btn","auth-account-btn");
-      accountLink.classList.add("textbtn");
-    }
+    if(accountLink) accountLink.classList.add("hidden");
   }
   if(avatar){
     if(user.avatarUrl){
@@ -1564,10 +1563,6 @@ function paintAuthBar(user){
     }
   }
   if(loginLink) loginLink.classList.toggle("hidden", registered);
-  if(registerLink){
-    registerLink.textContent="ผูกบัญชี";
-    registerLink.classList.toggle("hidden", registered);
-  }
 }
 function canUseFriends(){
   return !!(authUser&&authUser.accountType==="registered");
@@ -2394,6 +2389,25 @@ async function bootOnline(){
   $("makePrivate").onclick=()=>makeRoom("private");
   $("joinForm").onsubmit=e=>{ e.preventDefault(); joinCode($("joinCode").value); };
   $("joinCode").addEventListener("input",()=>{ $("joinCode").value=$("joinCode").value.replace(/\D/g,"").slice(0,6); });
+  const loginLink=$("loginLink");
+  if(loginLink){
+    loginLink.onclick=()=>{
+      if(authUser&&authUser.accountType==="guest") openAuthChoiceModal();
+      else location.href="login.html";
+    };
+  }
+  const authChoiceLink=$("authChoiceLink");
+  const authChoiceLogin=$("authChoiceLogin");
+  const authChoiceCancel=$("authChoiceCancel");
+  const authChoiceModal=$("authChoiceModal");
+  if(authChoiceLink) authChoiceLink.onclick=()=>{ location.href="account.html"; };
+  if(authChoiceLogin) authChoiceLogin.onclick=async()=>{
+    try{ await fetch("/api/v1/auth/logout",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"}); }
+    catch(e){}
+    location.href="login.html";
+  };
+  if(authChoiceCancel) authChoiceCancel.onclick=()=>closeAuthChoiceModal();
+  if(authChoiceModal) authChoiceModal.addEventListener("click",e=>{ if(e.target===authChoiceModal) closeAuthChoiceModal(); });
   const inviteBtn=$("inviteFriendsBtn");
   if(inviteBtn){
     inviteBtn.classList.add("hidden");
