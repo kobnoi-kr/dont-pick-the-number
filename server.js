@@ -442,7 +442,8 @@ function publicSpin(spin) {
     target: spin.target || 0,
     n: Number.isInteger(spin.n) ? spin.n : null,
     hit: !!spin.hit,
-    owner: spin.owner || ""
+    owner: spin.owner || "",
+    next: Array.isArray(spin.next) ? spin.next.slice() : undefined
   };
 }
 function roomLabel(room) {

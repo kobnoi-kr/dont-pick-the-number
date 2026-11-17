@@ -43,67 +43,48 @@
     <p class="hint"><a href="/app.html#rooms" style="color:inherit">← กลับ Dashboard</a></p>
   </section>
 
-  <section id="start" class="hidden">
-    <div class="brand" aria-label="NUMVERSE">
-      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
-    </div>
-    <h1 class="sr-only">NUMVERSE</h1>
-    <p class="sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
-    <div class="room-title-row">
-      <div>
-        <p class="label">ชื่อห้อง</p>
-        <p id="roomTitleText" class="room-title-text">ห้องใหม่</p>
-      </div>
-      <button type="button" id="renameRoomBtn" class="btn ghost room-title-btn">เปลี่ยนชื่อห้อง</button>
-    </div>
-    <form id="renameRoomForm" class="renamebox hidden" autocomplete="off">
-      <input id="renameRoomInput" maxlength="32" placeholder="ชื่อห้องใหม่">
-      <button class="btn" type="submit">บันทึก</button>
-      <button class="btn ghost" type="button" id="renameRoomCancel">ยกเลิก</button>
-    </form>
-    <form id="setup">
-      <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องและเริ่มเกมได้</p>
-      <div id="gameModeBadge" class="game-mode-badge">
-        <span class="game-mode-ico" id="gameModeIco" aria-hidden="true">🔢</span>
-        <div>
-          <b id="gameModeName">หาเลข</b>
-          <small id="gameModeHint">ห้ามโดนเลขลับ</small>
+  <section id="start" class="hidden lobby-screen">
+    <div class="lobby-top">
+      <div class="lobby-heading">
+        <h2 id="roomTitleText" class="lobby-room-title">ห้องใหม่</h2>
+        <div class="lobby-meta-row">
+          <span id="lobbyVis" class="badge">สาธารณะ</span>
+          <span id="lobbyPlayerCount" class="lobby-count">0/12</span>
+          <span id="gameModeBadge" class="game-mode-chip">
+            <span id="gameModeIco" aria-hidden="true">🔢</span>
+            <b id="gameModeName">หาเลข</b>
+          </span>
         </div>
+        <p class="sub lobby-sub" id="startSub">ทายเลข… แต่ห้ามโดนเลขนั้น!</p>
       </div>
-      <div id="cats" class="hidden" aria-hidden="true">
-        <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true" tabindex="-1"></button>
-        <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false" tabindex="-1"></button>
+      <button type="button" id="settingsGearBtn" class="gear-btn hidden" title="ตั้งค่าห้อง" aria-label="ตั้งค่าห้อง">⚙</button>
+    </div>
+
+    <div class="lobby-body">
+      <div class="lobby-main">
+        <div id="lobbyGrid" class="lobby-grid" aria-label="ผู้เล่นในห้อง"></div>
+        <p id="err" class="msg"></p>
       </div>
-      <p class="label">เลือกช่วงตัวเลข</p>
-      <div class="modes" id="modes">
-        <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
-        <button type="button" class="mode" data-min="1" data-max="999" aria-pressed="false">1–999</button>
-        <button type="button" class="mode" data-min="1" data-max="9999" aria-pressed="false">1–9999</button>
-        <button type="button" class="mode" data-custom="1" aria-pressed="false">กำหนดเอง</button>
-      </div>
-      <div id="custom" class="custom hidden">
-        <label>ต่ำสุด<input id="cmin" type="number" inputmode="numeric" value="1"></label>
-        <label>สูงสุด<input id="cmax" type="number" inputmode="numeric" value="50"></label>
-      </div>
-      <p id="err" class="msg"></p>
-      <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
-      <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
-      <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
-      <p class="hint">0 = ปิด · หมดเวลานับถอยหลังแล้วระบบสุ่มเลขและเปิดออโต้ให้ผู้เล่นคนนั้น</p>
-      <div id="wheelOnly" class="hidden">
-        <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
-      </div>
-      <div id="secretOnly">
-        <div class="row count-row"><label for="secretCount">จำนวนเลขลับ</label><input id="secretCount" type="number" inputmode="numeric" value="1"></div>
-        <p class="label">ถ้าเลขลับหมด แต่ยังเหลือมากกว่า 1 คน</p>
-        <div class="modes restmodes" id="restModes">
-          <button type="button" class="mode on" data-rest="all" aria-pressed="true">ทุกคน ยกเว้นคนที่โดน</button>
-          <button type="button" class="mode" data-rest="last" aria-pressed="false">คนสุดท้ายที่เหลือ</button>
+      <aside class="lobby-panel">
+        <div class="lobby-code-card">
+          <div class="tiny lobby-code-label">ROOM CODE</div>
+          <div class="lobby-code-row">
+            <span id="lobbyCode" class="code lobby-code">------</span>
+            <button type="button" id="lobbyCopy" class="icon-chip" title="คัดลอก">📋</button>
+          </div>
         </div>
-        <div class="row"><div><small>วิธีเลือกเลขลับ</small>สุ่มเลขอัตโนมัติ<small>ระบบจะสุ่มเลขลับให้ตามจำนวนที่กำหนด</small></div></div>
-      </div>
-      <button class="btn" type="submit">เริ่มเกม →</button>
-    </form>
+        <div class="lobby-actions-card">
+          <div id="gameModeHint" class="lobby-rules">ตั้งค่าเกมแล้วสุ่มลำดับก่อนเริ่ม</div>
+          <p id="winner" class="winner lobby-status" aria-live="polite">รอผู้เล่นเข้าห้อง</p>
+          <button type="button" class="btn" id="spin" disabled>สุ่มลำดับ (วงล้อ)</button>
+          <button type="button" class="btn lobby-start" id="lobbyStartBtn" disabled>เริ่มเกม</button>
+          <button type="button" class="btn ghost" id="addBot">เพิ่มบอท</button>
+          <button type="button" class="btn ghost" id="inviteFriendsBtn">เชิญเพื่อน</button>
+          <button type="button" class="btn ghost" id="clearScores">ล้างแต้ม</button>
+          <p class="hint" id="sideHint">โฮสต์ตั้งค่าห้องด้วยไอคอนฟันเฟือง · สุ่มลำดับแล้วค่อยเริ่มเกม</p>
+        </div>
+      </aside>
+    </div>
   </section>
 
   <section id="play" class="hidden">
@@ -192,25 +173,84 @@
 
 <aside class="side hidden">
   <h2 class="side-title">ผู้เล่นในห้อง</h2>
-  <p class="sub">สุ่มครั้งเดียว แล้วเล่นจนเหลือคนสุดท้าย</p>
-  <div class="dial">
-    <div class="pointer" aria-hidden="true"></div>
-    <canvas id="wheel" width="280" height="280" aria-hidden="true"></canvas>
-  </div>
-  <p id="winner" class="winner" aria-live="polite">รอผู้เล่นเข้าห้อง</p>
+  <p class="sub">ลำดับการเล่นและสถานะรอบนี้</p>
   <form id="addForm" class="addrow hidden">
     <input id="pname" type="text" maxlength="24" autocomplete="off" placeholder="ชื่อผู้เล่น">
     <button class="btn" type="submit">เพิ่ม</button>
   </form>
   <p id="perr" class="msg"></p>
   <ol class="board" id="board"></ol>
-  <p class="hint" id="sideHint">โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ</p>
-  <button class="btn" type="button" id="spin" disabled>สุ่มลำดับ</button>
-  <button class="btn ghost" type="button" id="addBot">เพิ่มบอท</button>
-  <button class="btn ghost" type="button" id="inviteFriendsBtn">เชิญเพื่อน</button>
-  <button class="btn ghost" type="button" id="clearScores">ล้างแต้ม</button>
 </aside>
 </div>
+
+<div id="spinModal" class="modal spin-modal hidden" role="dialog" aria-modal="true" aria-labelledby="spinModalTitle">
+  <div class="modal-card spin-card">
+    <h3 id="spinModalTitle">สุ่มลำดับผู้เล่น</h3>
+    <p class="sub" id="spinModalSub">กำลังหมุนวงล้อ…</p>
+    <div class="dial spin-dial">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="wheel" width="280" height="280" aria-hidden="true"></canvas>
+    </div>
+    <p id="spinModalResult" class="winner" aria-live="polite"></p>
+    <button type="button" id="spinModalClose" class="btn ghost">ปิด</button>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+  <div class="modal-card settings-card">
+    <div class="guide-head">
+      <h3 id="settingsModalTitle">ตั้งค่าห้อง</h3>
+      <button type="button" id="settingsClose" class="textbtn" aria-label="ปิด">ปิด</button>
+    </div>
+    <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องได้</p>
+    <div class="room-title-row">
+      <div>
+        <p class="label">ชื่อห้อง</p>
+        <p id="settingsRoomTitle" class="room-title-text">ห้องใหม่</p>
+      </div>
+      <button type="button" id="renameRoomBtn" class="btn ghost room-title-btn">เปลี่ยนชื่อ</button>
+    </div>
+    <form id="renameRoomForm" class="renamebox hidden" autocomplete="off">
+      <input id="renameRoomInput" maxlength="32" placeholder="ชื่อห้องใหม่">
+      <button class="btn" type="submit">บันทึก</button>
+      <button class="btn ghost" type="button" id="renameRoomCancel">ยกเลิก</button>
+    </form>
+    <form id="setup">
+      <div id="cats" class="hidden" aria-hidden="true">
+        <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true" tabindex="-1"></button>
+        <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false" tabindex="-1"></button>
+      </div>
+      <p class="label">เลือกช่วงตัวเลข</p>
+      <div class="modes" id="modes">
+        <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
+        <button type="button" class="mode" data-min="1" data-max="999" aria-pressed="false">1–999</button>
+        <button type="button" class="mode" data-min="1" data-max="9999" aria-pressed="false">1–9999</button>
+        <button type="button" class="mode" data-custom="1" aria-pressed="false">กำหนดเอง</button>
+      </div>
+      <div id="custom" class="custom hidden">
+        <label>ต่ำสุด<input id="cmin" type="number" inputmode="numeric" value="1"></label>
+        <label>สูงสุด<input id="cmax" type="number" inputmode="numeric" value="50"></label>
+      </div>
+      <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
+      <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
+      <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
+      <p class="hint">0 = ปิด · หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</p>
+      <div id="wheelOnly" class="hidden">
+        <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
+      </div>
+      <div id="secretOnly">
+        <div class="row count-row"><label for="secretCount">จำนวนเลขลับ</label><input id="secretCount" type="number" inputmode="numeric" value="1"></div>
+        <p class="label">ถ้าเลขลับหมด แต่ยังเหลือมากกว่า 1 คน</p>
+        <div class="modes restmodes" id="restModes">
+          <button type="button" class="mode on" data-rest="all" aria-pressed="true">ทุกคน ยกเว้นคนที่โดน</button>
+          <button type="button" class="mode" data-rest="last" aria-pressed="false">คนสุดท้ายที่เหลือ</button>
+        </div>
+      </div>
+      <button class="btn" type="submit">บันทึกการตั้งค่า</button>
+    </form>
+  </div>
+</div>
+
 <button type="button" id="helpBtn" class="helpbtn" aria-label="คู่มือการใช้งาน">
   <img src="/images/guide-book.png" alt="" width="28" height="28" decoding="async">
 </button>

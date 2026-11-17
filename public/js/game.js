@@ -254,10 +254,16 @@ function applySpectatorUi(){
 function show(n){
   ["gate","start","play","pick","wheelGame","over"].forEach(s=>$(s).classList.toggle("hidden",s!==n));
   const inRoom=n!=="gate";
+  const lobby=n==="start";
   const side=document.querySelector(".side");
-  if(side) side.classList.toggle("hidden",!inRoom);
-  $("roombar").classList.toggle("hidden",!inRoom);
-  $("roomNote").classList.toggle("hidden",!inRoom);
+  if(side) side.classList.toggle("hidden",!inRoom||lobby);
+  $("roombar").classList.toggle("hidden",!inRoom||lobby);
+  $("roomNote").classList.toggle("hidden",!inRoom||lobby);
+  document.body.classList.toggle("lobby-mode", lobby);
+  const stage=document.querySelector(".stage");
+  if(stage) stage.classList.toggle("lobby-stage", lobby);
+  const card=document.querySelector("main.card");
+  if(card) card.classList.toggle("lobby-card", lobby);
 }
 function isHost(){ return !!(myId&&myId===hostId); }
 function myName(){
@@ -726,9 +732,80 @@ function drawWheel(){
   ctx.fillStyle="#2563eb";
   ctx.fill();
 }
+const LOBBY_AV_COLORS=["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ec4899","#06b6d4","#f97316","#6366f1"];
+function renderLobbyGrid(){
+  const grid=$("lobbyGrid");
+  if(!grid) return;
+  grid.textContent="";
+  const maxSlots=12;
+  const ranked=order.length===players.length&&players.length>0;
+  const list=ranked?order:players;
+  for(let i=0;i<maxSlots;i++){
+    const name=list[i];
+    const slot=document.createElement("div");
+    if(!name){
+      slot.className="lobby-slot empty";
+      slot.innerHTML=`<div class="lobby-av ph">+</div><div class="lobby-slot-name">รอผู้เล่น…</div>`;
+      grid.appendChild(slot);
+      continue;
+    }
+    const meta=onlineMode?playerByName(name):null;
+    const hostFlag=!!(meta&&meta.host);
+    const connected=!meta||meta.connected||meta.bot;
+    const ready=ranked||(meta&&meta.connected);
+    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline");
+    const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
+    av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
+    if(meta&&meta.avatarUrl){
+      av.src=meta.avatarUrl;
+      av.alt="";
+      av.referrerPolicy="no-referrer";
+    }else{
+      av.textContent=(name||"?").slice(0,1).toUpperCase();
+      av.style.background=LOBBY_AV_COLORS[i%LOBBY_AV_COLORS.length];
+    }
+    const crown=hostFlag?`<span class="lobby-crown" title="โฮสต์">♛</span>`:"";
+    const status=document.createElement("div");
+    status.className="lobby-slot-status"+(ready?" on":"");
+    status.textContent=hostFlag?"HOST":(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE"));
+    const nm=document.createElement("div");
+    nm.className="lobby-slot-name";
+    nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
+    const acts=document.createElement("div");
+    acts.className="lobby-slot-acts";
+    const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
+    if(canHostAct&&meta.connected&&!meta.bot){
+      const give=document.createElement("button");
+      give.type="button";
+      give.className="textbtn";
+      give.textContent="โอนโฮสต์";
+      give.onclick=()=>send({t:"giveHost",id:meta.id});
+      acts.appendChild(give);
+    }
+    if(canHostAct){
+      const kick=document.createElement("button");
+      kick.type="button";
+      kick.className="textbtn";
+      kick.textContent="เตะ";
+      kick.onclick=()=>send({t:"kick",id:meta.id});
+      acts.appendChild(kick);
+    }
+    const avWrap=document.createElement("div");
+    avWrap.className="lobby-av-wrap";
+    avWrap.innerHTML=crown;
+    avWrap.appendChild(av);
+    if(connected){
+      const dot=document.createElement("span");
+      dot.className="lobby-online-dot";
+      avWrap.appendChild(dot);
+    }
+    slot.append(avWrap,nm,status,acts);
+    grid.appendChild(slot);
+  }
+}
 function renderPlayers(){
   const box=$("board");
-  box.textContent="";
+  if(box) box.textContent="";
   const playing=screenOpen("play");
   const picking=screenOpen("pick");
   const wheeling=screenOpen("wheelGame");
@@ -737,7 +814,8 @@ function renderPlayers(){
   const source=(playing&&roundOrder.length)?roundOrder:((picking||wheeling)&&wheelOrder.length)?wheelOrder:(ranked?order:players);
   const pickTotal=wheelOrder.length*Math.max(pickEach,1);
   const cur=playing?currentPlayer():picking&&pickCursor<pickTotal?wheelOrder[Math.floor(pickCursor/Math.max(pickEach,1))]:"";
-  source.forEach((name,i)=>{
+  if(netPhase==="lobby"||screenOpen("start")) renderLobbyGrid();
+  if(box) source.forEach((name,i)=>{
     const out=(playing&&roundOrder.length>0&&!alive.includes(name))||(wheeling&&wheelAlive.length>0&&!wheelAlive.includes(name));
     const row=document.createElement("li");
     row.className="prow"+(name===cur&&!out?" on":"")+(out?" out":"");
@@ -807,17 +885,32 @@ function renderPlayers(){
     row.append(rank,avWrap,nm,sc,acts);
     box.appendChild(row);
   });
-  $("spin").textContent="สุ่มลำดับ";
-  $("spin").disabled=spinning||wheelSpinning||players.length<2||locked||(onlineMode&&!isHost());
-  $("clearScores").disabled=spinning||wheelSpinning||picking||wheeling||players.length===0||(onlineMode&&!isHost());
+  const spinBtn=$("spin");
+  if(spinBtn){
+    spinBtn.textContent="สุ่มลำดับ (วงล้อ)";
+    spinBtn.disabled=spinning||wheelSpinning||players.length<2||locked||(onlineMode&&!isHost())||netPhase!=="lobby";
+  }
+  const clearBtn=$("clearScores");
+  if(clearBtn) clearBtn.disabled=spinning||wheelSpinning||picking||wheeling||players.length===0||(onlineMode&&!isHost());
   const addBot=$("addBot");
   if(addBot){
     const canBot=onlineMode&&isHost()&&netPhase==="lobby"&&!spinning&&players.length<12;
     addBot.classList.toggle("hidden",!onlineMode);
     addBot.disabled=!canBot;
   }
-  $("pname").disabled=spinning||wheelSpinning||locked;
-  $("addForm").querySelector("button").disabled=spinning||wheelSpinning||locked;
+  const startBtn=$("lobbyStartBtn");
+  if(startBtn){
+    const canStart=isHost()&&netPhase==="lobby"&&!spinning&&players.length>=2&&orderReady();
+    startBtn.disabled=!canStart;
+    startBtn.textContent=isHost()?(orderReady()?"เริ่มเกม":"สุ่มลำดับก่อนเริ่ม"):"รอโฮสต์เริ่มเกม";
+  }
+  const gear=$("settingsGearBtn");
+  if(gear) gear.classList.toggle("hidden",!(isHost()&&netPhase==="lobby"));
+  if($("pname")) $("pname").disabled=spinning||wheelSpinning||locked;
+  if($("addForm")){
+    const addBtn=$("addForm").querySelector("button");
+    if(addBtn) addBtn.disabled=spinning||wheelSpinning||locked;
+  }
   paintAutoButtons();
 }
 function paintAutoButtons(){
@@ -1423,10 +1516,10 @@ function applyCat(next){
     }
   }
   paintGameModeBadge(cat);
-  $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
-  $("sideHint").textContent=wheel
-    ?"แต่ละคนเลือกได้หลายเลข · วงล้อสุ่มแล้วตัดเลขที่ออกออกไปเรื่อยๆ · โดนเลขตัวไหนคนนั้นออก · คนสุดท้ายได้ 1 แต้ม"
-    :"โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ";
+  if($("startSub")) $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
+  if($("sideHint")) $("sideHint").textContent=wheel
+    ?"โฮสต์สุ่มลำดับด้วยวงล้อ · แล้วเริ่มเกมวงล้อสุ่มเลข"
+    :"โฮสต์ตั้งค่าด้วยฟันเฟือง · สุ่มลำดับแล้วค่อยเริ่มเกม";
   if(changed){
     loadScores();
     renderPlayers();
@@ -1488,11 +1581,46 @@ $("cats").onclick=e=>{
   applyCat(b.dataset.cat||"secret");
   if(onlineMode&&!applying&&isHost()) send({t:"setup",patch:{cat:b.dataset.cat==="wheel"?"wheel":"secret"}});
 };
+function requestStartGame(){
+  if(onlineMode){
+    if(!isHost()){ if($("err")) $("err").textContent="เฉพาะโฮสต์ที่เริ่มเกมได้"; return; }
+    if(!orderReady()){ if($("err")) $("err").textContent="กดสุ่มลำดับก่อนเริ่มเกม"; return; }
+    closeSettingsModal();
+    send({t:"start"});
+    return;
+  }
+  if($("setup")) $("setup").requestSubmit();
+}
+function openSettingsModal(){
+  if(!isHost()||netPhase!=="lobby") return;
+  const modal=$("settingsModal");
+  if(modal) modal.classList.remove("hidden");
+}
+function closeSettingsModal(){
+  const modal=$("settingsModal");
+  if(modal) modal.classList.add("hidden");
+  closeRenameRoom();
+}
+function openSpinModal(msg){
+  const modal=$("spinModal");
+  if(!modal) return;
+  modal.classList.remove("hidden");
+  if($("spinModalSub")) $("spinModalSub").textContent=msg||"กำลังหมุนวงล้อ…";
+  if($("spinModalResult")) $("spinModalResult").textContent="";
+  if($("spinModalClose")) $("spinModalClose").classList.add("hidden");
+  drawWheel();
+}
+function closeSpinModal(){
+  const modal=$("spinModal");
+  if(modal) modal.classList.add("hidden");
+}
 $("setup").onsubmit=e=>{
   e.preventDefault();
   if(onlineMode){
-    if(!isHost()){ $("err").textContent="เฉพาะโฮสต์ที่เริ่มเกมได้"; return; }
-    send({t:"start"});
+    if(!isHost()){ if($("err")) $("err").textContent="เฉพาะโฮสต์ที่ตั้งค่าได้"; return; }
+    pushNums();
+    closeSettingsModal();
+    if($("err")){ $("err").textContent="บันทึกการตั้งค่าแล้ว"; $("err").classList.add("ok"); }
     return;
   }
   const c=choice();
@@ -1955,30 +2083,46 @@ function hostLocks(){
   ["cats","modes","restModes"].forEach(id=>{
     for(const btn of $(id).querySelectorAll("button")) btn.disabled=!canSetup;
   });
-  const startBtn=$("setup").querySelector("button.btn[type='submit']")||$("setup").querySelector("button.btn");
-  if(startBtn){
-    startBtn.disabled=!host;
-    startBtn.textContent=host?"เริ่มเกม →":"รอโฮสต์เริ่มเกม";
+  const setupSubmit=$("setup")&&($("setup").querySelector("button.btn[type='submit']")||$("setup").querySelector("button.btn"));
+  if(setupSubmit){
+    setupSubmit.disabled=!canSetup;
+    setupSubmit.textContent="บันทึกการตั้งค่า";
   }
   ["leave","back","wheelLeave","pickLeave"].forEach(id=>{
-    $(id).classList.toggle("hidden",!host);
-    $(id).textContent="กลับห้อง";
+    const el=$(id);
+    if(!el) return;
+    el.classList.toggle("hidden",!host);
+    el.textContent="กลับห้อง";
   });
   const canRenameRoom=host&&lobby;
-  $("renameRoomBtn").classList.toggle("hidden",!canRenameRoom);
+  if($("renameRoomBtn")) $("renameRoomBtn").classList.toggle("hidden",!canRenameRoom);
+  if($("settingsGearBtn")) $("settingsGearBtn").classList.toggle("hidden",!(host&&lobby));
   if(!canRenameRoom) closeRenameRoom();
+  if(!(host&&lobby)) closeSettingsModal();
 }
 function paintRoom(s){
-  $("roomCode").textContent=s.code||"";
+  const code=s.code||"";
   const priv=s.visibility==="private";
   roomVisibility=priv?"private":"public";
-  $("visBadge").textContent=priv?"🔒 ส่วนตัว":"สาธารณะ";
-  $("visBadge").classList.toggle("private",priv);
   const count=(s.players||[]).filter(p=>p.connected).length;
-  $("roomCount").textContent=count+"/"+(s.maxPlayers||12);
-  $("roomNote").textContent=priv?"":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
-  $("roomTitleText").textContent=s.roomLabel||s.title||(priv?"ห้องส่วนตัว":"ห้องสาธารณะ");
-  document.title=(s.code?s.code+" · ":"")+"NUMVERSE";
+  const max=s.maxPlayers||12;
+  const title=s.roomLabel||s.title||(priv?"ห้องส่วนตัว":"ห้องสาธารณะ");
+  if($("roomCode")) $("roomCode").textContent=code;
+  if($("lobbyCode")) $("lobbyCode").textContent=code;
+  if($("visBadge")){
+    $("visBadge").textContent=priv?"🔒 ส่วนตัว":"สาธารณะ";
+    $("visBadge").classList.toggle("private",priv);
+  }
+  if($("lobbyVis")){
+    $("lobbyVis").textContent=priv?"Private":"Public";
+    $("lobbyVis").classList.toggle("private",priv);
+  }
+  if($("roomCount")) $("roomCount").textContent=count+"/"+max;
+  if($("lobbyPlayerCount")) $("lobbyPlayerCount").textContent=count+"/"+max+" Players";
+  if($("roomNote")) $("roomNote").textContent=priv?"":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
+  if($("roomTitleText")) $("roomTitleText").textContent=title;
+  if($("settingsRoomTitle")) $("settingsRoomTitle").textContent=title;
+  document.title=(code?code+" · ":"")+"NUMVERSE";
   const mine=(s.players||[]).find(p=>p.id===s.youId);
   if(mine&&mine.name) setLocalName(mine.name);
   paintInviteBtn();
@@ -1992,6 +2136,7 @@ function spinProgress(spin){
 }
 function syncOrderWheel(s){
   const canvas=$("wheel");
+  if(!canvas) return;
   canvas.style.transition="none";
   if(s.activeSpin&&s.activeSpin.kind==="order"){
     const from=Number.isFinite(s.activeSpin.from)?s.activeSpin.from:(s.orderRot||0);
@@ -2164,12 +2309,13 @@ function startOrderAnim(spin, done){
   const spinKey=spin.id;
   spinning=true;
   renderPlayers();
-  $("winner").textContent="กำลังสุ่มลำดับ…";
+  if($("winner")) $("winner").textContent="กำลังสุ่มลำดับ…";
+  openSpinModal("กำลังหมุนวงล้อสุ่มลำดับ…");
   const from=Number.isFinite(spin.from)?spin.from:rot;
   const target=spin.rot||0;
   const {dur, elapsed}=spinProgress({dur:spin.dur, left:spin.left!=null?spin.left:spinLeftNow()});
   const canvas=$("wheel");
-  canvas.style.transition="none";
+  if(canvas) canvas.style.transition="none";
   if(dur&&elapsed<400) playSpinSound();
   const t0=performance.now()-elapsed;
   function frame(now){
@@ -2177,7 +2323,7 @@ function startOrderAnim(spin, done){
     const t=dur?Math.min(1,(now-t0)/dur):1;
     const eased=1-Math.pow(1-t,3);
     rot=from+(target-from)*eased;
-    canvas.style.transform="rotate("+rot+"deg)";
+    if(canvas) canvas.style.transform="rotate("+rot+"deg)";
     if(t<1){
       orderAnim=requestAnimationFrame(frame);
       return;
@@ -2185,8 +2331,14 @@ function startOrderAnim(spin, done){
     stopSpinSound();
     spinning=false;
     rot=target;
-    canvas.style.transform="rotate("+rot+"deg)";
+    if(canvas) canvas.style.transform="rotate("+rot+"deg)";
+    const first=(spin.next&&spin.next[0])||order[0]||"";
+    if($("spinModalSub")) $("spinModalSub").textContent="สุ่มเสร็จแล้ว";
+    if($("spinModalResult")) $("spinModalResult").textContent=first?"เริ่มที่ "+first:"สุ่มลำดับแล้ว";
+    if($("winner")) $("winner").textContent=first?"เริ่มที่ "+first:wheelMessage();
+    if($("spinModalClose")) $("spinModalClose").classList.remove("hidden");
     done();
+    setTimeout(()=>{ if(!spinning) closeSpinModal(); }, 2400);
   }
   orderAnim=requestAnimationFrame(frame);
 }
@@ -2433,8 +2585,21 @@ async function bootOnline(){
     if(n==null){ $("pickMsg").textContent="ใส่เป็นจำนวนเต็ม"; return; }
     choosePick(n);
   };
-  $("spin").onclick=()=>{ if(isHost()) send({t:"spinOrder"}); };
-  $("clearScores").onclick=()=>{ if(isHost()) send({t:"clear"}); };
+  if($("spin")) $("spin").onclick=()=>{ if(isHost()) send({t:"spinOrder"}); };
+  if($("clearScores")) $("clearScores").onclick=()=>{ if(isHost()) send({t:"clear"}); };
+  if($("lobbyStartBtn")) $("lobbyStartBtn").onclick=()=>requestStartGame();
+  if($("settingsGearBtn")) $("settingsGearBtn").onclick=()=>openSettingsModal();
+  if($("settingsClose")) $("settingsClose").onclick=()=>closeSettingsModal();
+  if($("settingsModal")) $("settingsModal").addEventListener("click",e=>{ if(e.target===$("settingsModal")) closeSettingsModal(); });
+  if($("spinModalClose")) $("spinModalClose").onclick=()=>closeSpinModal();
+  if($("spinModal")) $("spinModal").addEventListener("click",e=>{ if(e.target===$("spinModal")&&!spinning) closeSpinModal(); });
+  if($("lobbyCopy")) $("lobbyCopy").onclick=async()=>{
+    try{
+      await navigator.clipboard.writeText(roomCode);
+      $("lobbyCopy").textContent="✓";
+      setTimeout(()=>{ if($("lobbyCopy")) $("lobbyCopy").textContent="📋"; }, 1200);
+    }catch(e){}
+  };
   $("again").onclick=()=>{ if(isHost()) send({t:"again"}); };
   ["leave","back","wheelLeave","pickLeave"].forEach(id=>{ $(id).onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
