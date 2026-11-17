@@ -1978,52 +1978,120 @@ attachGameApi({
       broadcastToUsersCore(recipientIds, toastMsg, send);
       broadcastToUsersCore(recipientIds, notifMsg, send);
     } else {
-      broadcastAllCore(toastMsg, send);
-      broadcastAllCore(notifMsg, send);
+      fanOutAllClients(toastMsg);
+      fanOutAllClients(notifMsg);
     }
+  },
+  /** Warn everyone, then kick after countdown (default 15s). */
+  scheduleForceMaintenance(message, seconds = 15) {
+    return scheduleMaintenanceKick(message, seconds);
+  },
+  cancelScheduledMaintenance() {
+    return cancelMaintenanceKick();
   },
   /** Close every room and boot all connected clients into maintenance. */
   forceMaintenance(message) {
-    const text =
-      String(message || "").trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
-    const codes = [...rooms.keys()];
-    for (const code of codes) {
-      const room = rooms.get(code);
-      if (!room) continue;
-      cancelSpin(room);
-      clearTurnTimer(room);
-      if (room.emptyTimer) {
-        clearTimeout(room.emptyTimer);
-        room.emptyTimer = null;
-      }
-      const everyone = room.players.slice();
-      const spectators = Array.isArray(room.spectators) ? room.spectators.slice() : [];
-      rooms.delete(room.code);
-      for (const player of everyone) {
-        const sock = player.ws;
-        if (sock) {
-          byWs.delete(sock);
-          player.ws = null;
-          send(sock, { t: "maintenance", message: text });
-          send(sock, { t: "roomClosed", message: text });
-        }
-      }
-      for (const sp of spectators) {
-        const sock = sp.ws;
-        if (sock) {
-          byWs.delete(sock);
-          send(sock, { t: "maintenance", message: text });
-          send(sock, { t: "roomClosed", message: text });
-        }
-      }
-    }
-    broadcastLobby();
-    const payload = { t: "maintenance", message: text, enabled: true };
-    broadcastAllCore(payload, send);
-    for (const sock of watchers) send(sock, payload);
-    return { roomsClosed: codes.length };
+    return forceMaintenanceNow(message);
   }
 });
+
+let maintenanceKickTimer = null;
+let maintenanceKickAt = 0;
+
+function fanOutAllClients(payload) {
+  broadcastAllCore(payload, send);
+  for (const sock of watchers) send(sock, payload);
+  for (const room of rooms.values()) {
+    for (const player of room.players) {
+      if (player.ws) send(player.ws, payload);
+    }
+    if (Array.isArray(room.spectators)) {
+      for (const sp of room.spectators) {
+        if (sp.ws) send(sp.ws, payload);
+      }
+    }
+  }
+}
+
+function cancelMaintenanceKick() {
+  if (maintenanceKickTimer) {
+    clearTimeout(maintenanceKickTimer);
+    maintenanceKickTimer = null;
+  }
+  const wasPending = maintenanceKickAt > 0;
+  maintenanceKickAt = 0;
+  if (wasPending) {
+    fanOutAllClients({ t: "maintenance:countdown", cancelled: true });
+  }
+  return { cancelled: wasPending };
+}
+
+function scheduleMaintenanceKick(message, seconds = 15) {
+  const text =
+    String(message || "").trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
+  const sec = Math.max(1, Math.min(120, Number(seconds) || 15));
+  const endsAt = Date.now() + sec * 1000;
+  if (maintenanceKickTimer) clearTimeout(maintenanceKickTimer);
+  maintenanceKickAt = endsAt;
+  const payload = {
+    t: "maintenance:countdown",
+    message: text,
+    seconds: sec,
+    endsAt
+  };
+  fanOutAllClients(payload);
+  maintenanceKickTimer = setTimeout(() => {
+    maintenanceKickTimer = null;
+    maintenanceKickAt = 0;
+    forceMaintenanceNow(text);
+  }, sec * 1000);
+  return { endsAt, seconds: sec };
+}
+
+function forceMaintenanceNow(message) {
+  if (maintenanceKickTimer) {
+    clearTimeout(maintenanceKickTimer);
+    maintenanceKickTimer = null;
+  }
+  maintenanceKickAt = 0;
+  const text =
+    String(message || "").trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
+  const codes = [...rooms.keys()];
+  for (const code of codes) {
+    const room = rooms.get(code);
+    if (!room) continue;
+    cancelSpin(room);
+    clearTurnTimer(room);
+    if (room.emptyTimer) {
+      clearTimeout(room.emptyTimer);
+      room.emptyTimer = null;
+    }
+    const everyone = room.players.slice();
+    const spectators = Array.isArray(room.spectators) ? room.spectators.slice() : [];
+    rooms.delete(room.code);
+    for (const player of everyone) {
+      const sock = player.ws;
+      if (sock) {
+        byWs.delete(sock);
+        player.ws = null;
+        send(sock, { t: "maintenance", message: text });
+        send(sock, { t: "roomClosed", message: text });
+      }
+    }
+    for (const sp of spectators) {
+      const sock = sp.ws;
+      if (sock) {
+        byWs.delete(sock);
+        send(sock, { t: "maintenance", message: text });
+        send(sock, { t: "roomClosed", message: text });
+      }
+    }
+  }
+  broadcastLobby();
+  const payload = { t: "maintenance", message: text, enabled: true };
+  fanOutAllClients(payload);
+  return { roomsClosed: codes.length };
+}
 
 const server = http.createServer(servePublic);
 const wss = new WebSocketServer({

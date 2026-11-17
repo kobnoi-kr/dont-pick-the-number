@@ -9,7 +9,11 @@ import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
 import { showRoomInviteBanner } from "./invites.js";
-import { enforceMaintenanceGate, applyLiveMaintenance } from "/js/maintenance-gate.js";
+import {
+  enforceMaintenanceGate,
+  applyLiveMaintenance,
+  applyMaintenanceCountdown
+} from "/js/maintenance-gate.js";
 
 const state = {
   user: null,
@@ -154,6 +158,12 @@ onDashboardMessage((msg) => {
     refreshNotifications();
   }
   if (msg.t === "roomInvite") showRoomInviteBanner(msg);
+  if (msg.t === "maintenance:countdown") {
+    const roles = (state.user && state.user.roles) || [];
+    const isAdmin =
+      roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+    applyMaintenanceCountdown(msg, { bypass: isAdmin });
+  }
   if (msg.t === "maintenance" && msg.enabled !== false) {
     const roles = (state.user && state.user.roles) || [];
     const isAdmin =

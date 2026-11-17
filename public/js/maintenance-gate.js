@@ -96,12 +96,91 @@ export async function enforceMaintenanceGate({ hardBlock = true } = {}) {
 
 /** Live WS push: kick UI into maintenance without waiting for refresh. */
 export function applyLiveMaintenance(message, { bypass = false } = {}) {
+  hideMaintenanceCountdown();
   if (bypass) {
     hideMaintenanceOverlay();
     return { blocked: false };
   }
   showMaintenanceOverlay(message || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง");
   return { blocked: true };
+}
+
+let countdownTimer = null;
+
+function hideMaintenanceCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+  const el = document.getElementById("nvMaintCountdown");
+  if (el) el.remove();
+}
+
+/**
+ * Top banner: server closing in N seconds.
+ * msg: { message, seconds, endsAt, cancelled? }
+ */
+export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
+  if (!msg || msg.cancelled) {
+    hideMaintenanceCountdown();
+    return;
+  }
+  ensureStyles();
+  // Admins still see the warning so they know the kick is coming.
+  const endsAt =
+    Number(msg.endsAt) ||
+    Date.now() + Math.max(1, Number(msg.seconds) || 15) * 1000;
+  let el = document.getElementById("nvMaintCountdown");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "nvMaintCountdown";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "assertive");
+    document.body.appendChild(el);
+  }
+  el.style.cssText = [
+    "position:fixed",
+    "top:14px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:99980",
+    "width:min(460px,calc(100vw - 24px))",
+    "pointer-events:none"
+  ].join(";");
+  const message =
+    msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาบันทึก/จบเกมก่อน";
+
+  const paint = () => {
+    const leftMs = Math.max(0, endsAt - Date.now());
+    const sec = Math.ceil(leftMs / 1000);
+    el.innerHTML = `
+      <div style="
+        pointer-events:auto;display:flex;align-items:center;gap:12px;
+        padding:12px 14px;border-radius:14px;
+        background:rgba(40,16,16,.96);border:1px solid rgba(239,68,68,.45);
+        box-shadow:0 14px 40px rgba(0,0,0,.5);color:#fee2e2;
+        font-family:system-ui,Segoe UI,sans-serif">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.7rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.85;margin-bottom:2px">
+            ปิดเซิร์ฟใน ${sec} วินาที
+          </div>
+          <div style="font-weight:700;line-height:1.35;white-space:pre-wrap">${esc(message)}</div>
+          ${bypass ? `<div style="margin-top:4px;font-size:.8rem;opacity:.75">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>` : ""}
+        </div>
+        <div style="
+          flex:0 0 auto;min-width:52px;height:52px;border-radius:12px;
+          display:flex;align-items:center;justify-content:center;
+          background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);
+          font-size:1.45rem;font-weight:900;font-variant-numeric:tabular-nums">${sec}</div>
+      </div>`;
+    if (sec <= 0) {
+      hideMaintenanceCountdown();
+    }
+  };
+
+  if (countdownTimer) clearInterval(countdownTimer);
+  paint();
+  countdownTimer = setInterval(paint, 250);
 }
 
 export default enforceMaintenanceGate;

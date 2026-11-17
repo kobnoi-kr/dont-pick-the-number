@@ -109,7 +109,8 @@ export async function renderSettings(root, { user }) {
           closeBtn.disabled = false;
           return;
         }
-        root.querySelector("#sToggleMsg").textContent = "ปิดเซิร์ฟแล้ว — ผู้เล่นจะเห็นหน้าปิดปรับปรุง";
+        root.querySelector("#sToggleMsg").textContent =
+          "ปิดเซิร์ฟแล้ว — แจ้งเตือนนับถอยหลัง 15 วิ แล้วเตะทุกคนออกจากห้อง";
         await load();
       };
     }

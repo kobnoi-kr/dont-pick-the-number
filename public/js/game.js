@@ -2586,13 +2586,30 @@ function connect(){
       if(pendingAction) runPendingAction();
       else if(!wantRoom&&!spectating&&!enterIntent) showGate();
       else renderLobby(msg);
+    }else if(msg.t==="announcement:new"){
+      if(window.NVToasts&&window.NVToasts.onLiveAnnouncement){
+        window.NVToasts.onLiveAnnouncement(msg.announcement);
+      }
+    }else if(msg.t==="maintenance:countdown"){
+      if(window.NVMaint&&window.NVMaint.applyMaintenanceCountdown){
+        window.NVMaint.applyMaintenanceCountdown(msg);
+      }
     }else if(msg.t==="maintenance"){
       try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
+      if(window.NVMaint&&window.NVMaint.applyLiveMaintenance){
+        window.NVMaint.applyLiveMaintenance(msg.message||"");
+      }
       location.replace("/app.html");
       return;
     }else if(msg.t==="left"||msg.t==="roomClosed"){
       // Ignore stale left while we are actively entering a room.
       if(enterIntent||pendingAction) return;
+      // Maintenance kick also sends roomClosed — prefer maintenance redirect.
+      if(msg.message&&/ปิดปรับปรุง|maintenance/i.test(String(msg.message))){
+        try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
+        location.replace("/app.html");
+        return;
+      }
       roomVisibility="";
       paintInviteBtn();
       if(msg.t==="roomClosed"&&msg.message&&$("err")) $("err").textContent=msg.message;

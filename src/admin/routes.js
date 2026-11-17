@@ -833,16 +833,32 @@ async function handleAdminApi(req, res, pathname) {
       } catch {
         /* ignore */
       }
-      // Turning maintenance ON → kick everyone out of rooms immediately
+      const gameApi = getGameApi();
+      // Turning maintenance ON → 15s countdown warning, then kick
       if (!beforeOn && afterOn) {
-        const gameApi = getGameApi();
         const msg =
           body.settings.maintenance_message != null
             ? String(body.settings.maintenance_message || "").trim()
             : "";
-        if (gameApi && typeof gameApi.forceMaintenance === "function") {
+        if (gameApi && typeof gameApi.scheduleForceMaintenance === "function") {
+          try {
+            gameApi.scheduleForceMaintenance(msg, 15);
+          } catch {
+            /* ignore */
+          }
+        } else if (gameApi && typeof gameApi.forceMaintenance === "function") {
           try {
             gameApi.forceMaintenance(msg);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      // Turning maintenance OFF → cancel pending kick countdown
+      if (beforeOn && !afterOn) {
+        if (gameApi && typeof gameApi.cancelScheduledMaintenance === "function") {
+          try {
+            gameApi.cancelScheduledMaintenance();
           } catch {
             /* ignore */
           }
