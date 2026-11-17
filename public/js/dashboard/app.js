@@ -32,6 +32,15 @@ function openCreateModal(opts = {}) {
   document.getElementById("crMsg").textContent = "";
   const cat = opts.cat || localStorage.getItem("nv-last-game") || "secret";
   setCreateCat(cat);
+  const lockCat = !!opts.lockCat;
+  const catField = document.getElementById("crCatField");
+  if (catField) catField.classList.toggle("hidden", lockCat);
+  const hint = document.getElementById("crHint");
+  if (hint) {
+    hint.textContent = lockCat
+      ? "ตั้งชื่อห้อง แล้วเข้าล็อบบี้"
+      : "เลือกเกม ตั้งชื่อห้อง แล้วเข้าล็อบบี้";
+  }
 }
 function closeCreateModal() {
   document.getElementById("createModal").classList.add("hidden");
@@ -166,7 +175,7 @@ onDashboardMessage((msg) => {
   connectDashboardWs();
   const q = new URLSearchParams(location.search);
   if (q.get("create") === "1" || q.get("cat")) {
-    openCreateModal({ cat: q.get("cat") || "secret" });
+    openCreateModal({ cat: q.get("cat") || "secret", lockCat: !!q.get("cat") });
   }
   const initial = (location.hash || "#overview").replace(/^#/, "") || "overview";
   await navigate(initial);

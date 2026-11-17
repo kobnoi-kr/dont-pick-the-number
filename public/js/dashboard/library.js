@@ -89,7 +89,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
       btn.onclick = () => {
         const id = btn.getAttribute("data-play");
         localStorage.setItem("nv-last-game", id);
-        if (openCreate) openCreate({ cat: id });
+        if (openCreate) openCreate({ cat: id, lockCat: true });
         else location.href = playUrl({ create: "public", setup: { cat: id } });
       };
     });
@@ -108,7 +108,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
           </div>`;
         detail.querySelector("[data-play2]").onclick = () => {
           localStorage.setItem("nv-last-game", g.id);
-          if (openCreate) openCreate({ cat: g.id });
+          if (openCreate) openCreate({ cat: g.id, lockCat: true });
         };
         detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
       };
