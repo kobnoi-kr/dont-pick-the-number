@@ -14,6 +14,7 @@ const DASHBOARD_ADMIN_ONLY = process.env.DASHBOARD_ADMIN_ONLY === "1";
 const { rateLimit } = require("../auth/rate-limit");
 const { getGameApi } = require("./bridge");
 const { listAcceptedFriendIds } = require("../auth/friends");
+const { rankingWindow } = require("./ranking-period");
 
 const GAME_CATALOG = [
   {
@@ -589,15 +590,15 @@ async function handleDashboardApi(req, res, pathname) {
       : "points";
     const take = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50) || 50));
 
-    // Period boards: aggregate finished games in window (registered only).
+    // Period boards: calendar week/month in Asia/Bangkok (registered only).
     if (period === "weekly" || period === "monthly") {
-      const days = period === "monthly" ? 30 : 7;
-      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const window = rankingWindow(period);
+      const since = window.since;
       const players = await prisma.gamePlayer.findMany({
         where: {
           userId: { not: null },
           user: { accountType: "registered", status: "active" },
-          game: { endedAt: { gte: since } }
+          game: { endedAt: { gte: since, lt: window.resetsAt } }
         },
         select: {
           userId: true,
@@ -688,7 +689,16 @@ async function handleDashboardApi(req, res, pathname) {
           };
         }
       }
-      sendJson(res, 200, { period, sort, rows, me, since: since.toISOString() });
+      sendJson(res, 200, {
+        period,
+        sort,
+        rows,
+        me,
+        since: since.toISOString(),
+        resetsAt: window.resetsAt.toISOString(),
+        timezone: window.timezone,
+        label: window.label
+      });
       return true;
     }
 

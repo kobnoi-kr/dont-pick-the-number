@@ -32,9 +32,13 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
       <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
         <div>
           <h2 style="margin:0">Top Weekly</h2>
-          <p class="muted tiny" style="margin:4px 0 0">อันดับแต้ม 7 วันล่าสุด (บัญชีที่ล็อกอิน)</p>
+          <p class="muted tiny" style="margin:4px 0 0">Top 1–3 สัปดาห์นี้ (จันทร์–อาทิตย์ เวลาไทย)</p>
         </div>
         <a class="btn ghost sm" href="#ranking">ดูทั้งหมด</a>
+      </div>
+      <div class="rank-cooldown" id="ovRankCd" style="margin-top:12px">
+        <span class="rank-cooldown-label">รีเซ็ต Weekly ใน (จันทร์ 00:00 เวลาไทย)</span>
+        <b class="rank-cooldown-time" id="ovRankCdTime">—:—:—</b>
       </div>
       <div id="ovTopRank" style="margin-top:12px"><div class="loading">Loading…</div></div>
     </div>
@@ -92,33 +96,80 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
   }
 
   const topBox = root.querySelector("#ovTopRank");
+  const cdTimeEl = root.querySelector("#ovRankCdTime");
+  const cdWrap = root.querySelector("#ovRankCd");
+
+  function formatCountdown(ms) {
+    if (ms <= 0) return "รีเซ็ตแล้ว";
+    const total = Math.floor(ms / 1000);
+    const d = Math.floor(total / 86400);
+    const h = Math.floor((total % 86400) / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (d > 0) return `${d}วัน ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  function ovAvatar(row) {
+    if (row && row.avatarUrl) {
+      return `<img class="rank-av lg" src="${esc(row.avatarUrl)}" alt="" referrerpolicy="no-referrer">`;
+    }
+    const ch = ((row && row.displayName) || "?").slice(0, 1).toUpperCase();
+    return `<div class="rank-av lg ph">${esc(ch)}</div>`;
+  }
+
+  function ovPodiumSlot(row, place) {
+    const placeClass = place === 1 ? "gold" : place === 2 ? "silver" : "bronze";
+    if (!row) {
+      return `<div class="podium-slot ${placeClass} empty">
+        <div class="podium-medal">#${place}</div>
+        <div class="rank-av lg ph">?</div>
+        <div class="podium-name">—</div>
+        <div class="podium-score">ยังว่าง</div>
+      </div>`;
+    }
+    return `<div class="podium-slot ${placeClass}">
+      <div class="podium-medal">#${place}</div>
+      ${ovAvatar(row)}
+      <div class="podium-name">${esc(row.displayName || "ผู้เล่น")}</div>
+      <div class="podium-score"><b>${row.totalPoints || 0}</b> แต้ม</div>
+      <div class="podium-sub">${row.gamesWon || 0} ชนะ · ${row.totalGames || 0} เกม</div>
+    </div>`;
+  }
+
   if (topBox) {
     if (guest) {
+      if (cdWrap) cdWrap.classList.add("hidden");
       topBox.innerHTML = `<div class="empty">เข้าสู่ระบบเพื่อดู Ranking</div>`;
     } else {
-      const lb = await api("/api/v1/leaderboard/weekly?sort=points&limit=5", { method: "GET" });
+      const lb = await api("/api/v1/leaderboard/weekly?sort=points&limit=3", { method: "GET" });
       const rows = (lb.data && lb.data.rows) || [];
+      if (lb.data && lb.data.resetsAt && cdTimeEl) {
+        const resetsAtMs = new Date(lb.data.resetsAt).getTime();
+        const tick = () => {
+          cdTimeEl.textContent = formatCountdown(resetsAtMs - Date.now());
+        };
+        tick();
+        const t = setInterval(tick, 1000);
+        const onLeave = () => {
+          clearInterval(t);
+          window.removeEventListener("hashchange", onLeave);
+        };
+        window.addEventListener("hashchange", onLeave);
+      }
       if (!lb.res.ok) {
         topBox.innerHTML = `<div class="empty">โหลด Top ไม่ได้</div>`;
       } else if (!rows.length) {
-        topBox.innerHTML = `<div class="empty">ยังไม่มีอันดับสัปดาห์นี้</div>`;
+        topBox.innerHTML = `<div class="empty">ยังไม่มี Top 3 สัปดาห์นี้</div>`;
       } else {
-        topBox.innerHTML = `<div class="rank-list compact">${rows
-          .map((r) => {
-            const av = r.avatarUrl
-              ? `<img class="rank-av" src="${esc(r.avatarUrl)}" alt="" width="32" height="32" referrerpolicy="no-referrer">`
-              : `<div class="rank-av ph">${esc((r.displayName || "?").slice(0, 1).toUpperCase())}</div>`;
-            return `<div class="rank-row">
-              <span class="rank-pos">#${r.rank}</span>
-              ${av}
-              <span class="rank-meta">
-                <span class="rank-name">${esc(r.displayName || "ผู้เล่น")}</span>
-                <span class="rank-sub">${r.gamesWon || 0} ชนะ · ${r.totalGames || 0} เกม</span>
-              </span>
-              <span class="rank-score"><b>${r.totalPoints || 0}</b><span class="tiny">แต้ม</span></span>
-            </div>`;
-          })
-          .join("")}</div>`;
+        const top1 = rows.find((r) => r.rank === 1) || rows[0] || null;
+        const top2 = rows.find((r) => r.rank === 2) || rows[1] || null;
+        const top3 = rows.find((r) => r.rank === 3) || rows[2] || null;
+        topBox.innerHTML = `<div class="podium" aria-label="Top 3 Weekly">
+          ${ovPodiumSlot(top2, 2)}
+          ${ovPodiumSlot(top1, 1)}
+          ${ovPodiumSlot(top3, 3)}
+        </div>`;
       }
     }
   }
