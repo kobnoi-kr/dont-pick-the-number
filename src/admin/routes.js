@@ -1013,6 +1013,42 @@ async function handleAdminApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/admin/activity-logs") {
+    const auth = await requirePermission(req, res, "logs.view");
+    if (!auth) return true;
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const url = new URL(req.url || "/", "http://localhost");
+    const action = (url.searchParams.get("action") || "").trim();
+    const q = (url.searchParams.get("q") || "").trim().slice(0, 64);
+    const take = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 80) || 80));
+    const where = {};
+    if (action) where.action = action;
+    if (q) {
+      where.user = {
+        OR: [
+          { username: { contains: q, mode: "insensitive" } },
+          { displayName: { contains: q, mode: "insensitive" } }
+        ]
+      };
+    }
+    const [logs, total] = await Promise.all([
+      prisma.userActivityLog.findMany({
+        where,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { id: true, displayName: true, username: true, accountType: true } }
+        }
+      }),
+      prisma.userActivityLog.count({ where })
+    ]);
+    sendJson(res, 200, { logs, total });
+    return true;
+  }
+
   // —— Me (admin context) ——
   if (pathname === "/api/v1/admin/me") {
     const auth = await requireAdmin(req, res);
