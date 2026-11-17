@@ -208,7 +208,7 @@ let friendsCache=[];
 let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
-let spectating=false, pendingAction=null, pendingSetup=null;
+let spectating=false, pendingAction=null, pendingSetup=null, enterIntent=false;
 function readPlayParams(){
   const q=new URLSearchParams(location.search);
   const code=String(q.get("code")||"").replace(/\D/g,"").slice(0,6);
@@ -229,15 +229,17 @@ function readPlayParams(){
 }
 function runPendingAction(){
   if(!pendingAction||!sock||sock.readyState!==1) return;
+  const action=pendingAction;
+  enterIntent=true;
   const name=typedName()||localStorage.getItem("dpn-name")||"Player";
-  if(pendingAction.type==="join"){
-    send({t:"join",code:pendingAction.code,name,token:myToken(),avatarUrl:myAvatar()});
-  }else if(pendingAction.type==="create"){
-    send({t:"create",visibility:pendingAction.visibility,name,token:myToken(),avatarUrl:myAvatar(),setup:pendingSetup||undefined});
-  }else if(pendingAction.type==="watch"){
-    send({t:"watch",code:pendingAction.code,token:myToken(),name,avatarUrl:myAvatar()});
-  }else if(pendingAction.type==="acceptInvite"){
-    send({t:"acceptInvite",inviteId:pendingAction.inviteId,name,token:myToken(),avatarUrl:myAvatar()});
+  if(action.type==="join"){
+    send({t:"join",code:action.code,name,token:myToken(),avatarUrl:myAvatar()});
+  }else if(action.type==="create"){
+    send({t:"create",visibility:action.visibility,name,token:myToken(),avatarUrl:myAvatar(),setup:pendingSetup||undefined});
+  }else if(action.type==="watch"){
+    send({t:"watch",code:action.code,token:myToken(),name,avatarUrl:myAvatar()});
+  }else if(action.type==="acceptInvite"){
+    send({t:"acceptInvite",inviteId:action.inviteId,name,token:myToken(),avatarUrl:myAvatar()});
   }
   pendingAction=null;
   try{
@@ -261,7 +263,15 @@ function show(n){
   const lobby=n==="start";
   const side=document.querySelector(".side");
   if(side) side.classList.toggle("hidden",!inRoom||lobby);
-  $("roombar").classList.toggle("hidden",!inRoom||lobby);
+  // In-game: keep a slim status bar (no code / leave). Lobby has its own leave.
+  const bar=$("roombar");
+  if(bar){
+    bar.classList.toggle("hidden",!inRoom||lobby);
+    bar.classList.toggle("in-game", inRoom&&!lobby);
+  }
+  if($("roomCode")) $("roomCode").classList.toggle("hidden", true);
+  if($("copyCode")) $("copyCode").classList.toggle("hidden", true);
+  if($("leaveRoom")) $("leaveRoom").classList.toggle("hidden", true);
   $("roomNote").classList.toggle("hidden",!inRoom||lobby);
   document.body.classList.toggle("lobby-mode", lobby);
   const stage=document.querySelector(".stage");
@@ -2023,7 +2033,12 @@ function send(obj){
   if(sock&&sock.readyState===1) sock.send(JSON.stringify(obj));
 }
 function showGate(){
+  if(pendingAction||enterIntent){
+    show("gate");
+    return;
+  }
   wantRoom=false;
+  enterIntent=false;
   roomCode="";
   netPhase="gate";
   myId="";
@@ -2038,11 +2053,17 @@ function showGate(){
   closeCodeModal();
   closeGuide();
   document.title="NUMVERSE";
-  if(pendingAction){
-    show("gate");
+  location.replace("/app.html#rooms");
+}
+function leaveCurrentRoom(){
+  if(spectating){
+    send({t:"unwatch"});
+    location.replace("/app.html#rooms");
     return;
   }
-  location.replace("/app.html#rooms");
+  enterIntent=false;
+  wantRoom=false;
+  send({t:"leave"});
 }
 function showErr(message){
   if(netPhase==="gate"){
@@ -2178,11 +2199,17 @@ function syncOrderWheel(s){
 }
 function applySnap(s){
   wantRoom=true;
+  enterIntent=false;
   applying=true;
   myId=s.youId||"";
   hostId=s.hostId||"";
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
+  // Already seated (hello reattach) — drop matching pending join/watch.
+  if(pendingAction&&s.code&&(
+    (pendingAction.type==="join"&&pendingAction.code===s.code)||
+    (pendingAction.type==="watch"&&pendingAction.code===s.code)
+  )) pendingAction=null;
   myTurn=!!s.yourTurn;
   myAuto=!!s.youAuto;
   playerMeta=Array.isArray(s.players)?s.players:[];
@@ -2465,17 +2492,18 @@ function renderLobby(msg){
     btn.className="btn";
     const midGame=room.phase!=="lobby"&&room.phase!=="over";
     if(room.joinable){
-      btn.textContent=priv&&!adminBypass?"ใส่รหัส":(adminBypass?"เข้าชม":"เข้า");
+      btn.textContent=priv&&!adminBypass?"ใส่รหัส":"เข้าร่วม";
       btn.disabled=false;
       btn.onclick=()=>{
         if(priv&&!adminBypass) openCodeModal("ห้องของ "+(room.host||"เพื่อน")+" ล็อกอยู่ · ใส่รหัส 6 หลัก");
         else joinCode(room.code);
       };
-    }else if(midGame&&adminBypass){
+    }else if(midGame&&hasCode&&(adminBypass||!priv)){
       btn.textContent="เข้าชม";
       btn.disabled=false;
       btn.onclick=()=>{
         spectating=true;
+        enterIntent=true;
         send({t:"watch",code:room.code,token:myToken(),name:typedName()||localStorage.getItem("dpn-name")||"",avatarUrl:myAvatar()});
       };
     }else{
@@ -2539,8 +2567,12 @@ function connect(){
   sock=ws;
   ws.onopen=()=>{
     if($("connMsg")) $("connMsg").textContent="";
+    if(pendingAction) enterIntent=true;
     send({t:"hello",token:myToken(),name:localStorage.getItem("dpn-name")||typedName(),avatarUrl:myAvatar()});
-    setTimeout(runPendingAction, 50);
+    // Prefer running after lobby; fallback if hello reattached without lobby.
+    setTimeout(()=>{
+      if(pendingAction&&!wantRoom) runPendingAction();
+    }, 250);
   };
   ws.onmessage=e=>{
     let msg;
@@ -2551,14 +2583,16 @@ function connect(){
       onSnap(msg);
     }
     else if(msg.t==="lobby"){
-      if(!wantRoom&&!spectating&&!pendingAction) showGate();
-      else renderLobby(msg);
       if(pendingAction) runPendingAction();
+      else if(!wantRoom&&!spectating&&!enterIntent) showGate();
+      else renderLobby(msg);
     }else if(msg.t==="maintenance"){
       try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
       location.replace("/app.html");
       return;
     }else if(msg.t==="left"||msg.t==="roomClosed"){
+      // Ignore stale left while we are actively entering a room.
+      if(enterIntent||pendingAction) return;
       roomVisibility="";
       paintInviteBtn();
       if(msg.t==="roomClosed"&&msg.message&&$("err")) $("err").textContent=msg.message;
@@ -2709,10 +2743,8 @@ async function bootOnline(){
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
-  $("leaveRoom").onclick=()=>{
-    if(spectating){ send({t:"unwatch"}); location.replace("/app.html#rooms"); return; }
-    send({t:"leave"});
-  };
+  if($("leaveRoom")) $("leaveRoom").onclick=()=>leaveCurrentRoom();
+  if($("lobbyLeaveBtn")) $("lobbyLeaveBtn").onclick=()=>leaveCurrentRoom();
   $("renameRoomBtn").onclick=()=>openRenameRoom();
   $("renameRoomCancel").onclick=()=>closeRenameRoom();
   $("renameRoomForm").onsubmit=e=>{

@@ -1495,10 +1495,12 @@ async function onHello(ws, msg) {
   const token = validToken(msg.token) ? msg.token : "";
   ws.token = token;
   ws.pendingName = cleanName(msg.name);
+  ws.dashboard = !!msg.dashboard;
   if (token) trackPresence(ws, token);
   await refreshAdminFlag(ws);
   const avatarUrl = cleanAvatar(msg.avatarUrl);
-  if (token) {
+  // Dashboard sockets only need presence/lobby — never steal the play seat.
+  if (token && !ws.dashboard) {
     const found = findSeat(token);
     if (found) {
       if (avatarUrl) found.player.avatarUrl = avatarUrl;

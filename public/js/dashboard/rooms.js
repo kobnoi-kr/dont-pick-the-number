@@ -154,16 +154,14 @@ export async function renderRooms(root, { openCreate, user } = {}) {
                 if (priv && !adminBypass) {
                   actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
                 } else if (hasCode) {
-                  actions = `<button class="btn sm" data-join="${esc(r.code)}">${adminBypass ? "เข้าชม" : "เข้า"}</button>
+                  actions = `<button class="btn sm" data-join="${esc(r.code)}">เข้าร่วม</button>
                        <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`;
                 } else {
                   actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
                 }
               } else if (r.phase !== "lobby" && r.phase !== "over") {
-                if (priv && !adminBypass) {
-                  actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
-                } else if (hasCode) {
-                  actions = `<a class="btn ghost sm" href="${playUrl({ code: r.code, watch: true })}">${adminBypass ? "เข้าชม" : "ดูสด"}</a>`;
+                if (hasCode) {
+                  actions = `<a class="btn ${adminBypass ? "sm" : "ghost sm"}" href="${playUrl({ code: r.code, watch: true })}">${adminBypass ? "เข้าชม" : "ดูสด"}</a>`;
                 } else {
                   actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
                 }
