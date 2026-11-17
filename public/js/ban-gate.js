@@ -79,9 +79,16 @@ export function clearStoredBan() {
   }
 }
 
+/** Remove overlay + forget stored ban (after unban / dismiss / successful auth). */
+export function clearBanNotice() {
+  clearStoredBan();
+  const el = document.getElementById("nvBanOverlay");
+  if (el) el.remove();
+}
+
 /**
  * Full-screen center notice when the account is banned/suspended/deleted.
- * @param {{status?:string,message?:string}} msg
+ * @param {{status?:string,message?:string,userId?:string}} msg
  */
 export function applyBanNotice(msg = {}) {
   ensureBanStyles();
@@ -93,7 +100,12 @@ export function applyBanNotice(msg = {}) {
       : status === "deleted"
         ? "บัญชีของคุณถูกลบแล้ว"
         : "บัญชีของคุณถูกแบน ไม่สามารถเข้าเล่นได้");
-  persistBan({ status, message, at: Date.now() });
+  persistBan({
+    status,
+    message,
+    userId: msg.userId || "",
+    at: Date.now()
+  });
 
   let el = document.getElementById("nvBanOverlay");
   if (!el) {
@@ -110,22 +122,23 @@ export function applyBanNotice(msg = {}) {
       <h1>${esc(titleFor(status))}</h1>
       <p>${esc(message)}</p>
       <div class="nv-ban-actions">
-        <a class="primary" href="/login.html">ไปหน้าเข้าสู่ระบบ</a>
+        <a class="primary" href="/login.html" id="nvBanLogin">ไปหน้าเข้าสู่ระบบ</a>
         <button type="button" id="nvBanDismiss">ปิด</button>
       </div>
     </div>
   `;
   const dismiss = el.querySelector("#nvBanDismiss");
-  if (dismiss) {
-    dismiss.onclick = () => {
-      // Keep stored ban so refresh still shows; only hide this layer if they insist.
-      el.remove();
-    };
+  if (dismiss) dismiss.onclick = () => clearBanNotice();
+  const login = el.querySelector("#nvBanLogin");
+  if (login) {
+    login.addEventListener("click", () => clearStoredBan());
   }
   return el;
 }
 
-/** On boot: re-show ban overlay if we were kicked this session. */
+/**
+ * Re-show only if still flagged — caller should clearBanNotice() after a successful active session.
+ */
 export function restoreBanNotice() {
   const stored = readStoredBan();
   if (!stored) return false;

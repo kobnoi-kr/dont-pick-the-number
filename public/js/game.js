@@ -1905,6 +1905,7 @@ async function ensureAuth(){
       paintAuthBar(authUser);
       if(authUser&&authUser.id){
         sessionStorage.setItem("dpn-token", authUser.id);
+        if(window.NVBan&&window.NVBan.clearBanNotice) window.NVBan.clearBanNotice();
         if(authUser.displayName&&!localStorage.getItem("dpn-name")){
           localStorage.setItem("dpn-name", authUser.displayName);
           if($("myName")&&!$("myName").value) $("myName").value=authUser.displayName;
@@ -2611,6 +2612,8 @@ function connect(){
         alert(msg.message||"บัญชีของคุณถูกแบน");
       }
       return;
+    }else if(msg.t==="unbanned"){
+      if(window.NVBan&&window.NVBan.clearBanNotice) window.NVBan.clearBanNotice();
     }else if(msg.t==="announcement:new"){
       if(window.NVToasts&&window.NVToasts.onLiveAnnouncement){
         window.NVToasts.onLiveAnnouncement(msg.announcement);

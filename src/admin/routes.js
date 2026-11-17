@@ -354,9 +354,9 @@ async function handleAdminApi(req, res, pathname) {
           authAccounts: { select: { provider: true, providerEmail: true } }
         }
       });
+      const gameApi = getGameApi();
       if (nextStatus === "banned" || nextStatus === "suspended" || nextStatus === "deleted") {
         await revokeAllUserSessions(prisma, userId);
-        const gameApi = getGameApi();
         if (gameApi && typeof gameApi.forceBanUser === "function") {
           try {
             gameApi.forceBanUser(userId, {
@@ -368,6 +368,15 @@ async function handleAdminApi(req, res, pathname) {
                     ? "บัญชีของคุณถูกลบแล้ว"
                     : "บัญชีของคุณถูกแบน"
             });
+          } catch {
+            /* ignore */
+          }
+        }
+      } else if (nextStatus === "active") {
+        // Clear client-side sticky ban overlay if they reconnect.
+        if (gameApi && typeof gameApi.notifyUnbanned === "function") {
+          try {
+            gameApi.notifyUnbanned(userId);
           } catch {
             /* ignore */
           }

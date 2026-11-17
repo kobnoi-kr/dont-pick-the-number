@@ -14,7 +14,7 @@ import {
   applyLiveMaintenance,
   applyMaintenanceCountdown
 } from "/js/maintenance-gate.js";
-import { applyBanNotice, restoreBanNotice } from "/js/ban-gate.js";
+import { applyBanNotice, restoreBanNotice, clearBanNotice } from "/js/ban-gate.js";
 
 const state = {
   user: null,
@@ -164,6 +164,9 @@ onDashboardMessage((msg) => {
     applyBanNotice(msg);
     return;
   }
+  if (msg.t === "unbanned") {
+    clearBanNotice();
+  }
   if (msg.t === "maintenance:countdown") {
     const roles = (state.user && state.user.roles) || [];
     const isAdmin =
@@ -184,10 +187,11 @@ onDashboardMessage((msg) => {
 });
 
 (async function boot() {
-  restoreBanNotice();
   try {
     const data = await ensureGuest();
     state.user = data.user || data;
+    // Working session means ban overlay must not stick after unban.
+    clearBanNotice();
     if (state.user && state.user.id) localStorage.setItem("dpn-token", state.user.id);
     if (state.user && (state.user.displayName || state.user.username)) {
       localStorage.setItem("dpn-name", state.user.displayName || state.user.username);
@@ -201,6 +205,7 @@ onDashboardMessage((msg) => {
     }
     paintUser(state.user);
   } catch (err) {
+    restoreBanNotice();
     paintUser(null);
   }
 

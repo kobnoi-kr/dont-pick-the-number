@@ -1926,6 +1926,14 @@ attachGameApi({
     if (sock) send(sock, { t: "err", message: "ถูกแอดมินเตะออกจากห้อง" });
     return true;
   },
+  /** Tell a user their ban/suspend was lifted (clears sticky client overlay). */
+  notifyUnbanned(userId) {
+    const id = validToken(userId) ? userId : "";
+    if (!id) return { ok: false };
+    const payload = { t: "unbanned", status: "active" };
+    sendToUser(id, payload);
+    return { ok: true };
+  },
   /** Ban/suspend: notify all sockets, pull out of rooms, then close WS. */
   forceBanUser(userId, opts = {}) {
     const id = validToken(userId) ? userId : "";

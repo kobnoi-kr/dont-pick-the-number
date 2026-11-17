@@ -352,19 +352,22 @@
     loadAnnouncementToasts,
     showAnnouncementToast
   } from "/js/dashboard/toasts.js";
-  import { applyBanNotice, restoreBanNotice } from "/js/ban-gate.js";
+  import { applyBanNotice, restoreBanNotice, clearBanNotice } from "/js/ban-gate.js";
 
   window.NVToasts = { onLiveAnnouncement, loadAnnouncementToasts, showAnnouncementToast };
   window.NVMaint = { applyLiveMaintenance, applyMaintenanceCountdown };
-  window.NVBan = { applyBanNotice, restoreBanNotice };
+  window.NVBan = { applyBanNotice, restoreBanNotice, clearBanNotice };
 
-  restoreBanNotice();
   const gate = await enforceMaintenanceGate({ hardBlock: true });
   if (!gate.blocked) {
+    // If auth/session works, drop any stale ban overlay left after unban.
+    clearBanNotice();
     loadAnnouncementToasts().catch(() => {});
     const s = document.createElement("script");
     s.src = "/js/game.js";
     document.body.appendChild(s);
+  } else {
+    restoreBanNotice();
   }
 </script>
 </body>
