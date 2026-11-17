@@ -34,18 +34,19 @@
       <button type="button" data-view="settings" data-perm="settings.view"><span class="ico">⚙</span> Settings</button>
       <div class="nav-section">ACCOUNT</div>
       <a class="admin-nav" href="/app"><span class="ico">←</span> User Dashboard</a>
-      <a class="admin-nav" href="/terms"><span class="ico">☰</span> ข้อกำหนด</a>
-      <a class="admin-nav" href="/faq"><span class="ico">?</span> FAQ</a>
     </nav>
-    <div class="sidebar-user">
-      <div id="sideAvatar" class="avatar-fallback">?</div>
-      <div class="meta">
-        <div class="name" id="sideName">Loading…</div>
-        <div class="status" id="sideStatus">—</div>
+    <div class="sidebar-foot">
+      <div class="sidebar-user">
+        <div id="sideAvatar" class="avatar-fallback">?</div>
+        <div class="meta">
+          <div class="name" id="sideName">Loading…</div>
+          <div class="status" id="sideStatus">—</div>
+        </div>
+        <button type="button" class="logout" id="sideLogout" title="Logout" aria-label="Logout">
+          <img src="/images/power-off.png" alt="" width="18" height="18" decoding="async">
+        </button>
       </div>
-      <button type="button" class="logout" id="sideLogout" title="Logout" aria-label="Logout">
-        <img src="/images/power-off.png" alt="" width="18" height="18" decoding="async">
-      </button>
+      <p class="sidebar-legal"><a href="/terms">ข้อกำหนด</a> · <a href="/faq">FAQ</a></p>
     </div>
   </aside>
 
