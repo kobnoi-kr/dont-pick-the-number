@@ -27,70 +27,81 @@ export async function renderPermissions(root, { user }) {
   ];
 
   root.innerHTML = `
-    <div class="card">
-      <h2>Admin &amp; Permissions</h2>
-      <p class="muted tiny" style="margin:6px 0 0">
-        จัดสิทธิ์ตามบทบาท · super_admin มีสิทธิ์ครบและแก้ matrix ไม่ได้ · สิทธิ์ใหม่ (Level / ลบ EXP) จะถูก sync อัตโนมัติ
-      </p>
-      <div class="table-wrap" style="margin-top:12px;overflow:auto">
-        <table class="table perm-matrix">
-          <thead>
-            <tr>
-              <th>Permission</th>
-              ${roles
+    <section class="page-head">
+      <div>
+        <h2 style="margin:0">Admin &amp; Permissions</h2>
+        <p class="muted" style="margin:6px 0 0">
+          จัดสิทธิ์ตามบทบาท · super_admin มีสิทธิ์ครบและแก้ไม่ได้
+        </p>
+      </div>
+      ${canManage ? `<button type="button" class="btn sm" id="pSave">Save changes</button>` : ""}
+    </section>
+    <p class="msg" id="pMsg"></p>
+    <div class="perm-legend">
+      ${roles
+        .map(
+          (r) =>
+            `<span class="perm-legend-chip"><b>${esc(r.name)}</b><em>${r.userCount} users</em></span>`
+        )
+        .join("")}
+    </div>
+    <div class="perm-groups">
+      ${orderedGroups
+        .map((groupId) => {
+          const rows = byGroup.get(groupId) || [];
+          const groupLabel = groups[groupId] || (rows[0] && rows[0].groupLabel) || groupId;
+          return `
+          <div class="card perm-group-card">
+            <h3 class="perm-group-title">${esc(groupLabel)}</h3>
+            <div class="perm-rows">
+              ${rows
                 .map(
-                  (r) =>
-                    `<th>${esc(r.name)}<div class="tiny">${r.userCount} users</div></th>`
+                  (p) => `
+                <div class="perm-row">
+                  <div class="perm-info">
+                    <div class="perm-name">${esc(p.label || p.name)}</div>
+                    <code class="perm-code">${esc(p.name)}</code>
+                    <p class="perm-desc">${esc(p.description || "")}</p>
+                  </div>
+                  <div class="perm-checks-row">
+                    ${roles
+                      .map((r) => {
+                        const on = (r.permissions || []).includes(p.name);
+                        const locked = r.name === "super_admin" || !canManage;
+                        return `<label class="perm-role-check${locked ? " locked" : ""}${on ? " on" : ""}" title="${esc(
+                          r.name
+                        )}">
+                          <span class="perm-role-label">${esc(r.name.replace("_", " "))}</span>
+                          <input type="checkbox" data-role="${esc(r.name)}" data-perm="${esc(p.name)}" ${
+                          on ? "checked" : ""
+                        } ${locked ? "disabled" : ""}/>
+                        </label>`;
+                      })
+                      .join("")}
+                  </div>
+                </div>`
                 )
                 .join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${orderedGroups
-              .map((groupId) => {
-                const rows = byGroup.get(groupId) || [];
-                const groupLabel = groups[groupId] || (rows[0] && rows[0].groupLabel) || groupId;
-                return `
-                  <tr class="perm-group-row">
-                    <td colspan="${roles.length + 1}"><strong>${esc(groupLabel)}</strong></td>
-                  </tr>
-                  ${rows
-                    .map(
-                      (p) => `<tr>
-                  <td>
-                    <div class="perm-name">${esc(p.label || p.name)}</div>
-                    <code class="tiny">${esc(p.name)}</code>
-                    <div class="tiny muted">${esc(p.description || "")}</div>
-                  </td>
-                  ${roles
-                    .map((r) => {
-                      const on = (r.permissions || []).includes(p.name);
-                      const locked = r.name === "super_admin" || !canManage;
-                      return `<td style="text-align:center">
-                        <input type="checkbox" data-role="${esc(r.name)}" data-perm="${esc(p.name)}" ${
-                        on ? "checked" : ""
-                      } ${locked ? "disabled" : ""}/>
-                      </td>`;
-                    })
-                    .join("")}
-                </tr>`
-                    )
-                    .join("")}`;
-              })
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-      ${canManage ? `<button type="button" class="btn sm" id="pSave" style="margin-top:12px">Save changes</button>` : ""}
-      <p class="tiny" id="pMsg"></p>
+            </div>
+          </div>`;
+        })
+        .join("")}
     </div>
   `;
+
+  root.querySelectorAll(".perm-role-check input").forEach((inp) => {
+    inp.onchange = () => {
+      const lab = inp.closest(".perm-role-check");
+      if (lab) lab.classList.toggle("on", inp.checked);
+    };
+  });
 
   const save = root.querySelector("#pSave");
   if (save) {
     save.onclick = async () => {
       const msg = root.querySelector("#pMsg");
       msg.textContent = "Saving…";
+      msg.classList.remove("ok");
       for (const role of roles) {
         if (role.name === "super_admin") continue;
         const nextPerms = [...root.querySelectorAll(`input[data-role="${role.name}"]:checked`)].map(

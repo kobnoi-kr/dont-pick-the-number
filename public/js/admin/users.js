@@ -43,12 +43,28 @@ export async function renderUsers(root, { user }) {
   const modal = root.querySelector("#uDetailModal");
   const panel = root.querySelector("#uDetailPanel");
 
+  let scrollY = 0;
+  function lockScroll() {
+    scrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.classList.add("modal-open");
+    document.body.style.top = `-${scrollY}px`;
+  }
+  function unlockScroll() {
+    if (!document.body.classList.contains("modal-open")) return;
+    document.body.classList.remove("modal-open");
+    document.body.style.top = "";
+    window.scrollTo(0, scrollY);
+  }
   function closeDetail() {
     modal.classList.add("hidden");
+    unlockScroll();
   }
 
   modal.addEventListener("click", (e) => {
     if (e.target === modal) closeDetail();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) closeDetail();
   });
 
   async function load() {
@@ -101,14 +117,15 @@ export async function renderUsers(root, { user }) {
 
   async function openDetail(id) {
     modal.classList.remove("hidden");
+    lockScroll();
     panel.innerHTML = `<div class="loading">Loading…</div>`;
     const { res, data } = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, { method: "GET" });
     if (!res.ok) {
       panel.innerHTML = `
-        <div class="row-between">
-          <div class="empty">ไม่พบผู้ใช้</div>
-          <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
-        </div>`;
+        <button type="button" class="icon-btn user-card-close" id="uClose" aria-label="ปิด">
+          <i class="fi fi-rr-cross" aria-hidden="true"></i>
+        </button>
+        <div class="empty">ไม่พบผู้ใช้</div>`;
       panel.querySelector("#uClose").onclick = closeDetail;
       return;
     }
@@ -122,7 +139,9 @@ export async function renderUsers(root, { user }) {
     const canResetExp = hasPerm(user, "users.reset_exp") || canBan;
 
     panel.innerHTML = `
-      <button type="button" class="textbtn user-card-close" id="uClose" aria-label="ปิด">ปิด</button>
+      <button type="button" class="icon-btn user-card-close" id="uClose" aria-label="ปิด">
+        <i class="fi fi-rr-cross" aria-hidden="true"></i>
+      </button>
       <div class="user-card-head">
         ${avHtml(u)}
         <div class="user-card-id">
