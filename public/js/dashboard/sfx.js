@@ -1,7 +1,20 @@
 const ADMIN_MUTE_KEY = "nv-admin-notif-mute";
 const ADMIN_PING = "/audio/correct-ping.mp3";
 const ANN_BELL = "/audio/mixkit-alert-bells-echo-765.wav";
-const MAINT_TICK = "/audio/maintenance-countdown.mp3";
+// Short beep — long countdown clips stack and keep playing after the timer ends.
+const MAINT_TICK = "/audio/beep.mp3";
+let maintTickAudio = null;
+
+export function stopMaintenanceTick() {
+  if (!maintTickAudio) return;
+  try {
+    maintTickAudio.pause();
+    maintTickAudio.currentTime = 0;
+  } catch {
+    /* ignore */
+  }
+  maintTickAudio = null;
+}
 
 export function isAdminNotifMuted() {
   try {
@@ -48,7 +61,19 @@ export function playAnnouncementBell() {
   playSfx(ANN_BELL, 0.38);
 }
 
-/** Tick during maintenance / deploy countdown. */
+/** One short tick per countdown second (stops previous clip first). */
 export function playMaintenanceTick() {
-  playSfx(MAINT_TICK, 0.4);
+  stopMaintenanceTick();
+  try {
+    const a = new Audio(MAINT_TICK);
+    a.volume = 0.35;
+    maintTickAudio = a;
+    a.onended = () => {
+      if (maintTickAudio === a) maintTickAudio = null;
+    };
+    const p = a.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  } catch {
+    /* ignore */
+  }
 }

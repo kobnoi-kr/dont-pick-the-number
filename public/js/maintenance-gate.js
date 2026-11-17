@@ -106,24 +106,110 @@ export function applyLiveMaintenance(message, { bypass = false } = {}) {
 }
 
 let countdownTimer = null;
+let maintTickAudio = null;
+let countdownLastSec = -1;
+
+function stopMaintTick() {
+  if (!maintTickAudio) return;
+  try {
+    maintTickAudio.pause();
+    maintTickAudio.currentTime = 0;
+  } catch {
+    /* ignore */
+  }
+  maintTickAudio = null;
+}
 
 function hideMaintenanceCountdown() {
   if (countdownTimer) {
     clearInterval(countdownTimer);
     countdownTimer = null;
   }
+  stopMaintTick();
+  countdownLastSec = -1;
   const el = document.getElementById("nvMaintCountdown");
   if (el) el.remove();
 }
 
+/** Short beep per second — long countdown.mp3 was stacking and outliving the timer. */
 function playMaintTick() {
+  stopMaintTick();
   try {
-    const a = new Audio("/audio/maintenance-countdown.mp3");
-    a.volume = 0.4;
+    const a = new Audio("/audio/beep.mp3");
+    a.volume = 0.35;
+    maintTickAudio = a;
+    a.onended = () => {
+      if (maintTickAudio === a) maintTickAudio = null;
+    };
     const p = a.play();
     if (p && typeof p.catch === "function") p.catch(() => {});
   } catch {
     /* ignore */
+  }
+}
+
+function resolveCountdownEndsAt(msg) {
+  const secHint = Math.max(1, Number(msg.seconds) || 15);
+  const relative = Date.now() + secHint * 1000;
+  const abs = Number(msg.endsAt);
+  if (!Number.isFinite(abs)) return relative;
+  // Reject stale / wildly skewed absolute stamps (clock skew / late join).
+  if (Math.abs(abs - relative) > 2500) return relative;
+  return abs;
+}
+
+function paintCountdownOverlay(el) {
+  if (!el || !document.body.contains(el)) return;
+  const target = el._nvEndsAt || Date.now();
+  const leftMs = Math.max(0, target - Date.now());
+  // floor+1 feel: show N while (N-1, N] seconds remain, except exact 0.
+  const sec = leftMs <= 0 ? 0 : Math.max(1, Math.ceil(leftMs / 1000));
+  if (sec !== countdownLastSec) {
+    const prev = countdownLastSec;
+    countdownLastSec = sec;
+    // Tick once when the displayed second changes (including first paint).
+    if (sec > 0 && sec !== prev) playMaintTick();
+    const badge = el._nvDeploy ? "SYSTEM UPDATE" : "MAINTENANCE";
+    const title = el._nvDeploy ? "กำลังอัปเดตระบบใน" : "Maintenance in";
+    const sub = el._nvDeploy
+      ? `กรุณาหยุดการกระทำ — ปิดปรับปรุงใน ${sec} วินาที`
+      : `ปิดเซิร์ฟใน ${sec} วินาที`;
+    el.innerHTML = `
+      <div style="
+        width:min(420px,100%);text-align:center;color:#fee2e2;
+        font-family:system-ui,Segoe UI,sans-serif;
+        background:#1a1018;border:1px solid rgba(239,68,68,.5);
+        border-radius:20px;padding:28px 24px 24px;
+        box-shadow:0 24px 70px rgba(0,0,0,.55)">
+        <div style="
+          display:inline-block;margin-bottom:10px;padding:4px 12px;border-radius:999px;
+          background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.4);
+          font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">
+          ${badge}
+        </div>
+        <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:#fecaca">
+          ${title}
+        </div>
+        <div style="
+          font-size:4.2rem;line-height:1;font-weight:900;
+          font-variant-numeric:tabular-nums;letter-spacing:.04em;
+          color:#fff;text-shadow:0 0 24px rgba(239,68,68,.45);margin:8px 0 10px">
+          ${sec}
+        </div>
+        <div style="font-size:.95rem;font-weight:700;color:#fca5a5;margin-bottom:12px">
+          ${sub}
+        </div>
+        <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(el._nvMessage || "")}</p>
+        ${
+          el._nvBypass
+            ? `<div style="margin-top:12px;font-size:.82rem;opacity:.8">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>`
+            : ""
+        }
+      </div>`;
+  }
+  if (sec <= 0) {
+    stopMaintTick();
+    hideMaintenanceCountdown();
   }
 }
 
@@ -137,11 +223,23 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     return;
   }
   ensureStyles();
-  // Use relative seconds from the message — avoid server/client clock skew
-  // wiping the overlay immediately (endsAt in the past on some devices).
-  const secHint = Math.max(1, Number(msg.seconds) || 15);
-  const endsAt = Date.now() + secHint * 1000;
+  const endsAt = resolveCountdownEndsAt(msg);
+  const message =
+    msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาเตรียมออกจากห้อง";
+  const isDeploy =
+    /อัปเดต|อัพเดต|deploy|update/i.test(String(message)) || msg.kind === "deploy";
+
   let el = document.getElementById("nvMaintCountdown");
+  // Server pulses every 1s — only refresh endsAt/message, do NOT reset lastSec
+  // (that was causing double ticks and drifting timing).
+  if (el && countdownTimer) {
+    el._nvEndsAt = endsAt;
+    el._nvMessage = message;
+    el._nvBypass = !!bypass;
+    el._nvDeploy = isDeploy;
+    return;
+  }
+
   if (!el) {
     el = document.createElement("div");
     el.id = "nvMaintCountdown";
@@ -162,73 +260,15 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     "backdrop-filter:blur(6px)",
     "pointer-events:auto"
   ].join(";");
-  const message =
-    msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาเตรียมออกจากห้อง";
-  const isDeploy =
-    /อัปเดต|อัพเดต|deploy|update/i.test(String(message)) || msg.kind === "deploy";
-
-  // Stash for resync from server pulses.
   el._nvEndsAt = endsAt;
   el._nvMessage = message;
   el._nvBypass = !!bypass;
   el._nvDeploy = isDeploy;
-
-  let lastSec = -1;
-  const paint = () => {
-    const target = el._nvEndsAt || endsAt;
-    const leftMs = Math.max(0, target - Date.now());
-    const sec = Math.max(0, Math.ceil(leftMs / 1000));
-    if (sec !== lastSec) {
-      const prev = lastSec;
-      lastSec = sec;
-      if (prev >= 0 && sec > 0 && sec !== prev) playMaintTick();
-      else if (prev < 0 && sec > 0) playMaintTick();
-      const badge = el._nvDeploy ? "SYSTEM UPDATE" : "MAINTENANCE";
-      const title = el._nvDeploy ? "กำลังอัปเดตระบบใน" : "Maintenance in";
-      const sub = el._nvDeploy
-        ? `กรุณาหยุดการกระทำ — ปิดปรับปรุงใน ${sec} วินาที`
-        : `ปิดเซิร์ฟใน ${sec} วินาที`;
-      el.innerHTML = `
-        <div style="
-          width:min(420px,100%);text-align:center;color:#fee2e2;
-          font-family:system-ui,Segoe UI,sans-serif;
-          background:#1a1018;border:1px solid rgba(239,68,68,.5);
-          border-radius:20px;padding:28px 24px 24px;
-          box-shadow:0 24px 70px rgba(0,0,0,.55)">
-          <div style="
-            display:inline-block;margin-bottom:10px;padding:4px 12px;border-radius:999px;
-            background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.4);
-            font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">
-            ${badge}
-          </div>
-          <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:#fecaca">
-            ${title}
-          </div>
-          <div style="
-            font-size:4.2rem;line-height:1;font-weight:900;
-            font-variant-numeric:tabular-nums;letter-spacing:.04em;
-            color:#fff;text-shadow:0 0 24px rgba(239,68,68,.45);margin:8px 0 10px">
-            ${sec}
-          </div>
-          <div style="font-size:.95rem;font-weight:700;color:#fca5a5;margin-bottom:12px">
-            ${sub}
-          </div>
-          <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(el._nvMessage || message)}</p>
-          ${
-            el._nvBypass
-              ? `<div style="margin-top:12px;font-size:.82rem;opacity:.8">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>`
-              : ""
-          }
-        </div>`;
-    }
-    if (sec <= 0) {
-      hideMaintenanceCountdown();
-    }
-  };
+  countdownLastSec = -1;
 
   if (countdownTimer) clearInterval(countdownTimer);
-  paint();
-  countdownTimer = setInterval(paint, 200);
+  paintCountdownOverlay(el);
+  countdownTimer = setInterval(() => paintCountdownOverlay(el), 100);
 }
 
 export default enforceMaintenanceGate;
