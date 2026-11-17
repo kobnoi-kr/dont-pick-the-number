@@ -43,9 +43,21 @@ async function createGuestUser(prisma, meta = {}) {
   });
 }
 
+function permissionsOf(user) {
+  const set = new Set();
+  for (const ur of user.userRoles || []) {
+    const role = ur.role;
+    if (!role) continue;
+    for (const rp of role.rolePermissions || []) {
+      if (rp.permission && rp.permission.name) set.add(rp.permission.name);
+    }
+  }
+  return [...set];
+}
+
 function publicUser(user) {
   if (!user) return null;
-  const roles = (user.userRoles || []).map((ur) => ur.role.name);
+  const roles = (user.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
   return {
     id: user.id,
     username: user.username,
@@ -56,6 +68,7 @@ function publicUser(user) {
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt,
     roles,
+    permissions: permissionsOf(user),
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt
   };
@@ -64,7 +77,15 @@ function publicUser(user) {
 async function getUserWithRoles(prisma, userId) {
   return prisma.user.findUnique({
     where: { id: userId },
-    include: { userRoles: { include: { role: true } } }
+    include: {
+      userRoles: {
+        include: {
+          role: {
+            include: { rolePermissions: { include: { permission: true } } }
+          }
+        }
+      }
+    }
   });
 }
 

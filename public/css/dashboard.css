@@ -572,6 +572,123 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .admin-stub-card { width: min(560px, 100%); }
 .admin-stub-card h1 { margin: 0 0 8px; font-size: 1.4rem; }
 
+.admin-app .nav-section { margin-top: 10px; }
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar .input { flex: 1; min-width: 140px; }
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.table-wrap { overflow-x: auto; }
+.click-row { cursor: pointer; }
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(86, 119, 252, 0.18);
+  color: #c5d0ff;
+}
+.status-pill.status-active { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+.status-pill.status-suspended { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+.status-pill.status-banned,
+.status-pill.status-deleted { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+.btn.danger {
+  background: #7f1d1d;
+  border-color: #991b1b;
+  color: #fee2e2;
+}
+.btn.danger:hover { background: #991b1b; }
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 140px;
+  padding: 8px 0;
+}
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.bar-col .bar {
+  width: 70%;
+  min-height: 2px;
+  background: linear-gradient(180deg, var(--nv-primary-hover), var(--nv-primary));
+  border-radius: 4px 4px 0 0;
+}
+.bar-label {
+  font-size: 0.65rem;
+  color: var(--nv-muted);
+  margin-top: 4px;
+  white-space: nowrap;
+}
+.perm-matrix input { transform: scale(1.1); }
+.perm-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.perm-checks label { display: flex; gap: 6px; align-items: center; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  margin: 2px;
+  font-size: 0.75rem;
+}
+.linkish {
+  background: none;
+  border: none;
+  color: var(--nv-primary-hover);
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+}
+.card.nested {
+  background: var(--nv-bg-2);
+  box-shadow: none;
+}
+.field { display: block; }
+.field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--nv-text-2);
+  font-size: 0.85rem;
+}
+.announce-banner {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--nv-radius);
+  border: 1px solid rgba(86, 119, 252, 0.35);
+  background: rgba(86, 119, 252, 0.12);
+}
+.announce-banner b { display: block; margin-bottom: 4px; }
+
 .friends-layout { align-items: start; }
 .friend-code-row {
   display: flex;

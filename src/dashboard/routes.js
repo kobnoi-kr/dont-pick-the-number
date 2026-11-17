@@ -98,6 +98,7 @@ async function handleDashboardApi(req, res, pathname) {
     pathname.startsWith("/api/v1/leaderboard") ||
     pathname.startsWith("/api/v1/settings") ||
     pathname.startsWith("/api/v1/notifications") ||
+    pathname.startsWith("/api/v1/announcements") ||
     pathname.match(/^\/api\/v1\/users\/[^/]+\/public$/);
 
   if (DASHBOARD_ADMIN_ONLY && isDashPath) {
@@ -110,7 +111,52 @@ async function handleDashboardApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
-    sendJson(res, 200, { games: GAME_CATALOG });
+    let flags = null;
+    if (authEnabled()) {
+      try {
+        const prisma = await getPrisma();
+        const row = await prisma.systemSetting.findUnique({ where: { key: "game_catalog" } });
+        if (row && row.value) flags = row.value;
+      } catch {
+        flags = null;
+      }
+    }
+    const games = GAME_CATALOG.filter((g) => {
+      if (!flags || !flags[g.id]) return true;
+      return flags[g.id].enabled !== false;
+    }).map((g) => {
+      const override = flags && flags[g.id];
+      if (override && override.name) return Object.assign({}, g, { name: override.name });
+      return g;
+    });
+    sendJson(res, 200, { games });
+    return true;
+  }
+
+  if (pathname === "/api/v1/announcements/active") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    if (!authEnabled()) {
+      sendJson(res, 200, { announcements: [] });
+      return true;
+    }
+    const prisma = await getPrisma();
+    const now = new Date();
+    const items = await prisma.announcement.findMany({
+      where: {
+        active: true,
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }
+        ]
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { id: true, title: true, body: true, createdAt: true }
+    });
+    sendJson(res, 200, { announcements: items });
     return true;
   }
 

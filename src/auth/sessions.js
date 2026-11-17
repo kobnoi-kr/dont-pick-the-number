@@ -32,7 +32,15 @@ async function findValidSession(prisma, rawToken) {
     where: { tokenHash },
     include: {
       user: {
-        include: { userRoles: { include: { role: true } } }
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                include: { rolePermissions: { include: { permission: true } } }
+              }
+            }
+          }
+        }
       }
     }
   });

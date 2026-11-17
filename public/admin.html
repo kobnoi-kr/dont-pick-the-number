@@ -9,34 +9,56 @@
 <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
-<div class="admin-stub">
-  <div class="card admin-stub-card">
-    <div class="sidebar-brand" style="padding:0 0 12px">
-      <img src="/images/numverse.png" alt="" width="42" height="42">
-      <span>NUMVERSE</span>
-      <span class="role-badge admin">ADMIN</span>
+<div class="app admin-app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="/admin.html" class="brand-link">
+        <img src="/images/numverse.png" alt="" width="42" height="42">
+        <span>NUMVERSE</span>
+      </a>
+      <span class="role-badge admin" id="roleBadge">ADMIN</span>
     </div>
-    <h1>Admin Dashboard</h1>
-    <p class="muted" id="adminMsg">กำลังตรวจสอบสิทธิ์…</p>
-    <p class="tiny">Phase 2 จะมี Overview, User/Game/Room Management, Live Monitor, System และ Permissions</p>
-    <div class="actions" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
-      <a class="btn" href="/app.html">กลับ User Dashboard</a>
-      <a class="btn ghost" href="/">หน้าแรก</a>
+    <nav class="nav" id="sideNav">
+      <div class="nav-section">DASHBOARD</div>
+      <button type="button" data-view="overview" data-perm="dashboard.view" class="active"><span class="ico">◈</span> Overview</button>
+      <button type="button" data-view="analytics" data-perm="analytics.view"><span class="ico">◔</span> Analytics</button>
+      <button type="button" data-view="live" data-perm="rooms.view"><span class="ico">⌁</span> Live Monitor</button>
+      <div class="nav-section">MANAGEMENT</div>
+      <button type="button" data-view="users" data-perm="users.view"><span class="ico">☺</span> User Management</button>
+      <button type="button" data-view="games" data-perm="games.view"><span class="ico">▣</span> Game Management</button>
+      <button type="button" data-view="rooms" data-perm="rooms.view"><span class="ico">⌂</span> Room Management</button>
+      <button type="button" data-view="announcements" data-perm="announcements.manage"><span class="ico">◎</span> Announcements</button>
+      <div class="nav-section">SYSTEM</div>
+      <button type="button" data-view="permissions" data-perm="admins.view"><span class="ico">🛡</span> Admin &amp; Permissions</button>
+      <button type="button" data-view="system" data-perm="settings.view"><span class="ico">▤</span> System Management</button>
+      <button type="button" data-view="logs" data-perm="logs.view"><span class="ico">☰</span> Activity Logs</button>
+      <button type="button" data-view="settings" data-perm="settings.view"><span class="ico">⚙</span> Settings</button>
+      <div class="nav-section">ACCOUNT</div>
+      <a class="admin-nav" href="/app.html"><span class="ico">←</span> User Dashboard</a>
+    </nav>
+    <div class="sidebar-user">
+      <div id="sideAvatar" class="avatar-fallback">?</div>
+      <div class="meta">
+        <div class="name" id="sideName">Loading…</div>
+        <div class="status" id="sideStatus">—</div>
+      </div>
+      <button type="button" class="logout" id="sideLogout" title="Logout">⎋</button>
     </div>
-  </div>
+  </aside>
+
+  <header class="topbar">
+    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+    <h1 id="pageTitle">Overview</h1>
+    <a class="btn ghost sm home-link" href="/">หน้าแรก</a>
+  </header>
+
+  <main class="main">
+    <div id="viewRoot"><div class="loading">กำลังโหลด Admin…</div></div>
+  </main>
 </div>
-<script type="module">
-import { api } from "/js/dashboard/api.js";
-const msg = document.getElementById("adminMsg");
-const { res, data } = await api("/api/v1/auth/me", { method: "GET" });
-const roles = (data && data.user && data.user.roles) || [];
-const ok = roles.includes("admin") || roles.includes("super_admin");
-if (!res.ok || !ok) {
-  msg.textContent = "ต้องเป็น admin หรือ super admin";
-  setTimeout(() => { location.href = "/app.html"; }, 1200);
-} else {
-  msg.textContent = "เข้าสู่โหมดแอดมินได้ — เครื่องมือจัดการเต็มรูปแบบกำลังพัฒนา (Phase 2)";
-}
-</script>
+
+<div id="backdrop" class="backdrop hidden"></div>
+
+<script type="module" src="/js/admin/app.js"></script>
 </body>
 </html>

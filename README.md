@@ -8,7 +8,7 @@
 public/
   landing.html         # หน้าแรก (Logo / Profile / Start)
   app.html             # User Dashboard
-  admin.html           # Admin stub (Phase 2)
+  admin.html           # Admin Dashboard (Phase 2)
   play.html            # Game runtime
   css/ · js/ · images/ · audio/
 server.js              # HTTP + WebSocket game server
@@ -73,7 +73,7 @@ npm start
 - `/app.html` User Dashboard
 - `/play.html` เกม
 - `/login.html` `/register.html` · account/friends → `/app.html#profile` / `#friends`
-- `/admin.html` Admin stub
+- `/admin.html` Admin Dashboard (role-gated)
 - `/reset-password.html` `/verify-email.html`
 
 API หลัก:
@@ -89,6 +89,8 @@ API หลัก:
 | GET | `/api/v1/auth/discord` | Discord OAuth |
 | GET | `/api/v1/games/catalog` | คลังเกม |
 | GET | `/api/v1/dashboard/summary` | Overview stats |
+| GET | `/api/v1/announcements/active` | ประกาศที่ publish แล้ว |
+| GET/PATCH… | `/api/v1/admin/*` | Admin Dashboard APIs (role + permission) |
 
 Guest Upgrade รักษา User ID เดิม และ rotate session หลังอัปเกรด
 

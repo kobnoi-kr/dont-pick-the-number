@@ -16,6 +16,7 @@ const {
   filterOnline
 } = require("./src/presence");
 const { handleDashboardApi } = require("./src/dashboard/routes");
+const { handleAdminApi } = require("./src/admin/routes");
 const { attachGameApi } = require("./src/dashboard/bridge");
 const { persistFinishedGame } = require("./src/dashboard/persist");
 
@@ -1668,6 +1669,8 @@ async function servePublic(req, res) {
   if (pathname.startsWith("/api/")) {
     const handled = await handleAuthApi(req, res, pathname);
     if (handled) return;
+    const admin = await handleAdminApi(req, res, pathname);
+    if (admin) return;
     const dash = await handleDashboardApi(req, res, pathname);
     if (dash) return;
     res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -1699,6 +1702,8 @@ async function serveAdmin(req, res) {
   if (pathname.startsWith("/api/")) {
     const handled = await handleAuthApi(req, res, pathname);
     if (handled) return;
+    const admin = await handleAdminApi(req, res, pathname);
+    if (admin) return;
     const dash = await handleDashboardApi(req, res, pathname);
     if (dash) return;
     res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -1752,6 +1757,32 @@ function lobbyRoomRow(room) {
   };
 }
 
+function adminRoomRow(room) {
+  const host = room.players.find((item) => item.id === room.hostId);
+  return {
+    code: room.code,
+    visibility: room.visibility === "private" ? "private" : "public",
+    title: roomLabel(room),
+    host: host ? host.name : "",
+    hostId: room.hostId || "",
+    count: room.players.filter((item) => item.connected).length,
+    max: MAX_PLAYERS,
+    cat: room.cat,
+    phase: room.phase,
+    joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+    spectators: Array.isArray(room.spectators) ? room.spectators.length : 0,
+    created: room.created || 0,
+    startedAt: room.startedAt || null,
+    players: room.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      connected: !!p.connected,
+      bot: !!p.bot,
+      host: p.id === room.hostId
+    }))
+  };
+}
+
 attachGameApi({
   listLobbyRooms() {
     const list = [];
@@ -1771,6 +1802,66 @@ attachGameApi({
       list.push(lobbyRoomRow(room));
     }
     return list.slice(0, 50);
+  },
+  listAllRooms() {
+    const list = [];
+    for (const room of rooms.values()) {
+      list.push(adminRoomRow(room));
+    }
+    list.sort((a, b) => (b.created || 0) - (a.created || 0));
+    return list;
+  },
+  adminStats() {
+    let players = 0;
+    let spectators = 0;
+    for (const room of rooms.values()) {
+      players += room.players.filter((p) => p.connected).length;
+      spectators += Array.isArray(room.spectators) ? room.spectators.length : 0;
+    }
+    return { rooms: rooms.size, players, spectators };
+  },
+  adminCloseRoom(code) {
+    const room = rooms.get(String(code || ""));
+    if (!room) return false;
+    cancelSpin(room);
+    clearTurnTimer(room);
+    if (room.emptyTimer) {
+      clearTimeout(room.emptyTimer);
+      room.emptyTimer = null;
+    }
+    const everyone = room.players.slice();
+    const spectators = Array.isArray(room.spectators) ? room.spectators.slice() : [];
+    rooms.delete(room.code);
+    broadcastLobby();
+    for (const player of everyone) {
+      const sock = player.ws;
+      if (sock) {
+        byWs.delete(sock);
+        player.ws = null;
+        send(sock, { t: "roomClosed", message: "แอดมินปิดห้องแล้ว" });
+        tellLobby(sock);
+      }
+    }
+    for (const sp of spectators) {
+      const sock = sp.ws;
+      if (sock) {
+        byWs.delete(sock);
+        send(sock, { t: "roomClosed", message: "แอดมินปิดห้องแล้ว" });
+        tellLobby(sock);
+      }
+    }
+    return true;
+  },
+  adminKick(code, playerId) {
+    const room = rooms.get(String(code || ""));
+    if (!room) return false;
+    const id = String(playerId || "");
+    const target = room.players.find((p) => p.id === id);
+    if (!target) return false;
+    const sock = target.ws;
+    takeOut(room, target, sock, true);
+    if (sock) send(sock, { t: "err", message: "ถูกแอดมินเตะออกจากห้อง" });
+    return true;
   },
   findQuickPlayRoom() {
     for (const room of rooms.values()) {

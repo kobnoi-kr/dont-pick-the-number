@@ -7,7 +7,7 @@ function esc(s) {
 
 function isElevatedAdmin(user) {
   const roles = (user && user.roles) || [];
-  return roles.includes("admin") || roles.includes("super_admin");
+  return roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
 }
 
 function resizeImageFile(file) {

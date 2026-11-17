@@ -13,6 +13,7 @@ const ROLES = [
 
 const PERMISSIONS = [
   "dashboard.view",
+  "analytics.view",
   "users.view",
   "users.ban",
   "users.unban",
@@ -22,6 +23,7 @@ const PERMISSIONS = [
   "rooms.view",
   "rooms.kick",
   "rooms.close",
+  "announcements.manage",
   "settings.view",
   "settings.manage",
   "admins.view",
@@ -44,6 +46,7 @@ const ROLE_PERMS = {
   ],
   admin: [
     "dashboard.view",
+    "analytics.view",
     "users.view",
     "users.ban",
     "users.unban",
@@ -53,6 +56,7 @@ const ROLE_PERMS = {
     "rooms.view",
     "rooms.kick",
     "rooms.close",
+    "announcements.manage",
     "settings.view",
     "settings.manage",
     "logs.view"
@@ -101,7 +105,23 @@ async function main() {
     }
   }
 
-  console.log("Seeded roles and permissions");
+  const defaults = {
+    maintenance_message: "",
+    max_rooms_display: 50,
+    game_catalog: {
+      secret: { enabled: true, name: "Secret Number" },
+      wheel: { enabled: true, name: "Number Wheel" }
+    }
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    await prisma.systemSetting.upsert({
+      where: { key },
+      update: {},
+      create: { key, value }
+    });
+  }
+
+  console.log("Seeded roles, permissions, and system settings");
 }
 
 main()
