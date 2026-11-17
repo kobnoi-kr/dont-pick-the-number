@@ -522,10 +522,30 @@ async function handleAdminApi(req, res, pathname) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
+      const kind = ["info", "warning", "danger", "alert"].includes(body.kind)
+        ? body.kind
+        : "info";
+      const personal = kind === "danger" || kind === "alert";
+      let targetIds = [];
+      if (personal) {
+        const raw = Array.isArray(body.targetIds)
+          ? body.targetIds
+          : String(body.targets || "")
+              .split(/[\s,;]+/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+        targetIds = [...new Set(raw.map(String))].slice(0, 50);
+        if (!targetIds.length) {
+          sendJson(res, 400, { error: "targets_required" });
+          return true;
+        }
+      }
       const item = await prisma.announcement.create({
         data: {
           title: String(body.title).slice(0, 160),
           body: String(body.body).slice(0, 8000),
+          kind,
+          targetIds: personal ? targetIds : [],
           active: !!body.active,
           startsAt: body.startsAt ? new Date(body.startsAt) : null,
           endsAt: body.endsAt ? new Date(body.endsAt) : null,
@@ -562,6 +582,18 @@ async function handleAdminApi(req, res, pathname) {
       if (body.active != null) data.active = !!body.active;
       if (body.startsAt !== undefined) data.startsAt = body.startsAt ? new Date(body.startsAt) : null;
       if (body.endsAt !== undefined) data.endsAt = body.endsAt ? new Date(body.endsAt) : null;
+      if (body.kind != null && ["info", "warning", "danger", "alert"].includes(body.kind)) {
+        data.kind = body.kind;
+      }
+      if (body.targetIds != null || body.targets != null) {
+        const raw = Array.isArray(body.targetIds)
+          ? body.targetIds
+          : String(body.targets || "")
+              .split(/[\s,;]+/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+        data.targetIds = [...new Set(raw.map(String))].slice(0, 50);
+      }
       const item = await prisma.announcement.update({ where: { id }, data });
       await writeAdminLog(prisma, {
         adminId: auth.user.id,

@@ -22,7 +22,6 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
         <button type="button" class="btn ghost" id="ovLibrary">คลังเกม</button>
       </div>
     </section>
-    <div id="ovAnnounce" class="hidden"></div>
     <div class="stats-row" id="ovStats">
       <div class="stat"><div class="label">เกมที่เล่น</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
       <div class="stat"><div class="label">ชั่วโมงเล่น</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
@@ -49,23 +48,7 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
     location.hash = "#library";
   };
 
-  const [summary, announceRes] = await Promise.all([
-    api("/api/v1/dashboard/summary", { method: "GET" }),
-    api("/api/v1/announcements/active", { method: "GET" })
-  ]);
-  const announces = (announceRes.data && announceRes.data.announcements) || [];
-  const annBox = root.querySelector("#ovAnnounce");
-  if (annBox && announces.length) {
-    annBox.classList.remove("hidden");
-    annBox.innerHTML = announces
-      .map(
-        (a) => `<div class="announce-banner">
-        <b>${esc(a.title)}</b>
-        <div class="tiny">${esc(a.body)}</div>
-      </div>`
-      )
-      .join("");
-  }
+  const summary = await api("/api/v1/dashboard/summary", { method: "GET" });
   const stats = (summary.data && summary.data.stats) || {};
   const lastGame = summary.data && summary.data.lastGame;
   root.querySelector("#ovStats").innerHTML = `

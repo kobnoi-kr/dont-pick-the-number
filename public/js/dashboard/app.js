@@ -7,6 +7,7 @@ import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
+import { loadAnnouncementToasts } from "./toasts.js";
 
 const state = {
   user: null,
@@ -173,6 +174,7 @@ onDashboardMessage((msg) => {
   }
   wireNotifications();
   connectDashboardWs();
+  loadAnnouncementToasts().catch(() => {});
   const q = new URLSearchParams(location.search);
   if (q.get("create") === "1" || q.get("cat")) {
     openCreateModal({ cat: q.get("cat") || "secret", lockCat: !!q.get("cat") });

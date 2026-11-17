@@ -143,6 +143,8 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     const prisma = await getPrisma();
+    const auth = await resolveAuth(req);
+    const user = auth && auth.user ? auth.user : null;
     const now = new Date();
     const items = await prisma.announcement.findMany({
       where: {
@@ -153,10 +155,41 @@ async function handleDashboardApi(req, res, pathname) {
         ]
       },
       orderBy: { createdAt: "desc" },
-      take: 5,
-      select: { id: true, title: true, body: true, createdAt: true }
+      take: 40,
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        kind: true,
+        targetIds: true,
+        createdAt: true
+      }
     });
-    sendJson(res, 200, { announcements: items });
+    const keys = new Set();
+    if (user) {
+      keys.add(String(user.id).toLowerCase());
+      if (user.username) keys.add(String(user.username).toLowerCase());
+      if (user.friendCode) keys.add(String(user.friendCode).toLowerCase());
+      if (user.displayName) keys.add(String(user.displayName).toLowerCase());
+    }
+    const filtered = items.filter((a) => {
+      const kind = a.kind || "info";
+      const personal = kind === "danger" || kind === "alert";
+      if (!personal) return true;
+      if (!user) return false;
+      const targets = Array.isArray(a.targetIds) ? a.targetIds : [];
+      if (!targets.length) return false;
+      return targets.some((t) => keys.has(String(t || "").trim().toLowerCase()));
+    });
+    sendJson(res, 200, {
+      announcements: filtered.slice(0, 8).map((a) => ({
+        id: a.id,
+        title: a.title,
+        body: a.body,
+        kind: a.kind || "info",
+        createdAt: a.createdAt
+      }))
+    });
     return true;
   }
 
