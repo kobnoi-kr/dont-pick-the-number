@@ -827,7 +827,11 @@ function renderLobbyGrid(){
     const crown=hostFlag?`<span class="lobby-crown" title="โฮสต์">♛</span>`:"";
     const status=document.createElement("div");
     status.className="lobby-slot-status"+(ready?" on":"");
-    status.textContent=champ?"WINNER":(hostFlag?"HOST":(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE")));
+    const statusBits=[];
+    if(champ) statusBits.push("WINNER");
+    if(hostFlag) statusBits.push("HOST");
+    if(!statusBits.length) statusBits.push(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE"));
+    status.textContent=statusBits.join(" · ");
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
     nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
@@ -837,17 +841,26 @@ function renderLobbyGrid(){
     if(canHostAct&&meta.connected&&!meta.bot){
       const give=document.createElement("button");
       give.type="button";
-      give.className="textbtn";
+      give.className="btn sm";
       give.textContent="โอนโฮสต์";
-      give.onclick=()=>send({t:"giveHost",id:meta.id});
+      give.title="โอนโฮสต์ให้ "+name+(champ?" (ผู้ชนะ)":"");
+      give.onclick=(e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        send({t:"giveHost",id:meta.id});
+      };
       acts.appendChild(give);
     }
     if(canHostAct){
       const kick=document.createElement("button");
       kick.type="button";
-      kick.className="textbtn";
+      kick.className="btn ghost sm";
       kick.textContent="เตะ";
-      kick.onclick=()=>send({t:"kick",id:meta.id});
+      kick.onclick=(e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        send({t:"kick",id:meta.id});
+      };
       acts.appendChild(kick);
     }
     const avWrap=document.createElement("div");
@@ -2830,7 +2843,8 @@ async function bootOnline(){
     if(empty) empty.classList.toggle("hidden",candidates.length>0);
     candidates.forEach(p=>{
       const li=document.createElement("li");
-      li.innerHTML=`<span>${p.name}</span>`;
+      const label=p.champion?`${p.name} · ผู้ชนะ`:`${p.name}`;
+      li.innerHTML=`<span class="name">${label.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}</span>`;
       const btn=document.createElement("button");
       btn.type="button";
       btn.className="btn sm";
