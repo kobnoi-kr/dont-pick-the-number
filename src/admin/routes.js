@@ -980,6 +980,7 @@ async function handleAdminApi(req, res, pathname) {
         "guest_create_per_ip_hour",
         "activity_log_enabled",
         "activity_log_retention_days",
+        "game_history_retention_days",
         "db_size_limit_mb"
       ];
       for (const key of allowed) {
@@ -1007,6 +1008,9 @@ async function handleAdminApi(req, res, pathname) {
           }
           if (key === "activity_log_retention_days") {
             value = Math.min(365, Math.max(1, Number(value) || 30));
+          }
+          if (key === "game_history_retention_days") {
+            value = Math.min(365, Math.max(1, Number(value) || 7));
           }
           if (key === "db_size_limit_mb") {
             value = Math.min(1024 * 1024, Math.max(64, Number(value) || 1024));

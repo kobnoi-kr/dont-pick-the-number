@@ -126,6 +126,9 @@ export async function renderSettings(root, { user }) {
           <label class="tiny">จำกัดสร้าง guest / IP / ชม. (0=ไม่จำกัด)
             <input class="input" id="sGuestRate" type="number" min="0" max="1000" value="${Number.isFinite(Number(s.guest_create_per_ip_hour)) ? Number(s.guest_create_per_ip_hour) : 40}" ${canManage ? "" : "disabled"}/>
           </label>
+          <label class="tiny">เก็บประวัติห้อง/เกม (วัน)
+            <input class="input" id="sGameHistDays" type="number" min="1" max="365" value="${Number.isFinite(Number(s.game_history_retention_days)) ? Number(s.game_history_retention_days) : 7}" ${canManage ? "" : "disabled"}/>
+          </label>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveClean">บันทึก Cleanup</button>` : ""}
@@ -277,7 +280,8 @@ export async function renderSettings(root, { user }) {
         : "ยังไม่เคยรัน cleanup";
       el.textContent =
         `Guest ${r.data.guestTotal || 0} · ค้างรอลบ ${r.data.staleGuests || 0} · session หมดอายุ ${r.data.expiredSessions || 0}` +
-        ` · activity ${r.data.activityTotal || 0} (หมดอายุ ${r.data.activityExpired || 0}) · ${lastText}`;
+        ` · activity ${r.data.activityTotal || 0} (หมดอายุ ${r.data.activityExpired || 0})` +
+        ` · ประวัติเกม ${r.data.gameTotal || 0} (หมดอายุ ${r.data.gameExpired || 0}) · ${lastText}`;
     }
     refreshCleanStats();
 
@@ -291,7 +295,8 @@ export async function renderSettings(root, { user }) {
             guest_idle_days: Number(root.querySelector("#sGuestIdle").value) || 7,
             guest_session_days: Number(root.querySelector("#sGuestSess").value) || 7,
             cleanup_interval_minutes: Number(root.querySelector("#sCleanEvery").value) || 60,
-            guest_create_per_ip_hour: Number(root.querySelector("#sGuestRate").value) || 0
+            guest_create_per_ip_hour: Number(root.querySelector("#sGuestRate").value) || 0,
+            game_history_retention_days: Number(root.querySelector("#sGameHistDays").value) || 7
           },
           root.querySelector("#sMsgClean")
         );

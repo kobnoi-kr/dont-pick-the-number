@@ -14,7 +14,8 @@ const DEFAULTS = {
   cleanup_interval_minutes: 60,
   guest_create_per_ip_hour: 40,
   activity_log_enabled: true,
-  activity_log_retention_days: 30
+  activity_log_retention_days: 30,
+  game_history_retention_days: 7
 };
 
 /** @type {Map<string, number[]>} */
@@ -69,8 +70,29 @@ async function loadCleanupSettings(prisma) {
       DEFAULTS.activity_log_retention_days,
       1,
       365
+    ),
+    gameHistoryRetentionDays: asInt(
+      map.game_history_retention_days,
+      DEFAULTS.game_history_retention_days,
+      1,
+      365
     )
   };
+}
+
+/** Drop finished room/game history older than retention (cascades players + rounds). */
+async function cleanupOldGames(prisma, retentionDays = 7) {
+  const days = Math.min(365, Math.max(1, Number(retentionDays) || 7));
+  const cutoff = new Date(Date.now() - days * DAY_MS);
+  const result = await prisma.game.deleteMany({
+    where: {
+      OR: [
+        { endedAt: { lt: cutoff } },
+        { AND: [{ endedAt: null }, { createdAt: { lt: cutoff } }] }
+      ]
+    }
+  });
+  return result.count || 0;
 }
 
 async function getGuestSessionTtlSec(prisma) {
@@ -160,7 +182,16 @@ async function cleanupStats(prisma) {
   const now = new Date();
   const cutoff = new Date(Date.now() - settings.guestIdleDays * DAY_MS);
   const activityCutoff = new Date(Date.now() - settings.activityLogRetentionDays * DAY_MS);
-  const [expiredSessions, staleGuests, guestTotal, activityTotal, activityExpired] = await Promise.all([
+  const gameCutoff = new Date(Date.now() - settings.gameHistoryRetentionDays * DAY_MS);
+  const [
+    expiredSessions,
+    staleGuests,
+    guestTotal,
+    activityTotal,
+    activityExpired,
+    gameTotal,
+    gameExpired
+  ] = await Promise.all([
     prisma.session.count({
       where: {
         OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }]
@@ -191,7 +222,18 @@ async function cleanupStats(prisma) {
     }),
     prisma.user.count({ where: { accountType: "guest" } }),
     prisma.userActivityLog.count().catch(() => 0),
-    prisma.userActivityLog.count({ where: { createdAt: { lt: activityCutoff } } }).catch(() => 0)
+    prisma.userActivityLog.count({ where: { createdAt: { lt: activityCutoff } } }).catch(() => 0),
+    prisma.game.count().catch(() => 0),
+    prisma.game
+      .count({
+        where: {
+          OR: [
+            { endedAt: { lt: gameCutoff } },
+            { AND: [{ endedAt: null }, { createdAt: { lt: gameCutoff } }] }
+          ]
+        }
+      })
+      .catch(() => 0)
   ]);
   return {
     settings,
@@ -200,6 +242,8 @@ async function cleanupStats(prisma) {
     guestTotal,
     activityTotal,
     activityExpired,
+    gameTotal,
+    gameExpired,
     lastRun
   };
 }
@@ -217,6 +261,7 @@ async function runCleanup(prisma, opts = {}) {
     let guestsDeleted = 0;
     let activityDeleted = 0;
     let dmDeleted = 0;
+    let gamesDeleted = 0;
 
     if (force || settings.sessionCleanupEnabled) {
       sessionsDeleted = await cleanupExpiredSessions(prisma);
@@ -234,6 +279,11 @@ async function runCleanup(prisma, opts = {}) {
     } catch {
       dmDeleted = 0;
     }
+    try {
+      gamesDeleted = await cleanupOldGames(prisma, settings.gameHistoryRetentionDays);
+    } catch {
+      gamesDeleted = 0;
+    }
 
     lastRun = {
       at: startedAt.toISOString(),
@@ -242,6 +292,7 @@ async function runCleanup(prisma, opts = {}) {
       guestsDeleted,
       activityDeleted,
       dmDeleted,
+      gamesDeleted,
       settings,
       forced: force
     };
@@ -293,9 +344,7 @@ function startCleanupScheduler() {
       pruneGuestCreateHits();
       const prisma = await getPrisma();
       const settings = await loadCleanupSettings(prisma);
-      if (!settings.guestCleanupEnabled && !settings.sessionCleanupEnabled && !settings.activityLogEnabled) {
-        return;
-      }
+      // Always allow tick — game history / DM cleanup run even if guest/session toggles are off.
       if (lastRun && lastRun.at) {
         const elapsed = Date.now() - new Date(lastRun.at).getTime();
         if (elapsed < settings.cleanupIntervalMinutes * 60 * 1000) return;
@@ -327,6 +376,7 @@ module.exports = {
   getGuestSessionTtlSec,
   allowGuestCreate,
   pruneGuestCreateHits,
+  cleanupOldGames,
   cleanupStats,
   runCleanup,
   startCleanupScheduler,

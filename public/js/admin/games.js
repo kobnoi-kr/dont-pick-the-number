@@ -91,7 +91,7 @@ export async function renderGames(root, { user }) {
       <div class="page-head" style="margin-bottom:10px">
         <div>
           <h2 style="margin:0">เกมที่จบแล้วล่าสุด</h2>
-          <p class="muted tiny" style="margin:6px 0 0">ประวัติจากห้องที่เล่นจบแล้ว (ดูอย่างเดียว)</p>
+          <p class="muted tiny" style="margin:6px 0 0">ประวัติจากห้องที่เล่นจบแล้ว (ดูอย่างเดียว · ลบอัตโนมัติหลัง 7 วัน)</p>
         </div>
       </div>
       ${
