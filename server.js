@@ -1506,17 +1506,20 @@ async function onHello(ws, msg) {
   if (token) trackPresence(ws, token);
   await refreshAdminFlag(ws);
   const avatarUrl = cleanAvatar(msg.avatarUrl);
+  const pendingMaint = maintenanceCountdownPayload();
   // Dashboard sockets only need presence/lobby — never steal the play seat.
   if (token && !ws.dashboard) {
     const found = findSeat(token);
     if (found) {
       if (avatarUrl) found.player.avatarUrl = avatarUrl;
       attach(ws, found.room, found.player);
+      if (pendingMaint) send(ws, pendingMaint);
       return;
     }
   }
   watchers.add(ws);
   sendLobby(ws);
+  if (pendingMaint) send(ws, pendingMaint);
 }
 function onLeave(ws) {
   const ctx = seat(ws);
@@ -2080,9 +2083,22 @@ attachGameApi({
 });
 
 let maintenanceKickTimer = null;
+let maintenanceKickPulse = null;
 let maintenanceKickAt = 0;
+let maintenanceKickMessage = "";
 
 function fanOutAllClients(payload) {
+  // Prefer every live WS socket so in-room + dashboard + lobby all get it.
+  let usedWss = false;
+  try {
+    if (wss && wss.clients) {
+      for (const sock of wss.clients) send(sock, payload);
+      usedWss = true;
+    }
+  } catch {
+    usedWss = false;
+  }
+  if (usedWss) return;
   broadcastAllCore(payload, send);
   for (const sock of watchers) send(sock, payload);
   for (const room of rooms.values()) {
@@ -2097,13 +2113,33 @@ function fanOutAllClients(payload) {
   }
 }
 
+function maintenanceCountdownPayload() {
+  if (!maintenanceKickAt || maintenanceKickAt <= Date.now()) return null;
+  const left = Math.max(1, Math.ceil((maintenanceKickAt - Date.now()) / 1000));
+  return {
+    t: "maintenance:countdown",
+    message: maintenanceKickMessage,
+    seconds: left,
+    endsAt: maintenanceKickAt
+  };
+}
+
+function clearMaintenancePulse() {
+  if (maintenanceKickPulse) {
+    clearInterval(maintenanceKickPulse);
+    maintenanceKickPulse = null;
+  }
+}
+
 function cancelMaintenanceKick() {
   if (maintenanceKickTimer) {
     clearTimeout(maintenanceKickTimer);
     maintenanceKickTimer = null;
   }
+  clearMaintenancePulse();
   const wasPending = maintenanceKickAt > 0;
   maintenanceKickAt = 0;
+  maintenanceKickMessage = "";
   if (wasPending) {
     fanOutAllClients({ t: "maintenance:countdown", cancelled: true });
   }
@@ -2116,7 +2152,9 @@ function scheduleMaintenanceKick(message, seconds = 15) {
   const sec = Math.max(1, Math.min(120, Number(seconds) || 15));
   const endsAt = Date.now() + sec * 1000;
   if (maintenanceKickTimer) clearTimeout(maintenanceKickTimer);
+  clearMaintenancePulse();
   maintenanceKickAt = endsAt;
+  maintenanceKickMessage = text;
   const payload = {
     t: "maintenance:countdown",
     message: text,
@@ -2124,8 +2162,18 @@ function scheduleMaintenanceKick(message, seconds = 15) {
     endsAt
   };
   fanOutAllClients(payload);
+  // Keep pulsing so late joiners / missed sockets still see the countdown.
+  maintenanceKickPulse = setInterval(() => {
+    const next = maintenanceCountdownPayload();
+    if (!next) {
+      clearMaintenancePulse();
+      return;
+    }
+    fanOutAllClients(next);
+  }, 1000);
   maintenanceKickTimer = setTimeout(() => {
     maintenanceKickTimer = null;
+    clearMaintenancePulse();
     maintenanceKickAt = 0;
     forceMaintenanceNow(text);
   }, sec * 1000);
@@ -2137,7 +2185,9 @@ function forceMaintenanceNow(message) {
     clearTimeout(maintenanceKickTimer);
     maintenanceKickTimer = null;
   }
+  clearMaintenancePulse();
   maintenanceKickAt = 0;
+  maintenanceKickMessage = "";
   const text =
     String(message || "").trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
   const codes = [...rooms.keys()];

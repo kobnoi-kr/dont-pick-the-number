@@ -126,9 +126,10 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     return;
   }
   ensureStyles();
-  const endsAt =
-    Number(msg.endsAt) ||
-    Date.now() + Math.max(1, Number(msg.seconds) || 15) * 1000;
+  // Use relative seconds from the message — avoid server/client clock skew
+  // wiping the overlay immediately (endsAt in the past on some devices).
+  const secHint = Math.max(1, Number(msg.seconds) || 15);
+  const endsAt = Date.now() + secHint * 1000;
   let el = document.getElementById("nvMaintCountdown");
   if (!el) {
     el = document.createElement("div");
@@ -153,9 +154,15 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
   const message =
     msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาเตรียมออกจากห้อง";
 
+  // Stash for resync from server pulses.
+  el._nvEndsAt = endsAt;
+  el._nvMessage = message;
+  el._nvBypass = !!bypass;
+
   let lastSec = -1;
   const paint = () => {
-    const leftMs = Math.max(0, endsAt - Date.now());
+    const target = el._nvEndsAt || endsAt;
+    const leftMs = Math.max(0, target - Date.now());
     const sec = Math.max(0, Math.ceil(leftMs / 1000));
     if (sec !== lastSec) {
       lastSec = sec;
@@ -184,9 +191,9 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
           <div style="font-size:.95rem;font-weight:700;color:#fca5a5;margin-bottom:12px">
             ปิดเซิร์ฟใน ${sec} วินาที
           </div>
-          <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(message)}</p>
+          <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(el._nvMessage || message)}</p>
           ${
-            bypass
+            el._nvBypass
               ? `<div style="margin-top:12px;font-size:.82rem;opacity:.8">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>`
               : ""
           }

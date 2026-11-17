@@ -2657,6 +2657,12 @@ function connect(){
     }else if(msg.t==="maintenance:countdown"){
       if(window.NVMaint&&window.NVMaint.applyMaintenanceCountdown){
         window.NVMaint.applyMaintenanceCountdown(msg);
+      }else{
+        // Fallback if module bridge not ready yet
+        try{
+          const sec=Math.max(1, Number(msg.seconds)||15);
+          alert("Maintenance in "+sec+" — "+(msg.message||"เซิร์ฟกำลังปิด"));
+        }catch(_){}
       }
     }else if(msg.t==="maintenance"){
       try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
