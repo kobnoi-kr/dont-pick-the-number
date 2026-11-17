@@ -100,11 +100,15 @@ export async function renderRooms(root, { openCreate, user } = {}) {
       <div id="liveRooms"><div class="loading">Loading…</div></div>
     </div>
 
-    <div class="card">
-      <h3 style="margin-top:0">ประวัติเกม</h3>
-      <p class="muted tiny" style="margin:0 0 10px">บันทึกเมื่อเล่นจบเท่านั้น — สร้างแล้วลบ/ออกโดยยังไม่จบเกมจะไม่ขึ้นที่นี่</p>
+    <section style="margin-top:4px">
+      <div class="page-head" style="margin-bottom:10px">
+        <div>
+          <h3 style="margin:0">ประวัติเกม</h3>
+          <p class="muted tiny" style="margin:6px 0 0">ห้องที่คุณสร้างแล้วเล่นจบ — สร้างแล้วลบ/ออกโดยยังไม่จบจะไม่ขึ้นที่นี่</p>
+        </div>
+      </div>
       <div id="pastRooms"><div class="loading">Loading…</div></div>
-    </div>
+    </section>
   `;
 
   root.querySelector("#roomsCreate").onclick = () => openCreate && openCreate();
@@ -210,22 +214,22 @@ export async function renderRooms(root, { openCreate, user } = {}) {
 
   const created = (mine.data && mine.data.created) || [];
   if (!created.length) {
-    pastBox.innerHTML = `<div class="empty">ยังไม่มีประวัติเกม<br><span class="tiny">สร้างห้องแล้วเล่นจนจบอย่างน้อย 1 รอบ ถึงจะมีประวัติ</span></div>`;
+    pastBox.innerHTML = `<div class="card empty">ยังไม่มีประวัติเกม<br><span class="tiny">สร้างห้องแล้วเล่นจนจบอย่างน้อย 1 รอบ ถึงจะมีประวัติ</span></div>`;
   } else {
     pastBox.innerHTML = `
-      <div class="room-card-list">
+      <div class="history-card-grid">
         ${created
           .map(
             (g) => `
-          <article class="room-card">
+          <article class="history-card">
             <div class="room-card-top">
               <div class="room-card-title">
                 <b>${esc(g.title)}</b>
                 <div class="tiny">${esc(g.code)} · ${g.visibility === "private" ? "Private" : "Public"}</div>
               </div>
+              <span class="history-mode">${modeLabel(g.gameMode)}</span>
             </div>
             <div class="room-card-meta">
-              <span><em>เกม</em> ${modeLabel(g.gameMode)}</span>
               <span><em>ผู้เล่น</em> ${g.playerCount}</span>
               <span><em>เมื่อ</em> ${g.endedAt ? esc(new Date(g.endedAt).toLocaleString("th-TH")) : "—"}</span>
             </div>

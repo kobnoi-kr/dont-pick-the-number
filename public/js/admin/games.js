@@ -87,42 +87,37 @@ export async function renderGames(root, { user }) {
       <p class="tiny" id="gMsg"></p>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h2>เกมที่จบแล้วล่าสุด</h2>
-      <p class="muted" style="margin-top:0">ประวัติจากห้องที่เล่นจบแล้ว (ดูอย่างเดียว)</p>
-      <div class="table-wrap" style="margin-top:10px">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>ชื่อห้อง</th>
-              <th>เกม</th>
-              <th>ผู้เล่น</th>
-              <th>จบเมื่อ</th>
-              <th>นาน</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              games.length
-                ? games
-                    .map(
-                      (g) => `<tr>
-                <td>
-                  <b>${esc(g.roomName || "ห้องไม่มีชื่อ")}</b>
-                  <div class="tiny">รหัส ${esc(g.roomCode)}</div>
-                </td>
-                <td>${esc(modeLabel(g.gameMode))}</td>
-                <td>${g.playerCount} คน</td>
-                <td class="tiny">${esc(fmtDate(g.endedAt))}</td>
-                <td>${esc(fmtDuration(g.durationSec))}</td>
-              </tr>`
-                    )
-                    .join("")
-                : `<tr><td colspan="5" class="empty">ยังไม่มีประวัติเกมที่จบ</td></tr>`
-            }
-          </tbody>
-        </table>
+    <div style="margin-top:16px">
+      <div class="page-head" style="margin-bottom:10px">
+        <div>
+          <h2 style="margin:0">เกมที่จบแล้วล่าสุด</h2>
+          <p class="muted tiny" style="margin:6px 0 0">ประวัติจากห้องที่เล่นจบแล้ว (ดูอย่างเดียว)</p>
+        </div>
       </div>
+      ${
+        games.length
+          ? `<div class="history-card-grid">
+            ${games
+              .map(
+                (g) => `<article class="history-card">
+                <div class="room-card-top">
+                  <div class="room-card-title">
+                    <b>${esc(g.roomName || "ห้องไม่มีชื่อ")}</b>
+                    <div class="tiny">รหัส ${esc(g.roomCode)}</div>
+                  </div>
+                  <span class="history-mode">${esc(modeLabel(g.gameMode))}</span>
+                </div>
+                <div class="room-card-meta">
+                  <span><em>ผู้เล่น</em> ${g.playerCount} คน</span>
+                  <span><em>นาน</em> ${esc(fmtDuration(g.durationSec))}</span>
+                  <span><em>จบเมื่อ</em> ${esc(fmtDate(g.endedAt))}</span>
+                </div>
+              </article>`
+              )
+              .join("")}
+          </div>`
+          : `<div class="card empty">ยังไม่มีประวัติเกมที่จบ</div>`
+      }
     </div>
   `;
 

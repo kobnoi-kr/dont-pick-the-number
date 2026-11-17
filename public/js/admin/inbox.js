@@ -16,20 +16,19 @@ export async function renderInbox(root, opts = {}) {
   const onOpenCount = typeof opts.onOpenCount === "function" ? opts.onOpenCount : null;
 
   root.innerHTML = `
-    <div class="card">
-      <div class="row-between" style="margin-bottom:12px">
-        <div>
-          <h2 style="margin:0">ข้อความติดต่อแอดมิน</h2>
-        </div>
-        <select class="input" id="inboxStatus" style="max-width:160px">
-          <option value="">ทั้งหมด</option>
-          <option value="open">ใหม่</option>
-          <option value="read">อ่านแล้ว</option>
-          <option value="closed">ปิดแล้ว</option>
-        </select>
+    <section class="page-head">
+      <div>
+        <h2 style="margin:0">ข้อความติดต่อแอดมิน</h2>
+        <p class="muted tiny" id="inboxOpenHint" style="margin:6px 0 0">กำลังโหลด…</p>
       </div>
-      <div id="inboxList" class="loading">Loading…</div>
-    </div>
+      <select class="input" id="inboxStatus" style="max-width:160px">
+        <option value="">ทั้งหมด</option>
+        <option value="open">ใหม่</option>
+        <option value="read">อ่านแล้ว</option>
+        <option value="closed">ปิดแล้ว</option>
+      </select>
+    </section>
+    <div id="inboxList" class="loading">Loading…</div>
   `;
 
   async function load() {
@@ -37,6 +36,7 @@ export async function renderInbox(root, opts = {}) {
     const params = new URLSearchParams({ limit: "100" });
     if (status) params.set("status", status);
     const box = root.querySelector("#inboxList");
+    const hint = root.querySelector("#inboxOpenHint");
     box.innerHTML = `<div class="loading">Loading…</div>`;
     const { res, data } = await api("/api/v1/admin/inbox?" + params.toString(), { method: "GET" });
     if (!res.ok) {
@@ -46,21 +46,24 @@ export async function renderInbox(root, opts = {}) {
     const messages = data.messages || [];
     const openCount = data.openCount != null ? data.openCount : 0;
     if (onOpenCount) onOpenCount(openCount);
+    if (hint) hint.textContent = `ข้อความใหม่รออ่าน: ${openCount}`;
+
+    if (!messages.length) {
+      box.innerHTML = `<div class="card empty">ยังไม่มีข้อความ</div>`;
+      return;
+    }
+
     box.innerHTML = `
-      <p class="tiny" style="margin:0 0 10px;color:var(--nv-muted)">ข้อความใหม่รออ่าน: ${openCount}</p>
-      <div class="room-card-list">
-        ${
-          messages.length
-            ? messages
-                .map((m) => {
-                  const who = m.user
-                    ? `${m.user.displayName || m.user.username} (@${m.user.username})`
-                    : "ผู้ใช้ถูกลบแล้ว";
-                  const img =
-                    isSafeImageData(m.imageData)
-                      ? `<img class="inbox-attach" src="${m.imageData}" alt="แนบรูป" loading="lazy">`
-                      : "";
-                  return `<article class="room-card" data-id="${esc(m.id)}">
+      <div class="inbox-card-grid">
+        ${messages
+          .map((m) => {
+            const who = m.user
+              ? `${m.user.displayName || m.user.username} (@${m.user.username})`
+              : "ผู้ใช้ถูกลบแล้ว";
+            const img = isSafeImageData(m.imageData)
+              ? `<img class="inbox-attach" src="${m.imageData}" alt="แนบรูป" loading="lazy">`
+              : "";
+            return `<article class="inbox-card${m.status === "open" ? " open-msg" : ""}" data-id="${esc(m.id)}">
               <div class="room-card-top">
                 <div class="room-card-title">
                   <b>${esc(m.subject || "ติดต่อแอดมิน")}</b>
@@ -68,11 +71,11 @@ export async function renderInbox(root, opts = {}) {
                 </div>
                 ${statusLabel(m.status)}
               </div>
-              <p style="margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;line-height:1.5;color:var(--nv-text-2);font-size:0.92rem">${esc(m.message)}</p>
+              <p class="inbox-body">${esc(m.message)}</p>
               ${img}
               ${
                 m.adminReply
-                  ? `<div style="margin-top:10px;padding:10px;border-radius:12px;border:1px solid rgba(86,119,252,.3);background:rgba(86,119,252,.08)">
+                  ? `<div class="inbox-reply-box">
                       <div class="tiny" style="color:#93c5fd;margin-bottom:4px">ตอบแล้ว · ${esc(fmtDate(m.repliedAt))}</div>
                       <div style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;line-height:1.45">${esc(m.adminReply)}</div>
                     </div>`
@@ -89,10 +92,8 @@ export async function renderInbox(root, opts = {}) {
                 <span class="tiny" data-msg></span>
               </div>
             </article>`;
-                })
-                .join("")
-            : `<div class="empty">ยังไม่มีข้อความ</div>`
-        }
+          })
+          .join("")}
       </div>`;
 
     box.querySelectorAll(".inbox-attach").forEach((img) => {
