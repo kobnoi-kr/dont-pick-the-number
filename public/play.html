@@ -352,10 +352,13 @@
     loadAnnouncementToasts,
     showAnnouncementToast
   } from "/js/dashboard/toasts.js";
+  import { applyBanNotice, restoreBanNotice } from "/js/ban-gate.js";
 
   window.NVToasts = { onLiveAnnouncement, loadAnnouncementToasts, showAnnouncementToast };
   window.NVMaint = { applyLiveMaintenance, applyMaintenanceCountdown };
+  window.NVBan = { applyBanNotice, restoreBanNotice };
 
+  restoreBanNotice();
   const gate = await enforceMaintenanceGate({ hardBlock: true });
   if (!gate.blocked) {
     loadAnnouncementToasts().catch(() => {});

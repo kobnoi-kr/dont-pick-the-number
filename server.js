@@ -13,6 +13,7 @@ const {
   untrackPresence: untrackPresenceCore,
   isUserOnline,
   sendToUser: sendToUserCore,
+  forEachUserSocket,
   filterOnline,
   broadcastAll: broadcastAllCore,
   broadcastToUsers: broadcastToUsersCore
@@ -1924,6 +1925,59 @@ attachGameApi({
     takeOut(room, target, sock, true);
     if (sock) send(sock, { t: "err", message: "ถูกแอดมินเตะออกจากห้อง" });
     return true;
+  },
+  /** Ban/suspend: notify all sockets, pull out of rooms, then close WS. */
+  forceBanUser(userId, opts = {}) {
+    const id = validToken(userId) ? userId : "";
+    if (!id) return { ok: false, notified: 0 };
+    const status = String(opts.status || "banned");
+    const message =
+      String(opts.message || "").trim() ||
+      (status === "suspended"
+        ? "บัญชีของคุณถูกระงับชั่วคราว"
+        : status === "deleted"
+          ? "บัญชีของคุณถูกลบแล้ว"
+          : "บัญชีของคุณถูกแบน");
+    const payload = { t: "banned", status, message };
+
+    const seat = findSeat(id);
+    if (seat) {
+      const sock = seat.player.ws;
+      takeOut(seat.room, seat.player, sock, false);
+    }
+    for (const room of rooms.values()) {
+      if (!Array.isArray(room.spectators)) continue;
+      const before = room.spectators.length;
+      room.spectators = room.spectators.filter((sp) => {
+        if (sp.id !== id && sp.ws && sp.ws.token !== id) return true;
+        if (sp.ws) {
+          try {
+            send(sp.ws, payload);
+          } catch {
+            /* ignore */
+          }
+        }
+        return false;
+      });
+      if (room.spectators.length !== before) broadcastLobby();
+    }
+
+    const notified = sendToUser(id, payload);
+    // Close every socket so they cannot keep playing on a dead session.
+    forEachUserSocket(id, (sock) => {
+      try {
+        send(sock, payload);
+      } catch {
+        /* ignore */
+      }
+      try {
+        sock.close();
+      } catch {
+        /* ignore */
+      }
+    });
+    clearInviteForUser(id);
+    return { ok: true, notified, status, message };
   },
   findQuickPlayRoom() {
     for (const room of rooms.values()) {

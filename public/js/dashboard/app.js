@@ -1,6 +1,6 @@
 import { ensureGuest, api, playUrl } from "./api.js";
 import { paintUser, wireShell, logout } from "./shell.js";
-import { connectDashboardWs, onDashboardMessage } from "./ws.js";
+import { connectDashboardWs, onDashboardMessage, disconnectDashboardWs } from "./ws.js";
 import { renderOverview } from "./overview.js";
 import { renderLibrary } from "./library.js";
 import { renderRooms } from "./rooms.js";
@@ -14,6 +14,7 @@ import {
   applyLiveMaintenance,
   applyMaintenanceCountdown
 } from "/js/maintenance-gate.js";
+import { applyBanNotice, restoreBanNotice } from "/js/ban-gate.js";
 
 const state = {
   user: null,
@@ -158,6 +159,11 @@ onDashboardMessage((msg) => {
     refreshNotifications();
   }
   if (msg.t === "roomInvite") showRoomInviteBanner(msg);
+  if (msg.t === "banned") {
+    disconnectDashboardWs();
+    applyBanNotice(msg);
+    return;
+  }
   if (msg.t === "maintenance:countdown") {
     const roles = (state.user && state.user.roles) || [];
     const isAdmin =
@@ -178,6 +184,7 @@ onDashboardMessage((msg) => {
 });
 
 (async function boot() {
+  restoreBanNotice();
   try {
     const data = await ensureGuest();
     state.user = data.user || data;

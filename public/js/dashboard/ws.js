@@ -1,6 +1,7 @@
 let sock = null;
 let handlers = new Set();
 let timer = null;
+let stopped = false;
 
 export function onDashboardMessage(fn) {
   handlers.add(fn);
@@ -9,11 +10,16 @@ export function onDashboardMessage(fn) {
 
 function emit(msg) {
   for (const fn of handlers) {
-    try { fn(msg); } catch { /* ignore */ }
+    try {
+      fn(msg);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 export function connectDashboardWs() {
+  if (stopped) return null;
   if (sock && (sock.readyState === 0 || sock.readyState === 1)) return sock;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const host = window.NV_PUBLIC_WS_HOST || location.host;
@@ -26,20 +32,47 @@ export function connectDashboardWs() {
   sock = ws;
   ws.onopen = () => {
     const token = localStorage.getItem("dpn-token") || "";
-    ws.send(JSON.stringify({ t: "hello", token, name: localStorage.getItem("dpn-name") || "", dashboard: true }));
+    ws.send(
+      JSON.stringify({
+        t: "hello",
+        token,
+        name: localStorage.getItem("dpn-name") || "",
+        dashboard: true
+      })
+    );
   };
   ws.onmessage = (e) => {
     let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
+    try {
+      msg = JSON.parse(e.data);
+    } catch {
+      return;
+    }
     if (msg && typeof msg === "object") emit(msg);
   };
   ws.onclose = () => {
     if (sock !== ws) return;
     sock = null;
     clearTimeout(timer);
-    timer = setTimeout(connectDashboardWs, 1000);
+    if (!stopped) timer = setTimeout(connectDashboardWs, 1000);
   };
   return ws;
+}
+
+export function disconnectDashboardWs() {
+  stopped = true;
+  clearTimeout(timer);
+  timer = null;
+  const ws = sock;
+  sock = null;
+  if (ws) {
+    try {
+      ws.onclose = null;
+      ws.close();
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function sendWs(obj) {

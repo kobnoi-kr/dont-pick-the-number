@@ -356,6 +356,22 @@ async function handleAdminApi(req, res, pathname) {
       });
       if (nextStatus === "banned" || nextStatus === "suspended" || nextStatus === "deleted") {
         await revokeAllUserSessions(prisma, userId);
+        const gameApi = getGameApi();
+        if (gameApi && typeof gameApi.forceBanUser === "function") {
+          try {
+            gameApi.forceBanUser(userId, {
+              status: nextStatus,
+              message:
+                nextStatus === "suspended"
+                  ? "บัญชีของคุณถูกระงับชั่วคราว"
+                  : nextStatus === "deleted"
+                    ? "บัญชีของคุณถูกลบแล้ว"
+                    : "บัญชีของคุณถูกแบน"
+            });
+          } catch {
+            /* ignore */
+          }
+        }
       }
       await writeAdminLog(prisma, {
         adminId: auth.user.id,

@@ -52,6 +52,22 @@ function sendToUser(userId, obj, sendFn) {
   return n;
 }
 
+/** Run fn for every live socket of a user (snapshot — safe to close inside). */
+function forEachUserSocket(userId, fn) {
+  const set = presence.get(userId);
+  if (!set || !set.size) return 0;
+  let n = 0;
+  for (const sock of [...set]) {
+    try {
+      fn(sock);
+    } catch {
+      /* ignore */
+    }
+    n += 1;
+  }
+  return n;
+}
+
 function filterOnline(ids) {
   return (ids || []).filter(isUserOnline);
 }
@@ -86,6 +102,7 @@ module.exports = {
   untrackPresence,
   isUserOnline,
   sendToUser,
+  forEachUserSocket,
   filterOnline,
   listOnlineUserIds,
   broadcastAll,

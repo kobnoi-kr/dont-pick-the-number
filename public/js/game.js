@@ -2586,6 +2586,21 @@ function connect(){
       if(pendingAction) runPendingAction();
       else if(!wantRoom&&!spectating&&!enterIntent) showGate();
       else renderLobby(msg);
+    }else if(msg.t==="banned"){
+      enterIntent=false;
+      wantRoom=false;
+      pendingAction=null;
+      clearTimeout(connTimer);
+      if(sock){
+        try{ sock.onclose=null; sock.close(); }catch(_){}
+        sock=null;
+      }
+      if(window.NVBan&&window.NVBan.applyBanNotice){
+        window.NVBan.applyBanNotice(msg);
+      }else{
+        alert(msg.message||"บัญชีของคุณถูกแบน");
+      }
+      return;
     }else if(msg.t==="announcement:new"){
       if(window.NVToasts&&window.NVToasts.onLiveAnnouncement){
         window.NVToasts.onLiveAnnouncement(msg.announcement);
