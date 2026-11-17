@@ -323,7 +323,8 @@ async function handleAdminApi(req, res, pathname) {
       const wantsStatus = Object.prototype.hasOwnProperty.call(body, "status");
       const wantsUsername = Object.prototype.hasOwnProperty.call(body, "username");
       const wantsDisplayName = Object.prototype.hasOwnProperty.call(body, "displayName");
-      if (!wantsStatus && !wantsUsername && !wantsDisplayName) {
+      const wantsResetExp = body.resetExp === true || body.resetExp === "true" || body.resetExp === 1;
+      if (!wantsStatus && !wantsUsername && !wantsDisplayName && !wantsResetExp) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
@@ -336,6 +337,44 @@ async function handleAdminApi(req, res, pathname) {
         },
         authAccounts: { select: { provider: true, providerEmail: true } }
       };
+
+      // —— Reset EXP / Level ——
+      if (wantsResetExp && !wantsStatus && !wantsUsername && !wantsDisplayName) {
+        const auth = await requirePermission(req, res, "users.ban");
+        if (!auth) return true;
+        const target = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { userRoles: { include: { role: true } } }
+        });
+        if (!target || target.status === "deleted") {
+          sendJson(res, 404, { error: "not_found" });
+          return true;
+        }
+        if (
+          userHasRole(target, "super_admin") &&
+          !userHasRole(auth.user, "super_admin")
+        ) {
+          sendJson(res, 403, { error: "cannot_modify_super_admin" });
+          return true;
+        }
+        const updated = await prisma.user.update({
+          where: { id: userId },
+          data: { exp: 0, level: 1 },
+          include: userInclude
+        });
+        await writeAdminLog(prisma, {
+          adminId: auth.user.id,
+          action: "user.reset_exp",
+          targetId: userId,
+          metadata: {
+            before: { exp: target.exp, level: target.level },
+            after: { exp: 0, level: 1 }
+          },
+          ipAddress: ip
+        });
+        sendJson(res, 200, { user: serializeUser(updated) });
+        return true;
+      }
 
       // —— Rename username / display name ——
       if ((wantsUsername || wantsDisplayName) && !wantsStatus) {
@@ -361,9 +400,9 @@ async function handleAdminApi(req, res, pathname) {
         if (wantsUsername) {
           const username = String(body.username || "")
             .trim()
-            .replace(/\s+/g, " ")
+            .replace(/\s+/g, "")
             .slice(0, 64);
-          if (username.length < 2) {
+          if (username.length < 2 || username.length > 64 || !/^[a-zA-Z0-9._-]+$/.test(username)) {
             sendJson(res, 400, { error: "invalid_username" });
             return true;
           }

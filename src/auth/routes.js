@@ -375,7 +375,8 @@ async function handleAccountProfile(req, res) {
         sendJson(res, 400, { error: "invalid_input" });
         return true;
       }
-      const data = { displayName, username: displayName.slice(0, 64) };
+      // Display name only — never overwrite username here (that rolled admin renames back).
+      const data = { displayName };
       if (Object.prototype.hasOwnProperty.call(body, "avatarUrl")) {
         const av = cleanAvatarUrl(body.avatarUrl);
         if (av === false) {

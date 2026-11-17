@@ -94,14 +94,27 @@ export async function renderUsers(root, { user }) {
         <div>
           <h2 style="margin:0">${esc(u.displayName || u.username)}</h2>
           <div class="tiny">@${esc(u.username)} · ${statusPill(u.status)} · ${(u.roles || []).map(esc).join(", ")}</div>
+          <div class="tiny" style="margin-top:4px">Level ${Number(u.level) || 1} · ${Number(u.exp) || 0} EXP</div>
         </div>
         <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
       </div>
       ${
+        canBan
+          ? `<div style="margin-top:16px">
+        <h3 style="margin:0 0 8px">Level / EXP</h3>
+        <p class="tiny muted" style="margin:0 0 10px">ลบ EXP แล้วเลเวลจะกลับไป 1</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button type="button" class="btn ghost sm danger-outline" id="uResetExp">ลบ EXP</button>
+          <span class="tiny" id="uExpMsg"></span>
+        </div>
+      </div>`
+          : ""
+      }
+      ${
         canRename
           ? `<div style="margin-top:16px">
         <h3 style="margin:0 0 8px">เปลี่ยนชื่อ</h3>
-        <p class="tiny muted" style="margin:0 0 10px">Username ใช้ระบุบัญชี · Display name คือชื่อที่แสดง</p>
+        <p class="tiny muted" style="margin:0 0 10px">Username ใช้ระบุบัญชี (a-z, 0-9, . _ -) · Display name คือชื่อที่แสดง · ไม่ผูกกันอัตโนมัติ</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
           <label class="tiny">Username
             <input class="input" id="uUsername" maxlength="64" value="${esc(u.username || "")}" />
@@ -154,14 +167,43 @@ export async function renderUsers(root, { user }) {
         await load();
       };
     });
+    const resetExp = panel.querySelector("#uResetExp");
+    if (resetExp) {
+      resetExp.onclick = async () => {
+        const msg = panel.querySelector("#uExpMsg");
+        if (!confirm("ลบ EXP ของผู้เล่นนี้และรีเซ็ตเลเวลเป็น 1?")) return;
+        if (msg) msg.textContent = "กำลังลบ…";
+        resetExp.disabled = true;
+        const r = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ resetExp: true })
+        });
+        resetExp.disabled = false;
+        if (!r.res.ok) {
+          const err = (r.data && r.data.error) || "";
+          if (msg) {
+            msg.textContent =
+              err === "cannot_modify_super_admin" ? "แก้ super_admin ไม่ได้" : "ลบไม่สำเร็จ";
+          }
+          return;
+        }
+        if (msg) msg.textContent = "ลบ EXP แล้ว";
+        await openDetail(id);
+        await load();
+      };
+    }
     const saveName = panel.querySelector("#uSaveName");
     if (saveName) {
       saveName.onclick = async () => {
         const msg = panel.querySelector("#uNameMsg");
-        const username = (panel.querySelector("#uUsername").value || "").trim();
+        const username = (panel.querySelector("#uUsername").value || "").trim().replace(/\s+/g, "");
         const displayName = (panel.querySelector("#uDisplayName").value || "").trim();
         if (username.length < 2) {
           if (msg) msg.textContent = "Username อย่างน้อย 2 ตัวอักษร";
+          return;
+        }
+        if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+          if (msg) msg.textContent = "Username ใช้ได้แค่ a-z 0-9 . _ -";
           return;
         }
         if (!displayName) {
@@ -184,7 +226,7 @@ export async function renderUsers(root, { user }) {
                 : err === "cannot_modify_super_admin"
                   ? "แก้ super_admin ไม่ได้"
                   : err === "invalid_username"
-                    ? "Username ไม่ถูกต้อง"
+                    ? "Username ไม่ถูกต้อง (a-z 0-9 . _ -)"
                     : "บันทึกไม่สำเร็จ";
           }
           return;
