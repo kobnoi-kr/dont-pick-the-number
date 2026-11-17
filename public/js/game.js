@@ -986,6 +986,17 @@ function renderLobbyGrid(){
       dot.className="lobby-online-dot";
       avWrap.appendChild(dot);
     }
+    if(canOpenPlayerProfile(meta)){
+      slot.classList.add("profile-openable");
+      const openCard=(e)=>{
+        if(e){ e.preventDefault(); e.stopPropagation(); }
+        if(!canOpenPlayerProfile(meta)) return;
+        openPlayerProfileModal(meta.id);
+      };
+      avWrap.addEventListener("click", openCard);
+      nm.addEventListener("click", openCard);
+      avWrap.title="ดูโปรไฟล์";
+    }
     slot.append(avWrap,nm,status,acts);
     grid.appendChild(slot);
   }
@@ -2001,6 +2012,214 @@ function paintAuthBar(user){
 function canUseFriends(){
   return !!(authUser&&authUser.accountType==="registered");
 }
+function formatAccountTenure(iso){
+  if(!iso) return "—";
+  const start=new Date(iso).getTime();
+  if(!Number.isFinite(start)) return "—";
+  const days=Math.max(0, Math.floor((Date.now()-start)/86400000));
+  if(days<1) return "วันนี้";
+  if(days<30) return days+" วัน";
+  const months=Math.floor(days/30);
+  if(months<12) return months+" เดือน";
+  const years=Math.floor(months/12);
+  const rem=months%12;
+  return rem?years+" ปี "+rem+" เดือน":years+" ปี";
+}
+function canOpenPlayerProfile(meta){
+  return !!(onlineMode&&netPhase==="lobby"&&!spinning&&meta&&meta.id&&!meta.bot);
+}
+function closePlayerProfileModal(){
+  const modal=$("playerProfileModal");
+  if(modal) modal.classList.add("hidden");
+}
+async function openPlayerProfileModal(userId){
+  if(netPhase!=="lobby"||spinning) return;
+  const modal=$("playerProfileModal");
+  if(!modal||!userId) return;
+  const title=$("playerProfileTitle");
+  const userEl=$("playerProfileUser");
+  const tenure=$("playerProfileTenure");
+  const winRate=$("playerProfileWinRate");
+  const wins=$("playerProfileWins");
+  const games=$("playerProfileGames");
+  const hint=$("playerProfileHint");
+  const acts=$("playerProfileActs");
+  const head=modal.querySelector(".player-profile-head");
+  function setProfileAv(src, letter){
+    if(!head) return;
+    let node=$("playerProfileAv");
+    if(src){
+      if(!node||node.tagName!=="IMG"){
+        const img=document.createElement("img");
+        img.id="playerProfileAv";
+        img.className="player-profile-av";
+        img.alt="";
+        img.referrerPolicy="no-referrer";
+        if(node) node.replaceWith(img); else head.prepend(img);
+        node=img;
+      }
+      node.className="player-profile-av";
+      node.src=src;
+    }else{
+      if(!node||node.tagName==="IMG"){
+        const div=document.createElement("div");
+        div.id="playerProfileAv";
+        div.className="player-profile-av ph";
+        div.setAttribute("aria-hidden","true");
+        if(node) node.replaceWith(div); else head.prepend(div);
+        node=div;
+      }
+      node.className="player-profile-av ph";
+      node.textContent=letter||"?";
+    }
+  }
+  if(title) title.textContent="กำลังโหลด…";
+  if(userEl) userEl.textContent="@—";
+  if(tenure) tenure.textContent="—";
+  if(winRate) winRate.textContent="—";
+  if(wins) wins.textContent="—";
+  if(games) games.textContent="—";
+  if(hint) hint.textContent="";
+  if(acts) acts.innerHTML="";
+  setProfileAv(null,"?");
+  modal.classList.remove("hidden");
+  let data=null;
+  try{
+    const res=await fetch("/api/v1/users/"+encodeURIComponent(userId)+"/public",{
+      method:"GET",credentials:"same-origin",headers:{Accept:"application/json"}
+    });
+    data=await res.json().catch(()=>({}));
+    if(!res.ok){
+      if(title) title.textContent="โหลดโปรไฟล์ไม่ได้";
+      if(hint) hint.textContent=(data&&data.error)||"ลองใหม่อีกครั้ง";
+      return;
+    }
+  }catch(e){
+    if(title) title.textContent="โหลดโปรไฟล์ไม่ได้";
+    if(hint) hint.textContent="เครือข่ายมีปัญหา";
+    return;
+  }
+  if(netPhase!=="lobby"){ closePlayerProfileModal(); return; }
+  const u=data.user||{};
+  const st=data.stats;
+  const rel=data.relation||{status:"none"};
+  if(title) title.textContent=u.displayName||"ผู้เล่น";
+  if(userEl) userEl.textContent=u.username?("@"+u.username):"";
+  setProfileAv(u.avatarUrl||null, String(u.displayName||"?").slice(0,1).toUpperCase());
+  if(tenure) tenure.textContent=formatAccountTenure(u.createdAt);
+  if(st){
+    if(winRate) winRate.textContent=(st.winRate!=null?st.winRate:0)+"%";
+    if(wins) wins.textContent=String(st.gamesWon||0);
+    if(games) games.textContent=String(st.totalGames||0);
+  }else{
+    if(winRate) winRate.textContent="ซ่อน";
+    if(wins) wins.textContent="—";
+    if(games) games.textContent="—";
+    if(hint) hint.textContent="ผู้เล่นซ่อนสถิติสาธารณะ";
+  }
+  if(!acts) return;
+  acts.innerHTML="";
+  const mk=(label,cls)=>{
+    const b=document.createElement("button");
+    b.type="button";
+    b.className="btn"+(cls?" "+cls:"")+" sm";
+    b.textContent=label;
+    return b;
+  };
+  if(rel.status==="self"){
+    if(hint) hint.textContent="นี่คือคุณ";
+    return;
+  }
+  if(!canUseFriends()){
+    if(hint) hint.textContent="เข้าสู่ระบบด้วยบัญชีจริงเพื่อเพิ่มเพื่อน";
+    return;
+  }
+  if(rel.status==="blocked"){
+    if(hint) hint.textContent=rel.blockedByMe?"คุณบล็อกผู้เล่นคนนี้ไว้":"ไม่สามารถเพิ่มเพื่อนได้";
+    if(rel.blockedByMe){
+      const un=mk("อันบล็อก","ghost");
+      un.onclick=async()=>{
+        un.disabled=true;
+        try{
+          const res=await fetch("/api/v1/friends/"+encodeURIComponent(userId)+"/block",{
+            method:"DELETE",credentials:"same-origin",headers:{Accept:"application/json"}
+          });
+          if(res.ok) openPlayerProfileModal(userId);
+          else if(hint) hint.textContent="ปลดบล็อกไม่สำเร็จ";
+        }catch(e){ if(hint) hint.textContent="ปลดบล็อกไม่สำเร็จ"; }
+      };
+      acts.appendChild(un);
+    }
+    return;
+  }
+  if(rel.status==="friends"){
+    if(hint) hint.textContent="เป็นเพื่อนกันแล้ว";
+    return;
+  }
+  if(rel.status==="outgoing"){
+    if(hint) hint.textContent="ส่งคำขอแล้ว รอตอบรับ";
+    return;
+  }
+  if(rel.status==="incoming"&&rel.friendshipId){
+    if(hint) hint.textContent="มีคำขอเป็นเพื่อนถึงคุณ";
+    const acc=mk("รับเพื่อน");
+    acc.onclick=async()=>{
+      acc.disabled=true;
+      try{
+        const res=await fetch("/api/v1/friends/"+encodeURIComponent(rel.friendshipId)+"/accept",{
+          method:"POST",credentials:"same-origin",
+          headers:{Accept:"application/json","Content-Type":"application/json"},
+          body:"{}"
+        });
+        if(res.ok) openPlayerProfileModal(userId);
+        else if(hint) hint.textContent="รับเพื่อนไม่สำเร็จ";
+      }catch(e){ if(hint) hint.textContent="รับเพื่อนไม่สำเร็จ"; }
+    };
+    const dec=mk("ปฏิเสธ","ghost");
+    dec.onclick=async()=>{
+      dec.disabled=true;
+      try{
+        await fetch("/api/v1/friends/"+encodeURIComponent(rel.friendshipId)+"/decline",{
+          method:"POST",credentials:"same-origin",
+          headers:{Accept:"application/json","Content-Type":"application/json"},
+          body:"{}"
+        });
+        openPlayerProfileModal(userId);
+      }catch(e){ openPlayerProfileModal(userId); }
+    };
+    acts.append(acc,dec);
+    return;
+  }
+  const add=mk("เพิ่มเพื่อน");
+  add.onclick=async()=>{
+    add.disabled=true;
+    try{
+      const res=await fetch("/api/v1/friends/request",{
+        method:"POST",credentials:"same-origin",
+        headers:{Accept:"application/json","Content-Type":"application/json"},
+        body:JSON.stringify({userId})
+      });
+      const body=await res.json().catch(()=>({}));
+      if(res.ok){
+        openPlayerProfileModal(userId);
+      }else{
+        const map={
+          already_friends:"เป็นเพื่อนกันอยู่แล้ว",
+          request_pending:"มีคำขอค้างอยู่แล้ว",
+          user_blocked:"บล็อกอยู่",
+          registered_required:"ต้องเข้าสู่ระบบก่อน",
+          user_not_found:"ไม่พบผู้เล่น"
+        };
+        if(hint) hint.textContent=map[body.error]||body.error||"ส่งคำขอไม่สำเร็จ";
+        add.disabled=false;
+      }
+    }catch(e){
+      if(hint) hint.textContent="ส่งคำขอไม่สำเร็จ";
+      add.disabled=false;
+    }
+  };
+  acts.appendChild(add);
+}
 function paintInviteBtn(){
   const btn=$("inviteFriendsBtn");
   if(!btn) return;
@@ -2429,6 +2648,8 @@ function applySnap(s){
   hostId=s.hostId||"";
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
+  // Profile card is lobby-only — never stay open during play/pick/wheel/over.
+  if(netPhase!=="lobby") closePlayerProfileModal();
   if(s.phase==="over") clearActiveRoom();
   else rememberActiveRoom(s.code);
   // Already seated (hello reattach) — drop matching pending join/watch/resume.
@@ -3006,6 +3227,10 @@ async function bootOnline(){
   if($("transferHostClose")) $("transferHostClose").onclick=()=>$("transferHostModal").classList.add("hidden");
   if($("transferHostModal")) $("transferHostModal").addEventListener("click",e=>{
     if(e.target===$("transferHostModal")) $("transferHostModal").classList.add("hidden");
+  });
+  if($("playerProfileClose")) $("playerProfileClose").onclick=()=>closePlayerProfileModal();
+  if($("playerProfileModal")) $("playerProfileModal").addEventListener("click",e=>{
+    if(e.target===$("playerProfileModal")) closePlayerProfileModal();
   });
   function openDeleteRoomModal(){
     const modal=$("deleteRoomModal");

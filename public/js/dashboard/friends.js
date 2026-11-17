@@ -77,6 +77,11 @@ export async function renderFriends(root, { user } = {}) {
                 <ul class="list" id="friendsAll"></ul>
                 <p class="tiny empty-line" id="friendsEmpty">ยังไม่มีเพื่อน</p>
               </div>
+              <div class="card">
+                <h3 style="margin-top:0">บล็อกแล้ว</h3>
+                <ul class="list" id="blockedList"></ul>
+                <p class="tiny empty-line" id="blockedEmpty">ยังไม่มีรายการบล็อก</p>
+              </div>
             </div>
           </div>`
     }
@@ -124,7 +129,8 @@ export async function renderFriends(root, { user } = {}) {
       cannot_friend_self: "เพิ่มตัวเองไม่ได้",
       already_friends: "เป็นเพื่อนกันอยู่แล้ว",
       request_pending: "มีคำขอค้างอยู่แล้ว",
-      registered_required: "ต้องผูกบัญชีก่อน"
+      registered_required: "ต้องผูกบัญชีก่อน",
+      user_blocked: "บล็อกอยู่ — ปลดบล็อกก่อน"
     };
     const err = data && data.error;
     setMsg(res.ok ? "ส่งคำขอแล้ว" : map[err] || err || "ล้มเหลว", res.ok);
@@ -188,7 +194,30 @@ export async function renderFriends(root, { user } = {}) {
         await api("/api/v1/friends/" + item.friendshipId, { method: "DELETE" });
         refreshFriends();
       };
-      acts.appendChild(r);
+      const b = makeBtn("บล็อก", "danger-outline");
+      b.onclick = async () => {
+        if (!confirm("บล็อกเพื่อนคนนี้? จะเลิกเป็นเพื่อนด้วย")) return;
+        const uid = item.user && item.user.id;
+        if (!uid) return;
+        const res = await api("/api/v1/friends/" + uid + "/block", {
+          method: "POST",
+          body: "{}"
+        });
+        setMsg(res.res.ok ? "บล็อกแล้ว" : "บล็อกไม่สำเร็จ", res.res.ok);
+        refreshFriends();
+      };
+      acts.append(r, b);
+    });
+    fillList("blockedList", "blockedEmpty", data.blocked || [], (acts, item) => {
+      const u = makeBtn("อันบล็อก");
+      u.onclick = async () => {
+        const uid = item.user && item.user.id;
+        if (!uid) return;
+        const res = await api("/api/v1/friends/" + uid + "/block", { method: "DELETE" });
+        setMsg(res.res.ok ? "ปลดบล็อกแล้ว" : "ปลดบล็อกไม่สำเร็จ", res.res.ok);
+        refreshFriends();
+      };
+      acts.appendChild(u);
     });
   }
 

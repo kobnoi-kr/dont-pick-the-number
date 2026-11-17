@@ -79,6 +79,56 @@ async function findExistingPair(prisma, a, b) {
   });
 }
 
+async function findBlockEitherWay(prisma, a, b) {
+  if (!a || !b || a === b) return null;
+  return prisma.userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerId: a, blockedId: b },
+        { blockerId: b, blockedId: a }
+      ]
+    }
+  });
+}
+
+async function isBlockedByMe(prisma, meId, otherId) {
+  if (!meId || !otherId || meId === otherId) return false;
+  const row = await prisma.userBlock.findUnique({
+    where: { blockerId_blockedId: { blockerId: meId, blockedId: otherId } },
+    select: { id: true }
+  });
+  return !!row;
+}
+
+/** @type {Map<string, { at: number, ids: string[] }>} */
+const friendIdsCache = new Map();
+const FRIEND_IDS_TTL_MS = 15000;
+
+function clearFriendIdsCache(userId) {
+  if (userId) friendIdsCache.delete(String(userId));
+}
+
+async function friendshipRelation(prisma, meId, otherId) {
+  if (!meId || !otherId) return { status: "none" };
+  if (meId === otherId) return { status: "self" };
+  const blockedByMe = await isBlockedByMe(prisma, meId, otherId);
+  if (blockedByMe) return { status: "blocked", blockedByMe: true };
+  const blockedEither = await findBlockEitherWay(prisma, meId, otherId);
+  if (blockedEither) return { status: "blocked", blockedByMe: false };
+  const row = await findExistingPair(prisma, meId, otherId);
+  if (!row) return { status: "none" };
+  if (row.status === "accepted") {
+    return { status: "friends", friendshipId: row.id };
+  }
+  if (row.status === "pending") {
+    if (row.requesterId === meId) {
+      return { status: "outgoing", friendshipId: row.id };
+    }
+    return { status: "incoming", friendshipId: row.id };
+  }
+  return { status: "none" };
+}
+
 async function handleFriendsList(req, res) {
   if (method(req) !== "GET") {
     sendJson(res, 405, { error: "method_not_allowed" });
@@ -119,11 +169,27 @@ async function handleFriendsList(req, res) {
     else incoming.push(item);
   }
 
+  const blockRows = await auth.prisma.userBlock.findMany({
+    where: { blockerId: me.id },
+    include: { blocked: true },
+    orderBy: { createdAt: "desc" }
+  });
+  const blocked = [];
+  for (const row of blockRows) {
+    if (!row.blocked || row.blocked.status !== "active") continue;
+    blocked.push({
+      blockId: row.id,
+      user: publicFriendUser(row.blocked),
+      createdAt: row.createdAt
+    });
+  }
+
   sendJson(res, 200, {
     me: publicUser(me),
     friends,
     incoming,
-    outgoing
+    outgoing,
+    blocked
   });
   return true;
 }
@@ -156,6 +222,15 @@ async function handleFriendsSearch(req, res) {
   for (const r of related) {
     exclude.add(r.requesterId);
     exclude.add(r.addresseeId);
+  }
+  const myBlocks = await auth.prisma.userBlock.findMany({
+    where: {
+      OR: [{ blockerId: me.id }, { blockedId: me.id }]
+    },
+    select: { blockerId: true, blockedId: true }
+  });
+  for (const b of myBlocks) {
+    exclude.add(b.blockerId === me.id ? b.blockedId : b.blockerId);
   }
 
   const users = await auth.prisma.user.findMany({
@@ -224,6 +299,12 @@ async function handleFriendRequest(req, res) {
     return true;
   }
 
+  const blocked = await findBlockEitherWay(auth.prisma, auth.user.id, target.id);
+  if (blocked) {
+    sendJson(res, 403, { error: "user_blocked" });
+    return true;
+  }
+
   const existing = await findExistingPair(auth.prisma, auth.user.id, target.id);
   if (existing) {
     if (existing.status === "accepted") {
@@ -284,11 +365,18 @@ async function handleFriendAccept(req, res, friendshipId) {
     sendJson(res, 404, { error: "request_not_found" });
     return true;
   }
+  const blocked = await findBlockEitherWay(auth.prisma, auth.user.id, row.requesterId);
+  if (blocked) {
+    sendJson(res, 403, { error: "user_blocked" });
+    return true;
+  }
   const updated = await auth.prisma.friendship.update({
     where: { id: row.id },
     data: { status: "accepted" },
     include: { requester: true }
   });
+  clearFriendIdsCache(auth.user.id);
+  clearFriendIdsCache(updated.requesterId);
   sendJson(res, 200, {
     friendshipId: updated.id,
     status: "accepted",
@@ -336,7 +424,71 @@ async function handleFriendDelete(req, res, friendshipId) {
     sendJson(res, 404, { error: "friendship_not_found" });
     return true;
   }
+  const otherId = row.requesterId === auth.user.id ? row.addresseeId : row.requesterId;
   await auth.prisma.friendship.delete({ where: { id: row.id } });
+  clearFriendIdsCache(auth.user.id);
+  clearFriendIdsCache(otherId);
+  sendJson(res, 200, { ok: true });
+  return true;
+}
+
+async function handleFriendBlock(req, res, userId) {
+  if (method(req) !== "POST") {
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+  const auth = await requireAuth(req, res);
+  if (!auth) return true;
+  if (!requireRegistered(auth, res)) return true;
+
+  const targetId = String(userId || "");
+  if (!targetId || targetId === auth.user.id) {
+    sendJson(res, 400, { error: "cannot_block_self" });
+    return true;
+  }
+  const target = await auth.prisma.user.findFirst({
+    where: { id: targetId, accountType: "registered", status: "active" }
+  });
+  if (!target) {
+    sendJson(res, 404, { error: "user_not_found" });
+    return true;
+  }
+
+  const existing = await findExistingPair(auth.prisma, auth.user.id, target.id);
+  if (existing) {
+    await auth.prisma.friendship.delete({ where: { id: existing.id } });
+  }
+
+  await auth.prisma.userBlock.upsert({
+    where: {
+      blockerId_blockedId: { blockerId: auth.user.id, blockedId: target.id }
+    },
+    create: { blockerId: auth.user.id, blockedId: target.id },
+    update: {}
+  });
+  clearFriendIdsCache(auth.user.id);
+  clearFriendIdsCache(target.id);
+  sendJson(res, 200, { ok: true, user: publicFriendUser(target) });
+  return true;
+}
+
+async function handleFriendUnblock(req, res, userId) {
+  if (method(req) !== "DELETE") {
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+  const auth = await requireAuth(req, res);
+  if (!auth) return true;
+  if (!requireRegistered(auth, res)) return true;
+
+  const targetId = String(userId || "");
+  const deleted = await auth.prisma.userBlock.deleteMany({
+    where: { blockerId: auth.user.id, blockedId: targetId }
+  });
+  if (!deleted.count) {
+    sendJson(res, 404, { error: "block_not_found" });
+    return true;
+  }
   sendJson(res, 200, { ok: true });
   return true;
 }
@@ -355,10 +507,6 @@ async function areFriends(prisma, userA, userB) {
   });
   return !!row;
 }
-
-/** @type {Map<string, { at: number, ids: string[] }>} */
-const friendIdsCache = new Map();
-const FRIEND_IDS_TTL_MS = 15000;
 
 async function listAcceptedFriendIds(prisma, userId) {
   const key = String(userId || "");
@@ -403,6 +551,14 @@ async function handleFriendsApi(req, res, pathname) {
   if (pathname === "/api/v1/friends/request") return handleFriendRequest(req, res);
   if (pathname === "/api/v1/friends/online") return handleFriendsOnline(req, res);
 
+  const block = pathname.match(/^\/api\/v1\/friends\/([0-9a-f-]{36})\/block$/i);
+  if (block) {
+    if (method(req) === "POST") return handleFriendBlock(req, res, block[1]);
+    if (method(req) === "DELETE") return handleFriendUnblock(req, res, block[1]);
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
   const accept = pathname.match(/^\/api\/v1\/friends\/([0-9a-f-]{36})\/accept$/i);
   if (accept) return handleFriendAccept(req, res, accept[1]);
   const decline = pathname.match(/^\/api\/v1\/friends\/([0-9a-f-]{36})\/decline$/i);
@@ -419,5 +575,7 @@ module.exports = {
   listAcceptedFriendIds,
   publicFriendUser,
   normalizeFriendCode,
+  friendshipRelation,
+  findBlockEitherWay,
   handleFriendsApi
 };

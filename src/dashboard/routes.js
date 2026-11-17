@@ -13,7 +13,7 @@ const {
 const DASHBOARD_ADMIN_ONLY = process.env.DASHBOARD_ADMIN_ONLY === "1";
 const { rateLimit } = require("../auth/rate-limit");
 const { getGameApi } = require("./bridge");
-const { listAcceptedFriendIds } = require("../auth/friends");
+const { listAcceptedFriendIds, friendshipRelation } = require("../auth/friends");
 const { rankingWindow } = require("./ranking-period");
 
 const GAME_CATALOG = [
@@ -931,6 +931,13 @@ async function handleDashboardApi(req, res, pathname) {
     }
     const pref = (u.settings && u.settings.preferences) || {};
     const stats = pref.publicStats === false ? null : await statsForUser(u.id);
+    const viewer = await optionalUser(req);
+    let relation = { status: "none" };
+    if (viewer && viewer.accountType === "registered") {
+      relation = await friendshipRelation(prisma, viewer.id, u.id);
+    } else if (viewer && viewer.id === u.id) {
+      relation = { status: "self" };
+    }
     sendJson(res, 200, {
       user: {
         id: u.id,
@@ -940,7 +947,8 @@ async function handleDashboardApi(req, res, pathname) {
         accountType: u.accountType,
         createdAt: u.createdAt
       },
-      stats
+      stats,
+      relation
     });
     return true;
   }

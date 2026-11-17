@@ -281,6 +281,27 @@
     <button type="button" id="transferHostClose" class="btn ghost">ปิด</button>
   </div>
 </div>
+
+<div id="playerProfileModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="playerProfileTitle">
+  <div class="modal-card player-profile-card">
+    <button type="button" id="playerProfileClose" class="textbtn player-profile-close" aria-label="ปิด">ปิด</button>
+    <div class="player-profile-head">
+      <div id="playerProfileAv" class="player-profile-av ph" aria-hidden="true">?</div>
+      <div class="player-profile-id">
+        <h3 id="playerProfileTitle">ผู้เล่น</h3>
+        <p class="sub" id="playerProfileUser">@—</p>
+      </div>
+    </div>
+    <div class="player-profile-stats" id="playerProfileStats">
+      <div class="player-profile-stat"><span class="label">เล่นมา</span><b id="playerProfileTenure">—</b></div>
+      <div class="player-profile-stat"><span class="label">Win rate</span><b id="playerProfileWinRate">—</b></div>
+      <div class="player-profile-stat"><span class="label">ชนะ</span><b id="playerProfileWins">—</b></div>
+      <div class="player-profile-stat"><span class="label">เกม</span><b id="playerProfileGames">—</b></div>
+    </div>
+    <p class="hint" id="playerProfileHint"></p>
+    <div class="modal-actions-row" id="playerProfileActs"></div>
+  </div>
+</div>
 <div id="deleteRoomModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteRoomTitle">
   <div class="modal-card">
     <h3 id="deleteRoomTitle">ลบห้อง?</h3>
