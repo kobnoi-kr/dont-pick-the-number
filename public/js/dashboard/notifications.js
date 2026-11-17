@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { isAdminNotifMuted, playAdminNotifPing, toggleAdminNotifMuted } from "./sfx.js";
 
 const CATS = [
   { id: "all", label: "ทั้งหมด" },
@@ -286,6 +287,22 @@ export async function refreshNotifications() {
   return cacheItems;
 }
 
+function paintNotifSoundToggle() {
+  const btn = document.getElementById("notifSoundToggle");
+  if (!btn) return;
+  const muted = isAdminNotifMuted();
+  btn.textContent = muted ? "เสียงแอดมิน: ปิด" : "เสียงแอดมิน: เปิด";
+  btn.setAttribute("aria-pressed", muted ? "true" : "false");
+  btn.classList.toggle("is-muted", muted);
+}
+
+/** Live WS: play ping only for admin reply messages. */
+export function onNotificationPush(msg) {
+  if (msg && String(msg.type || "") === "admin_reply") {
+    playAdminNotifPing();
+  }
+}
+
 export function wireNotifications() {
   const btn = document.getElementById("notifBtn");
   const panel = document.getElementById("notifPanel");
@@ -293,14 +310,24 @@ export function wireNotifications() {
   const deleteAll = document.getElementById("notifDeleteAll");
   const deleteSelected = document.getElementById("notifDeleteSelected");
   const selectAll = document.getElementById("notifSelectAll");
+  const soundToggle = document.getElementById("notifSoundToggle");
   if (!btn || !panel) return;
 
   paintCats();
+  paintNotifSoundToggle();
 
   // Keep panel open while interacting; re-render used to detach click targets
   // and the document outside-click handler then closed the panel.
   panel.addEventListener("click", (e) => e.stopPropagation());
   panel.addEventListener("mousedown", (e) => e.stopPropagation());
+
+  if (soundToggle) {
+    soundToggle.onclick = (e) => {
+      e.stopPropagation();
+      toggleAdminNotifMuted();
+      paintNotifSoundToggle();
+    };
+  }
 
   btn.addEventListener("click", async (e) => {
     e.preventDefault();

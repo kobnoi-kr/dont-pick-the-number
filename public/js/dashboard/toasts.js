@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { playAnnouncementBell } from "./sfx.js";
 
 const SEEN_KEY = "nv-ann-seen";
 
@@ -112,6 +113,7 @@ export function showAnnouncementToast(ann) {
   };
   el.querySelector(".toast-close").onclick = close;
   host.appendChild(el);
+  playAnnouncementBell();
   requestAnimationFrame(() => el.classList.add("in"));
   // Auto-dismiss general/info after 12s; personal stay until closed
   if (ann.kind === "info" || ann.kind === "warning") {

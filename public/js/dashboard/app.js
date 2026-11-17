@@ -6,7 +6,7 @@ import { renderLibrary } from "./library.js";
 import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
-import { wireNotifications, refreshNotifications } from "./notifications.js";
+import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
 import { showRoomInviteBanner } from "./invites.js";
 import {
@@ -153,7 +153,10 @@ window.addEventListener("hashchange", () => {
 
 onDashboardMessage((msg) => {
   if (msg.t === "lobby" && state.view === "rooms") navigate("rooms");
-  if (msg.t === "notification:new") refreshNotifications();
+  if (msg.t === "notification:new") {
+    onNotificationPush(msg);
+    refreshNotifications();
+  }
   if (msg.t === "announcement:new") {
     onLiveAnnouncement(msg.announcement);
     refreshNotifications();

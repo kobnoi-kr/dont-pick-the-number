@@ -1206,6 +1206,14 @@ async function handleAdminApi(req, res, pathname) {
               }
             }
           });
+          const gameApi = getGameApi();
+          if (gameApi && typeof gameApi.notifyUser === "function") {
+            try {
+              gameApi.notifyUser(existing.userId, { type: "admin_reply" });
+            } catch {
+              /* ignore */
+            }
+          }
         }
         await writeAdminLog(prisma, {
           adminId: auth.user.id,

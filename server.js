@@ -2177,7 +2177,7 @@ attachGameApi({
   /** Live toast + inbox ping. recipientIds=null → everyone online. */
   pushAnnouncement(announcement, recipientIds) {
     const toastMsg = { t: "announcement:new", announcement };
-    const notifMsg = { t: "notification:new" };
+    const notifMsg = { t: "notification:new", type: "announcement" };
     if (Array.isArray(recipientIds)) {
       broadcastToUsersCore(recipientIds, toastMsg, send);
       broadcastToUsersCore(recipientIds, notifMsg, send);
@@ -2185,6 +2185,15 @@ attachGameApi({
       fanOutAllClients(toastMsg);
       fanOutAllClients(notifMsg);
     }
+  },
+  /** Push a notification:new (and optional payload) to one user. */
+  notifyUser(userId, payload) {
+    if (!userId) return 0;
+    const msg =
+      payload && typeof payload === "object"
+        ? Object.assign({ t: "notification:new" }, payload)
+        : { t: "notification:new" };
+    return broadcastToUsersCore([userId], msg, send);
   },
   /** Warn everyone, then kick after countdown (default 15s). */
   scheduleForceMaintenance(message, seconds = 15) {

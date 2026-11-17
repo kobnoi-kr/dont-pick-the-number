@@ -116,6 +116,17 @@ function hideMaintenanceCountdown() {
   if (el) el.remove();
 }
 
+function playMaintTick() {
+  try {
+    const a = new Audio("/audio/maintenance-countdown.mp3");
+    a.volume = 0.4;
+    const p = a.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Center overlay: Maintenance in 15, 14, 13...
  * msg: { message, seconds, endsAt, cancelled? }
@@ -168,7 +179,10 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     const leftMs = Math.max(0, target - Date.now());
     const sec = Math.max(0, Math.ceil(leftMs / 1000));
     if (sec !== lastSec) {
+      const prev = lastSec;
       lastSec = sec;
+      if (prev >= 0 && sec > 0 && sec !== prev) playMaintTick();
+      else if (prev < 0 && sec > 0) playMaintTick();
       const badge = el._nvDeploy ? "SYSTEM UPDATE" : "MAINTENANCE";
       const title = el._nvDeploy ? "กำลังอัปเดตระบบใน" : "Maintenance in";
       const sub = el._nvDeploy

@@ -828,6 +828,10 @@ td.row-actions > a.btn:last-child {
   font-size: 0.78rem;
   color: var(--nv-muted);
 }
+#notifSoundToggle.is-muted {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
 .notif-head-actions {
   display: flex;
   gap: 6px;
