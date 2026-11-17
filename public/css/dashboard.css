@@ -827,6 +827,16 @@ textarea:focus {
 .kind-dot.alert {
   background: repeating-linear-gradient(-45deg, #f59e0b 0 3px, #ef4444 3px 6px);
 }
+.game-admin-card h3 { font-size: 1.1rem; }
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--nv-text-2);
+  white-space: nowrap;
+}
+.switch-row input { width: 16px; height: 16px; accent-color: var(--nv-primary); }
 
 .friends-layout { align-items: start; }
 .friend-code-row {

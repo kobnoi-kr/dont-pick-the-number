@@ -1,5 +1,34 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, fmtDate, modeLabel, hasPerm } from "./util.js";
+import { esc, fmtDate, hasPerm } from "./util.js";
+
+const GAMES = [
+  {
+    id: "secret",
+    defaultName: "หาเลข",
+    en: "Don't Get The Secret",
+    blurb: "เกมทายเลข — ห้ามโดนเลขลับ ใช้ในคลังเกมและตอนสร้างห้อง"
+  },
+  {
+    id: "wheel",
+    defaultName: "วงล้อ",
+    en: "Number Wheel",
+    blurb: "เกมหมุนวงล้อ — ใครโดนเลขตัวเองตกรอบ"
+  }
+];
+
+function modeLabel(mode) {
+  if (mode === "wheel") return "วงล้อ";
+  if (mode === "secret") return "หาเลข";
+  return mode || "—";
+}
+
+function fmtDuration(sec) {
+  const n = Number(sec) || 0;
+  if (n < 60) return n + " วินาที";
+  const m = Math.floor(n / 60);
+  const s = n % 60;
+  return s ? `${m} นาที ${s} วินาที` : `${m} นาที`;
+}
 
 export async function renderGames(root, { user }) {
   root.innerHTML = `<div class="loading">Loading…</div>`;
@@ -17,45 +46,79 @@ export async function renderGames(root, { user }) {
 
   root.innerHTML = `
     <div class="card">
-      <h2>Game catalog</h2>
-      <div class="content-grid" id="gCat">
-        ${["secret", "wheel"]
-          .map((id) => {
-            const row = catalog[id] || { enabled: true, name: id === "wheel" ? "วงล้อ" : "หาเลข" };
-            return `<div class="card nested">
-              <label class="row-between">
-                <b>${esc(row.name || id)}</b>
-                <span><input type="checkbox" data-id="${id}" data-field="enabled" ${row.enabled !== false ? "checked" : ""} ${canManage ? "" : "disabled"}/> Enabled</span>
+      <h2>จัดการเกมในคลัง</h2>
+      <p class="muted" style="margin-top:0">
+        หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> และชื่อที่ผู้เล่นเห็น
+        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิดและตั้งชื่อแสดงผล
+      </p>
+      <div class="content-grid" id="gCat" style="margin-top:14px">
+        ${GAMES.map((g) => {
+          const row = catalog[g.id] || {};
+          const name = (row.name && String(row.name).trim()) || g.defaultName;
+          const on = row.enabled !== false;
+          return `<div class="card nested game-admin-card">
+            <div class="row-between" style="align-items:flex-start">
+              <div>
+                <div class="tiny">รหัสเกม: <code>${esc(g.id)}</code></div>
+                <h3 style="margin:4px 0 2px">${esc(g.defaultName)}</h3>
+                <div class="tiny">${esc(g.en)}</div>
+              </div>
+              <label class="switch-row" title="เปิด = โชว์ในคลังเกม">
+                <input type="checkbox" data-id="${g.id}" data-field="enabled" ${on ? "checked" : ""} ${canManage ? "" : "disabled"}/>
+                <span>${on ? "เปิดในคลัง" : "ปิดจากคลัง"}</span>
               </label>
-              <input class="input" style="margin-top:8px" data-id="${id}" data-field="name" value="${esc(row.name || "")}" ${canManage ? "" : "disabled"}/>
-              <div class="tiny" style="margin-top:6px">id: ${esc(id)}</div>
-            </div>`;
-          })
-          .join("")}
+            </div>
+            <p class="tiny" style="margin:10px 0 8px">${esc(g.blurb)}</p>
+            <label class="field">
+              <span>ชื่อที่แสดงให้ผู้เล่น</span>
+              <div class="toolbar" style="margin-top:6px">
+                <input class="input" data-id="${g.id}" data-field="name" value="${esc(name)}" ${canManage ? "" : "disabled"} placeholder="${esc(g.defaultName)}"/>
+                ${
+                  canManage
+                    ? `<button type="button" class="btn ghost sm" data-reset="${g.id}">คืนชื่อเดิม</button>`
+                    : ""
+                }
+              </div>
+            </label>
+          </div>`;
+        }).join("")}
       </div>
-      ${canManage ? `<button type="button" class="btn sm" id="gSave" style="margin-top:12px">Save catalog</button>` : ""}
+      ${canManage ? `<button type="button" class="btn sm" id="gSave" style="margin-top:14px">บันทึกการตั้งค่าเกม</button>` : ""}
       <p class="tiny" id="gMsg"></p>
     </div>
+
     <div class="card" style="margin-top:16px">
-      <h2>Finished games</h2>
-      <div class="table-wrap">
+      <h2>เกมที่จบแล้วล่าสุด</h2>
+      <p class="muted" style="margin-top:0">ประวัติจากห้องที่เล่นจบแล้ว (ดูอย่างเดียว)</p>
+      <div class="table-wrap" style="margin-top:10px">
         <table class="table">
-          <thead><tr><th>Room</th><th>Mode</th><th>Players</th><th>Ended</th><th>Duration</th></tr></thead>
+          <thead>
+            <tr>
+              <th>ชื่อห้อง</th>
+              <th>เกม</th>
+              <th>ผู้เล่น</th>
+              <th>จบเมื่อ</th>
+              <th>นาน</th>
+            </tr>
+          </thead>
           <tbody>
             ${
               games.length
                 ? games
                     .map(
                       (g) => `<tr>
-                <td><b>${esc(g.roomName)}</b><div class="tiny">${esc(g.roomCode)}</div></td>
+                <td>
+                  <b>${esc(g.roomName || "ห้องไม่มีชื่อ")}</b>
+                  <div class="tiny">รหัส ${esc(g.roomCode)}</div>
+                </td>
                 <td>${esc(modeLabel(g.gameMode))}</td>
-                <td>${g.playerCount}</td>
+                <td>${g.playerCount} คน</td>
                 <td class="tiny">${esc(fmtDate(g.endedAt))}</td>
-                <td>${g.durationSec || 0}s</td>
+                <td>${esc(fmtDuration(g.durationSec))}</td>
               </tr>`
                     )
                     .join("")
-                : `<tr><td colspan="5" class="empty">ยังไม่มีประวัติ</td></tr>`
+                : `<tr><td colspan="5" class="empty">ยังไม่มีประวัติเกมที่จบ</td></tr>`
             }
           </tbody>
         </table>
@@ -63,20 +126,40 @@ export async function renderGames(root, { user }) {
     </div>
   `;
 
+  root.querySelectorAll("[data-field='enabled']").forEach((box) => {
+    box.onchange = () => {
+      const label = box.parentElement && box.parentElement.querySelector("span");
+      if (label) label.textContent = box.checked ? "เปิดในคลัง" : "ปิดจากคลัง";
+    };
+  });
+
+  root.querySelectorAll("[data-reset]").forEach((btn) => {
+    btn.onclick = () => {
+      const id = btn.getAttribute("data-reset");
+      const g = GAMES.find((x) => x.id === id);
+      const input = root.querySelector(`input[data-id="${id}"][data-field="name"]`);
+      if (g && input) input.value = g.defaultName;
+    };
+  });
+
   const save = root.querySelector("#gSave");
   if (save) {
     save.onclick = async () => {
       const next = {};
-      for (const id of ["secret", "wheel"]) {
-        const en = root.querySelector(`input[data-id="${id}"][data-field="enabled"]`);
-        const name = root.querySelector(`input[data-id="${id}"][data-field="name"]`);
-        next[id] = { enabled: !!(en && en.checked), name: (name && name.value) || id };
+      for (const g of GAMES) {
+        const en = root.querySelector(`input[data-id="${g.id}"][data-field="enabled"]`);
+        const nameEl = root.querySelector(`input[data-id="${g.id}"][data-field="name"]`);
+        const name = ((nameEl && nameEl.value) || "").trim() || g.defaultName;
+        next[g.id] = { enabled: !!(en && en.checked), name };
       }
       const r = await api("/api/v1/admin/games/catalog", {
         method: "PATCH",
         body: JSON.stringify({ catalog: next })
       });
-      root.querySelector("#gMsg").textContent = r.res.ok ? "บันทึกแล้ว" : "บันทึกไม่สำเร็จ";
+      root.querySelector("#gMsg").textContent = r.res.ok
+        ? "บันทึกแล้ว — ผู้เล่นจะเห็นตามนี้ในคลังเกม"
+        : "บันทึกไม่สำเร็จ";
+      if (r.res.ok) renderGames(root, { user });
     };
   }
 }
