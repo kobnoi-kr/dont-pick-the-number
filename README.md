@@ -54,13 +54,13 @@ ALLOWED_HOSTS=numverse.click,www.numverse.click
 node scripts/make-admin.js <username|email>
 ```
 
-## Auth (Guest-First + OAuth + Email)
+## Auth (Guest-First + OAuth)
 
 Auth เปิดเมื่อตั้ง `DATABASE_URL` (ดู `.env.example`)
 
 ```bash
 cp .env.example .env
-# แก้ DATABASE_URL + AUTH_SECRET (+ Google/Discord/SMTP ถ้าต้องการ)
+# แก้ DATABASE_URL + AUTH_SECRET (+ Google/Discord ถ้าต้องการ)
 npm install
 npx prisma migrate deploy
 npm run db:seed
@@ -70,11 +70,10 @@ npm start
 หน้าเว็บ:
 
 - `/` Landing
-- `/app.html` User Dashboard
-- `/play.html` เกม
-- `/login.html` `/register.html` · account/friends → `/app.html#profile` / `#friends`
-- `/admin.html` Admin Dashboard (role-gated)
-- `/reset-password.html` `/verify-email.html`
+- `/app` User Dashboard
+- `/play` เกม
+- `/login` `/register` · account/friends → `/app#profile` / `#friends`
+- `/admin` Admin Dashboard (role-gated)
 
 API หลัก:
 
@@ -83,8 +82,6 @@ API หลัก:
 | POST | `/api/v1/auth/guest` | Guest session |
 | GET | `/api/v1/auth/me` | Session ปัจจุบัน |
 | POST | `/api/v1/auth/logout` | Logout |
-| POST | `/api/v1/auth/register` | สมัคร / อัปเกรด Guest ด้วย Email |
-| POST | `/api/v1/auth/login` | Email login (ต้องยืนยันอีเมลแล้ว) |
 | GET | `/api/v1/auth/google` | Google OAuth |
 | GET | `/api/v1/auth/discord` | Discord OAuth |
 | GET | `/api/v1/games/catalog` | คลังเกม |
@@ -92,7 +89,7 @@ API หลัก:
 | GET | `/api/v1/announcements/active` | ประกาศที่ publish แล้ว |
 | GET/PATCH… | `/api/v1/admin/*` | Admin Dashboard APIs (role + permission) |
 
-Guest Upgrade รักษา User ID เดิม และ rotate session หลังอัปเกรด
+Guest Upgrade ด้วย Google/Discord รักษา User ID เดิม และ rotate session หลังอัปเกรด
 
 ### Render
 

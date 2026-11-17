@@ -122,6 +122,30 @@ async function persistFinishedGame(room, scoreOf) {
       }).catch(() => {});
     }
 
+    // Activity: only when a match reached winTarget (over.reset).
+    if (room.over && room.over.reset) {
+      try {
+        const { logActivity } = require("../system/activity-log");
+        for (const r of ranked) {
+          if (!r.userId) continue;
+          logActivity({
+            userId: r.userId,
+            action: "match_end",
+            metadata: {
+              gameId: game.id,
+              code: room.code,
+              mode: room.cat === "wheel" ? "wheel" : "secret",
+              won: winners.has(r.token),
+              points: r.points,
+              winTarget: room.winTarget
+            }
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     return game;
   } catch (err) {
     console.error("[persistFinishedGame]", err.message || err);

@@ -57,6 +57,7 @@ model User {
   gamePlayers         GamePlayer[]
   playerStatistics    PlayerStatistics?
   notifications       Notification[]
+  activityLogs        UserActivityLog[]
 
   @@map("users")
 }
@@ -345,4 +346,21 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+/// Sparse user action log (login, room create/join, ban, match end).
+model UserActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String   @db.VarChar(64)
+  metadata  Json?
+  ipAddress String?  @map("ip_address") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("user_activity_logs")
 }

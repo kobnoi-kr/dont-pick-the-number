@@ -112,7 +112,16 @@ async function main() {
     game_catalog: {
       secret: { enabled: true, name: "Secret Number" },
       wheel: { enabled: true, name: "Number Wheel" }
-    }
+    },
+    guest_cleanup_enabled: true,
+    guest_idle_days: 7,
+    guest_session_days: 7,
+    session_cleanup_enabled: true,
+    cleanup_interval_minutes: 60,
+    guest_create_per_ip_hour: 40,
+    activity_log_enabled: true,
+    activity_log_retention_days: 30,
+    db_size_limit_mb: 1024
   };
   for (const [key, value] of Object.entries(defaults)) {
     await prisma.systemSetting.upsert({

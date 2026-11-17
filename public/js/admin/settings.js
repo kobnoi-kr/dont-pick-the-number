@@ -66,6 +66,65 @@ export async function renderSettings(root, { user }) {
         ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveMax" style="margin-top:10px">บันทึก</button>` : ""}
         <p class="tiny" id="sMsgMax"></p>
       </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Guest &amp; Session Cleanup</h2>
+        <p class="muted" style="margin-top:0">ลบ session หมดอายุ และ guest ที่ไม่ได้ใช้งาน เพื่อไม่ให้ฐานข้อมูลพอง</p>
+        <div class="row-between" style="gap:12px;flex-wrap:wrap;margin-top:8px">
+          <label class="tiny" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="sGuestClean" ${s.guest_cleanup_enabled === false || s.guest_cleanup_enabled === "false" ? "" : "checked"} ${canManage ? "" : "disabled"}/>
+            ลบ guest ค้างอัตโนมัติ
+          </label>
+          <label class="tiny" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="sSessClean" ${s.session_cleanup_enabled === false || s.session_cleanup_enabled === "false" ? "" : "checked"} ${canManage ? "" : "disabled"}/>
+            ลบ session หมดอายุอัตโนมัติ
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px">
+          <label class="tiny">Guest idle (วัน)
+            <input class="input" id="sGuestIdle" type="number" min="1" max="365" value="${Number(s.guest_idle_days) || 7}" ${canManage ? "" : "disabled"}/>
+          </label>
+          <label class="tiny">อายุ session guest (วัน)
+            <input class="input" id="sGuestSess" type="number" min="1" max="90" value="${Number(s.guest_session_days) || 7}" ${canManage ? "" : "disabled"}/>
+          </label>
+          <label class="tiny">รอบ cleanup (นาที)
+            <input class="input" id="sCleanEvery" type="number" min="5" max="1440" value="${Number(s.cleanup_interval_minutes) || 60}" ${canManage ? "" : "disabled"}/>
+          </label>
+          <label class="tiny">จำกัดสร้าง guest / IP / ชม. (0=ไม่จำกัด)
+            <input class="input" id="sGuestRate" type="number" min="0" max="1000" value="${Number.isFinite(Number(s.guest_create_per_ip_hour)) ? Number(s.guest_create_per_ip_hour) : 40}" ${canManage ? "" : "disabled"}/>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveClean">บันทึก Cleanup</button>` : ""}
+          ${canManage ? `<button type="button" class="btn sm" id="sRunClean">รัน Cleanup ตอนนี้</button>` : ""}
+        </div>
+        <p class="tiny" id="sMsgClean" style="margin-top:8px"></p>
+        <p class="tiny" id="sCleanStats" style="margin-top:4px;color:var(--nv-muted)"></p>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>User Activity Log</h2>
+        <p class="muted" style="margin-top:0">บันทึกเฉพาะ login, สร้าง/เข้าห้อง, ban, จบแมตช์ — แล้วลบของเก่าตามจำนวนวัน</p>
+        <label class="tiny" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input type="checkbox" id="sActLog" ${s.activity_log_enabled === false || s.activity_log_enabled === "false" ? "" : "checked"} ${canManage ? "" : "disabled"}/>
+          เปิดบันทึก activity
+        </label>
+        <label class="tiny" style="display:block;margin-top:10px">เก็บ log กี่วัน
+          <input class="input" id="sActDays" type="number" min="1" max="365" value="${Number.isFinite(Number(s.activity_log_retention_days)) ? Number(s.activity_log_retention_days) : 30}" ${canManage ? "" : "disabled"}/>
+        </label>
+        ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveAct" style="margin-top:10px">บันทึก Activity Log</button>` : ""}
+        <p class="tiny" id="sMsgAct" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Database meter</h2>
+        <p class="muted" style="margin-top:0">ขีดจำกัดสำหรับหลอดใน Overview (ค่าเริ่มต้น 1024 MB = Render free Postgres)</p>
+        <label class="tiny" style="display:block;margin-top:10px">ขีดจำกัด DB (MB)
+          <input class="input" id="sDbLimit" type="number" min="64" max="1048576" value="${Number.isFinite(Number(s.db_size_limit_mb)) ? Number(s.db_size_limit_mb) : 1024}" ${canManage ? "" : "disabled"}/>
+        </label>
+        ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveDb" style="margin-top:10px">บันทึกขีดจำกัด DB</button>` : ""}
+        <p class="tiny" id="sMsgDb" style="margin-top:8px"></p>
+      </div>
     `;
 
     async function patchSettings(settings, msgEl) {
@@ -135,6 +194,89 @@ export async function renderSettings(root, { user }) {
           root.querySelector("#sMsgMax")
         );
         root.querySelector("#sMsgMax").textContent = r.res.ok ? "บันทึกแล้ว" : "บันทึกไม่สำเร็จ";
+      };
+    }
+
+    async function refreshCleanStats() {
+      const el = root.querySelector("#sCleanStats");
+      if (!el) return;
+      const r = await api("/api/v1/admin/system/cleanup", { method: "GET" });
+      if (!r.res.ok) {
+        el.textContent = "";
+        return;
+      }
+      const last = r.data.lastRun;
+      const lastText = last && last.at
+        ? `รันล่าสุด ${new Date(last.at).toLocaleString("th-TH")} · ลบ session ${last.sessionsDeleted || 0} · guest ${last.guestsDeleted || 0}`
+        : "ยังไม่เคยรัน cleanup";
+      el.textContent =
+        `Guest ${r.data.guestTotal || 0} · ค้างรอลบ ${r.data.staleGuests || 0} · session หมดอายุ ${r.data.expiredSessions || 0}` +
+        ` · activity ${r.data.activityTotal || 0} (หมดอายุ ${r.data.activityExpired || 0}) · ${lastText}`;
+    }
+    refreshCleanStats();
+
+    const saveClean = root.querySelector("#sSaveClean");
+    if (saveClean) {
+      saveClean.onclick = async () => {
+        const r = await patchSettings(
+          {
+            guest_cleanup_enabled: !!root.querySelector("#sGuestClean").checked,
+            session_cleanup_enabled: !!root.querySelector("#sSessClean").checked,
+            guest_idle_days: Number(root.querySelector("#sGuestIdle").value) || 7,
+            guest_session_days: Number(root.querySelector("#sGuestSess").value) || 7,
+            cleanup_interval_minutes: Number(root.querySelector("#sCleanEvery").value) || 60,
+            guest_create_per_ip_hour: Number(root.querySelector("#sGuestRate").value) || 0
+          },
+          root.querySelector("#sMsgClean")
+        );
+        root.querySelector("#sMsgClean").textContent = r.res.ok ? "บันทึก Cleanup แล้ว" : "บันทึกไม่สำเร็จ";
+        if (r.res.ok) refreshCleanStats();
+      };
+    }
+
+    const saveAct = root.querySelector("#sSaveAct");
+    if (saveAct) {
+      saveAct.onclick = async () => {
+        const r = await patchSettings(
+          {
+            activity_log_enabled: !!root.querySelector("#sActLog").checked,
+            activity_log_retention_days: Number(root.querySelector("#sActDays").value) || 30
+          },
+          root.querySelector("#sMsgAct")
+        );
+        root.querySelector("#sMsgAct").textContent = r.res.ok ? "บันทึก Activity Log แล้ว" : "บันทึกไม่สำเร็จ";
+        if (r.res.ok) refreshCleanStats();
+      };
+    }
+
+    const saveDb = root.querySelector("#sSaveDb");
+    if (saveDb) {
+      saveDb.onclick = async () => {
+        const r = await patchSettings(
+          { db_size_limit_mb: Number(root.querySelector("#sDbLimit").value) || 1024 },
+          root.querySelector("#sMsgDb")
+        );
+        root.querySelector("#sMsgDb").textContent = r.res.ok ? "บันทึกขีดจำกัด DB แล้ว" : "บันทึกไม่สำเร็จ";
+      };
+    }
+
+    const runClean = root.querySelector("#sRunClean");
+    if (runClean) {
+      runClean.onclick = async () => {
+        if (!confirm("รัน cleanup ตอนนี้? จะลบ session หมดอายุและ guest ที่ค้างตามค่าที่ตั้งไว้")) return;
+        runClean.disabled = true;
+        root.querySelector("#sMsgClean").textContent = "กำลัง cleanup…";
+        const r = await api("/api/v1/admin/system/cleanup", { method: "POST", body: "{}" });
+        runClean.disabled = false;
+        if (!r.res.ok) {
+          root.querySelector("#sMsgClean").textContent = r.data && r.data.skipped
+            ? "กำลังรันอยู่แล้ว ลองใหม่ภายหลัง"
+            : "cleanup ไม่สำเร็จ";
+          return;
+        }
+        root.querySelector("#sMsgClean").textContent =
+          `เสร็จแล้ว · session ${r.data.sessionsDeleted || 0} · guest ${r.data.guestsDeleted || 0} · activity ${r.data.activityDeleted || 0}`;
+        refreshCleanStats();
       };
     }
   }

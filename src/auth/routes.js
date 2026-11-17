@@ -29,17 +29,9 @@ const {
   fetchDiscordUser
 } = require("./oauth-discord");
 const { resolveProviderLogin, unlinkProvider } = require("./upgrade");
-const {
-  registerWithEmail,
-  loginWithEmail,
-  verifyEmailToken,
-  resendVerification,
-  requestPasswordReset,
-  resetPassword,
-  linkEmailToUser
-} = require("./email-auth");
 const { ensureFriendCode, handleFriendsApi } = require("./friends");
 const { maybeGrantAdminFromOAuth } = require("./admin-bootstrap");
+const { logActivity } = require("../system/activity-log");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -78,15 +70,35 @@ async function handleGuest(req, res) {
     clearSessionCookie(res);
   }
 
+  const {
+    loadCleanupSettings,
+    allowGuestCreate,
+    getGuestSessionTtlSec
+  } = require("../system/cleanup");
+  const cleanupSettings = await loadCleanupSettings(prisma);
+  const ip = clientIp(req);
+  if (!allowGuestCreate(ip, cleanupSettings.guestCreatePerIpHour)) {
+    sendJson(res, 429, { error: "guest_rate_limited" });
+    return true;
+  }
+
   const user = await createGuestUser(prisma, {
-    ip: clientIp(req),
+    ip,
     userAgent: String(req.headers["user-agent"] || "").slice(0, 512)
   });
-  const { session, token, ttlSec } = await createSession(prisma, user, {
+  const ttlSec = await getGuestSessionTtlSec(prisma);
+  const { session, token } = await createSession(prisma, user, {
+    ttlSec,
     userAgent: String(req.headers["user-agent"] || "").slice(0, 512) || null,
-    ipAddress: clientIp(req) || null
+    ipAddress: ip || null
   });
   setSessionCookie(res, token, ttlSec);
+  logActivity({
+    userId: user.id,
+    action: "login",
+    ipAddress: ip,
+    metadata: { method: "guest", accountType: "guest" }
+  });
   sendJson(res, 201, Object.assign({ reused: false }, sessionResponse(session, user)));
   return true;
 }
@@ -297,6 +309,16 @@ async function finishOAuth(req, res, provider) {
         include: { userRoles: { include: { role: true } } }
       });
       await rotateAndIssueSession(prisma, req, res, fresh || result.user);
+      logActivity({
+        userId: (fresh || result.user).id,
+        action: "login",
+        ipAddress: clientIp(req),
+        metadata: {
+          method: provider,
+          linked: !!result.linked,
+          accountType: (fresh || result.user).accountType
+        }
+      });
       if (result.linked) {
         redirect(res, "/account?linked=" + provider);
         return true;
@@ -315,165 +337,6 @@ async function finishOAuth(req, res, provider) {
   } catch (err) {
     console.error("[oauth:" + provider + "]", err);
     redirect(res, loginErrorRedirect(err.code || "oauth_failed"));
-  }
-  return true;
-}
-
-async function handleRegister(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  const rl = rateLimit("reg:" + clientIp(req), 10, 15 * 60 * 1000);
-  if (!rl.ok) return tooMany(res, rl.retryAfterSec), true;
-
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    const auth = await resolveAuth(req);
-    const guestUserId =
-      auth.user && auth.user.accountType === "guest" ? auth.user.id : null;
-    const result = await registerWithEmail(prisma, req, {
-      email: body.email,
-      password: body.password,
-      guestUserId
-    });
-    // Keep guest/registered session; email not verified yet so don't force login
-    if (guestUserId) {
-      await rotateAndIssueSession(prisma, req, res, result.user);
-    }
-    sendJson(res, 201, {
-      ok: true,
-      user: publicUser(result.user),
-      upgraded: !!result.upgraded,
-      verificationRequired: true,
-      previewLink: process.env.NODE_ENV === "production" ? undefined : result.previewLink
-    });
-  } catch (err) {
-    const status =
-      err.code === "email_taken" ? 409 :
-      err.code === "weak_password" || err.code === "invalid_input" ? 400 : 400;
-    sendJson(res, status, { error: err.code || "register_failed", issues: err.issues });
-  }
-  return true;
-}
-
-async function handleLogin(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  const rl = rateLimit("login:" + clientIp(req), 20, 15 * 60 * 1000);
-  if (!rl.ok) return tooMany(res, rl.retryAfterSec), true;
-
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    const user = await loginWithEmail(prisma, {
-      email: body.email,
-      password: body.password
-    });
-    const payload = await rotateAndIssueSession(prisma, req, res, user);
-    sendJson(res, 200, payload);
-  } catch (err) {
-    const status =
-      err.code === "email_unverified" ? 403 :
-      err.code === "account_blocked" ? 403 : 401;
-    sendJson(res, status, { error: err.code || "invalid_credentials" });
-  }
-  return true;
-}
-
-async function handleVerifyEmail(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    const user = await verifyEmailToken(prisma, body.token);
-    const payload = await rotateAndIssueSession(prisma, req, res, user);
-    sendJson(res, 200, Object.assign({ verified: true }, payload));
-  } catch (err) {
-    sendJson(res, 400, { error: err.code || "invalid_token" });
-  }
-  return true;
-}
-
-async function handleResendVerification(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  const rl = rateLimit("resend:" + clientIp(req), 5, 15 * 60 * 1000);
-  if (!rl.ok) return tooMany(res, rl.retryAfterSec), true;
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    await resendVerification(prisma, req, body.email);
-    sendJson(res, 200, { ok: true });
-  } catch (err) {
-    sendJson(res, 400, { error: err.code || "resend_failed" });
-  }
-  return true;
-}
-
-async function handleForgotPassword(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  const rl = rateLimit("forgot:" + clientIp(req), 5, 15 * 60 * 1000);
-  if (!rl.ok) return tooMany(res, rl.retryAfterSec), true;
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    const result = await requestPasswordReset(prisma, req, body.email);
-    sendJson(res, 200, result);
-  } catch (err) {
-    sendJson(res, 200, { ok: true });
-  }
-  return true;
-}
-
-async function handleResetPassword(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  if (!authEnabled()) {
-    sendJson(res, 503, { error: "auth_disabled" });
-    return true;
-  }
-  try {
-    const body = await readJsonBody(req);
-    const prisma = await getPrisma();
-    await resetPassword(prisma, { token: body.token, password: body.password });
-    clearSessionCookie(res);
-    sendJson(res, 200, { ok: true });
-  } catch (err) {
-    sendJson(res, 400, { error: err.code || "reset_failed", issues: err.issues });
   }
   return true;
 }
@@ -551,27 +414,6 @@ async function handleAccountProviders(req, res) {
   return true;
 }
 
-async function handleLinkEmail(req, res) {
-  if (method(req) !== "POST") {
-    sendJson(res, 405, { error: "method_not_allowed" });
-    return true;
-  }
-  const auth = await requireAuth(req, res);
-  if (!auth) return true;
-  try {
-    const body = await readJsonBody(req);
-    const result = await linkEmailToUser(auth.prisma, req, auth.user.id, {
-      email: body.email,
-      password: body.password
-    });
-    const payload = await rotateAndIssueSession(auth.prisma, req, res, result.user);
-    sendJson(res, 200, Object.assign({ verificationRequired: true }, payload));
-  } catch (err) {
-    sendJson(res, 400, { error: err.code || "link_failed", issues: err.issues });
-  }
-  return true;
-}
-
 async function handleUnlink(req, res, provider) {
   if (method(req) !== "DELETE") {
     sendJson(res, 405, { error: "method_not_allowed" });
@@ -579,7 +421,7 @@ async function handleUnlink(req, res, provider) {
   }
   const auth = await requireAuth(req, res);
   if (!auth) return true;
-  if (!["google", "discord", "email"].includes(provider)) {
+  if (!["google", "discord"].includes(provider)) {
     sendJson(res, 400, { error: "invalid_provider" });
     return true;
   }
@@ -692,23 +534,15 @@ async function handleAuthApi(req, res, pathname) {
     if (pathname === "/api/v1/auth/discord/callback") return await finishOAuth(req, res, "discord");
     if (pathname === "/api/v1/auth/link/discord") return await startOAuth(req, res, "discord", "link");
 
-    if (pathname === "/api/v1/auth/register") return await handleRegister(req, res);
-    if (pathname === "/api/v1/auth/login") return await handleLogin(req, res);
-    if (pathname === "/api/v1/auth/verify-email") return await handleVerifyEmail(req, res);
-    if (pathname === "/api/v1/auth/resend-verification") return await handleResendVerification(req, res);
-    if (pathname === "/api/v1/auth/forgot-password") return await handleForgotPassword(req, res);
-    if (pathname === "/api/v1/auth/reset-password") return await handleResetPassword(req, res);
-
     if (pathname === "/api/v1/account/profile") return await handleAccountProfile(req, res);
     if (pathname === "/api/v1/account/providers") return await handleAccountProviders(req, res);
-    if (pathname === "/api/v1/account/link/email") return await handleLinkEmail(req, res);
     if (pathname === "/api/v1/account/sessions") return await handleAccountSessions(req, res);
     if (pathname === "/api/v1/account/delete") return await handleDeleteAccount(req, res);
 
     const friendsHandled = await handleFriendsApi(req, res, pathname);
     if (friendsHandled) return true;
 
-    const unlink = pathname.match(/^\/api\/v1\/account\/unlink\/(google|discord|email)$/);
+    const unlink = pathname.match(/^\/api\/v1\/account\/unlink\/(google|discord)$/);
     if (unlink) return await handleUnlink(req, res, unlink[1]);
     const delSession = pathname.match(/^\/api\/v1\/account\/sessions\/([0-9a-f-]{36})$/i);
     if (delSession) return await handleDeleteSession(req, res, delSession[1]);

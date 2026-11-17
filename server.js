@@ -23,6 +23,7 @@ const { handleAdminApi } = require("./src/admin/routes");
 const { attachGameApi } = require("./src/dashboard/bridge");
 const { persistFinishedGame } = require("./src/dashboard/persist");
 const { publishDueAnnouncements } = require("./src/admin/publish-announcement");
+const { startCleanupScheduler } = require("./src/system/cleanup");
 const {
   getMaxRoomsDisplay,
   getMaintenanceState,
@@ -1493,6 +1494,21 @@ async function onCreate(ws, msg) {
   applyRoomSetup(room, msg.setup);
   rooms.set(code, room);
   attach(ws, room, player);
+  try {
+    const { logActivity } = require("./src/system/activity-log");
+    logActivity({
+      userId: player.id,
+      action: "room_create",
+      metadata: {
+        code: room.code,
+        visibility: room.visibility,
+        cat: room.cat,
+        title: room.title || ""
+      }
+    });
+  } catch {
+    /* ignore */
+  }
 }
 function detachSpectator(ws) {
   for (const room of rooms.values()) {
@@ -1561,6 +1577,21 @@ async function onJoin(ws, msg) {
     room.rot = 0;
   }
   attach(ws, room, player);
+  try {
+    const { logActivity } = require("./src/system/activity-log");
+    logActivity({
+      userId: player.id,
+      action: "room_join",
+      metadata: {
+        code: room.code,
+        visibility: room.visibility,
+        cat: room.cat,
+        playerCount: room.players.length
+      }
+    });
+  } catch {
+    /* ignore */
+  }
 }
 async function onHello(ws, msg) {
   const token = validToken(msg.token) ? msg.token : "";
@@ -2341,6 +2372,10 @@ setInterval(() => {
     .then((prisma) => publishDueAnnouncements(prisma))
     .catch(() => {});
 }, 15000);
+
+/** Guest + expired session cleanup (interval from admin settings). */
+startCleanupScheduler();
+
 server.listen(PORT, HOST, () => {
   console.log("Public game: http://localhost:" + PORT + " (/play)");
   console.log("Bind public: " + HOST + ":" + PORT + (HOST === "0.0.0.0" ? " (เครือข่าย)" : " (local)"));

@@ -78,7 +78,8 @@ async function handleAdminApi(req, res, pathname) {
       return true;
     }
     const today = startOfDay();
-    const [usersTotal, usersActive, sessionsActive, gamesToday, recentLogs] = await Promise.all([
+    const { getDbStats } = require("../system/db-stats");
+    const [usersTotal, usersActive, sessionsActive, gamesToday, recentLogs, db] = await Promise.all([
       prisma.user.count({ where: { status: { not: "deleted" } } }),
       prisma.user.count({ where: { status: "active" } }),
       prisma.session.count({
@@ -89,7 +90,8 @@ async function handleAdminApi(req, res, pathname) {
         take: 10,
         orderBy: { createdAt: "desc" },
         include: { admin: { select: { id: true, displayName: true, username: true } } }
-      })
+      }),
+      getDbStats(prisma)
     ]);
     const stats = game && game.adminStats ? game.adminStats() : { rooms: 0, players: 0, spectators: 0 };
     const liveRooms = game && game.listAllRooms ? game.listAllRooms().slice(0, 8) : [];
@@ -102,6 +104,7 @@ async function handleAdminApi(req, res, pathname) {
         liveRooms: stats.rooms,
         livePlayers: stats.players
       },
+      db,
       liveRooms,
       recentLogs
     });
@@ -371,6 +374,17 @@ async function handleAdminApi(req, res, pathname) {
           } catch {
             /* ignore */
           }
+        }
+        try {
+          const { logActivity } = require("../system/activity-log");
+          logActivity({
+            userId,
+            action: "ban",
+            ipAddress: ip,
+            metadata: { status: nextStatus, byAdminId: auth.user.id }
+          });
+        } catch {
+          /* ignore */
         }
       } else if (nextStatus === "active") {
         // Clear client-side sticky ban overlay if they reconnect.
@@ -769,6 +783,8 @@ async function handleAdminApi(req, res, pathname) {
     }
     const mem = process.memoryUsage();
     const stats = game && game.adminStats ? game.adminStats() : {};
+    const { getDbStats } = require("../system/db-stats");
+    const db = await getDbStats(prisma);
     sendJson(res, 200, {
       uptimeSec: Math.floor(process.uptime()),
       node: process.version,
@@ -777,7 +793,8 @@ async function handleAdminApi(req, res, pathname) {
         heapUsed: mem.heapUsed,
         heapTotal: mem.heapTotal
       },
-      rooms: stats
+      rooms: stats,
+      db
     });
     return true;
   }
@@ -811,6 +828,36 @@ async function handleAdminApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/admin/system/cleanup") {
+    const { cleanupStats, runCleanup } = require("../system/cleanup");
+    if (method(req) === "GET") {
+      const auth = await requirePermission(req, res, "settings.view");
+      if (!auth) return true;
+      const stats = await cleanupStats(prisma);
+      sendJson(res, 200, stats);
+      return true;
+    }
+    if (method(req) === "POST") {
+      const auth = await requirePermission(req, res, "settings.manage");
+      if (!auth) return true;
+      const result = await runCleanup(prisma, { force: true });
+      await writeAdminLog(prisma, {
+        adminId: auth.user.id,
+        action: "system.cleanup",
+        metadata: {
+          sessionsDeleted: result.sessionsDeleted || 0,
+          guestsDeleted: result.guestsDeleted || 0,
+          skipped: !!result.skipped
+        },
+        ipAddress: ip
+      });
+      sendJson(res, 200, result);
+      return true;
+    }
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
   // —— Settings ——
   if (pathname === "/api/v1/admin/settings") {
     if (method(req) === "GET") {
@@ -835,7 +882,16 @@ async function handleAdminApi(req, res, pathname) {
         "maintenance_enabled",
         "maintenance_message",
         "max_rooms_display",
-        "game_catalog"
+        "game_catalog",
+        "guest_cleanup_enabled",
+        "guest_idle_days",
+        "guest_session_days",
+        "session_cleanup_enabled",
+        "cleanup_interval_minutes",
+        "guest_create_per_ip_hour",
+        "activity_log_enabled",
+        "activity_log_retention_days",
+        "db_size_limit_mb"
       ];
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(body.settings, key)) {
@@ -845,10 +901,37 @@ async function handleAdminApi(req, res, pathname) {
           if (key === "max_rooms_display") {
             value = Math.min(200, Math.max(1, Number(value) || 50));
           }
+          if (
+            key === "guest_cleanup_enabled" ||
+            key === "session_cleanup_enabled" ||
+            key === "activity_log_enabled"
+          ) {
+            value = !!value;
+          }
+          if (key === "guest_idle_days") value = Math.min(365, Math.max(1, Number(value) || 7));
+          if (key === "guest_session_days") value = Math.min(90, Math.max(1, Number(value) || 7));
+          if (key === "cleanup_interval_minutes") {
+            value = Math.min(24 * 60, Math.max(5, Number(value) || 60));
+          }
+          if (key === "guest_create_per_ip_hour") {
+            value = Math.min(1000, Math.max(0, Number(value) || 0));
+          }
+          if (key === "activity_log_retention_days") {
+            value = Math.min(365, Math.max(1, Number(value) || 30));
+          }
+          if (key === "db_size_limit_mb") {
+            value = Math.min(1024 * 1024, Math.max(64, Number(value) || 1024));
+          }
           await setSetting(prisma, key, value);
         }
       }
       invalidatePublicSettingsCache();
+      try {
+        const { invalidateActivityLogCache } = require("../system/activity-log");
+        invalidateActivityLogCache();
+      } catch {
+        /* ignore */
+      }
       // Force refresh so open/close server takes effect immediately
       let afterOn = beforeOn;
       try {

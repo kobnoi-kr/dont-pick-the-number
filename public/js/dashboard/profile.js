@@ -49,7 +49,9 @@ export async function renderProfile(root, { user, onSaved }) {
   };
   const pref = s.preferences || {};
   const providersRes = await api("/api/v1/account/providers", { method: "GET" });
-  const providers = (providersRes.data && providersRes.data.providers) || [];
+  const providers = ((providersRes.data && providersRes.data.providers) || []).filter(
+    (p) => p && (p.provider === "google" || p.provider === "discord")
+  );
   const linked = new Set(providers.map((p) => p.provider));
   const sessRes = await api("/api/v1/account/sessions", { method: "GET" });
   const sessions = (sessRes.data && sessRes.data.sessions) || [];
