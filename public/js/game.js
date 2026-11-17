@@ -2642,11 +2642,27 @@ async function bootOnline(){
   if($("transferHostModal")) $("transferHostModal").addEventListener("click",e=>{
     if(e.target===$("transferHostModal")) $("transferHostModal").classList.add("hidden");
   });
+  function openDeleteRoomModal(){
+    const modal=$("deleteRoomModal");
+    if(modal) modal.classList.remove("hidden");
+  }
+  function closeDeleteRoomModal(){
+    const modal=$("deleteRoomModal");
+    if(modal) modal.classList.add("hidden");
+  }
   if($("deleteRoomBtn")) $("deleteRoomBtn").onclick=()=>{
     if(!isHost()||netPhase!=="lobby") return;
-    if(!confirm("ลบห้องนี้? ผู้เล่นทุกคนจะถูกเตะออก")) return;
+    openDeleteRoomModal();
+  };
+  if($("deleteRoomCancel")) $("deleteRoomCancel").onclick=()=>closeDeleteRoomModal();
+  if($("deleteRoomConfirm")) $("deleteRoomConfirm").onclick=()=>{
+    if(!isHost()||netPhase!=="lobby"){ closeDeleteRoomModal(); return; }
+    closeDeleteRoomModal();
     send({t:"deleteRoom"});
   };
+  if($("deleteRoomModal")) $("deleteRoomModal").addEventListener("click",e=>{
+    if(e.target===$("deleteRoomModal")) closeDeleteRoomModal();
+  });
   $("again").onclick=()=>{ if(isHost()) send({t:"again"}); };
   ["leave","back","wheelLeave","pickLeave"].forEach(id=>{ $(id).onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };

@@ -14,11 +14,24 @@ const state = {
   favoriteMode: null
 };
 
+function setCreateCat(cat) {
+  const next = cat === "wheel" ? "wheel" : "secret";
+  state.pendingCat = next;
+  const hidden = document.getElementById("crCat");
+  if (hidden) hidden.value = next;
+  const wrap = document.getElementById("crCatToggle");
+  if (wrap) {
+    wrap.querySelectorAll("[data-cat]").forEach((b) => {
+      b.classList.toggle("on", b.getAttribute("data-cat") === next);
+    });
+  }
+}
+
 function openCreateModal(opts = {}) {
   document.getElementById("createModal").classList.remove("hidden");
   document.getElementById("crMsg").textContent = "";
-  if (opts.cat) state.pendingCat = opts.cat === "wheel" ? "wheel" : "secret";
-  else state.pendingCat = localStorage.getItem("nv-last-game") || "secret";
+  const cat = opts.cat || localStorage.getItem("nv-last-game") || "secret";
+  setCreateCat(cat);
 }
 function closeCreateModal() {
   document.getElementById("createModal").classList.add("hidden");
@@ -36,13 +49,23 @@ function wireVisToggle() {
   });
 }
 
+function wireCatToggle() {
+  const wrap = document.getElementById("crCatToggle");
+  if (!wrap) return;
+  wrap.querySelectorAll("[data-cat]").forEach((btn) => {
+    btn.onclick = () => setCreateCat(btn.getAttribute("data-cat"));
+  });
+}
+
 async function createRoomFromModal() {
   const msg = document.getElementById("crMsg");
   const name =
     (document.getElementById("crName").value || "").trim() ||
     (state.user && (state.user.displayName || state.user.username)) ||
     "Player";
-  const cat = state.pendingCat === "wheel" ? "wheel" : "secret";
+  const catEl = document.getElementById("crCat");
+  const cat = (catEl && catEl.value === "wheel") || state.pendingCat === "wheel" ? "wheel" : "secret";
+  state.pendingCat = cat;
   localStorage.setItem("nv-last-game", cat);
   const body = {
     visibility: document.getElementById("crVis").value || "public",
@@ -99,6 +122,7 @@ const shell = wireShell({
 });
 
 wireVisToggle();
+wireCatToggle();
 document.getElementById("crCancel").onclick = closeCreateModal;
 document.getElementById("crSubmit").onclick = createRoomFromModal;
 document.getElementById("createModal").addEventListener("click", (e) => {

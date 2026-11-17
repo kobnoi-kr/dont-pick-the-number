@@ -79,8 +79,21 @@
 <div id="createModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-card">
     <h3>สร้างห้อง</h3>
-    <p class="muted">ใส่ชื่อห้อง แล้วเข้าล็อบบี้ตั้งค่าเกมต่อ</p>
+    <p class="muted">เลือกเกม ตั้งชื่อห้อง แล้วเข้าล็อบบี้</p>
     <div class="form-grid">
+      <label>เกม
+        <div class="vis-toggle game-pick-toggle" id="crCatToggle" role="group" aria-label="เลือกเกม">
+          <button type="button" class="vis-opt on" data-cat="secret">
+            <span class="cr-game-ico" aria-hidden="true">🔢</span>
+            <span>หาเลข</span>
+          </button>
+          <button type="button" class="vis-opt" data-cat="wheel">
+            <span class="cr-game-ico" aria-hidden="true">🎡</span>
+            <span>วงล้อ</span>
+          </button>
+        </div>
+        <input type="hidden" id="crCat" value="secret">
+      </label>
       <label>ชื่อห้อง<input id="crName" maxlength="32" placeholder="ห้องของฉัน"></label>
       <label>การมองเห็น
         <div class="vis-toggle" id="crVisToggle" role="group" aria-label="การมองเห็น">

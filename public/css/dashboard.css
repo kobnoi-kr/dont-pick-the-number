@@ -787,6 +787,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: rgba(37, 99, 235, 0.35);
   border-color: rgba(96, 165, 250, 0.7);
 }
+.game-pick-toggle .vis-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 72px;
+  justify-content: center;
+}
+.cr-game-ico { font-size: 1.35rem; line-height: 1; }
 
 .lib-section { margin-bottom: 22px; }
 .lib-section-head { margin-bottom: 10px; }
