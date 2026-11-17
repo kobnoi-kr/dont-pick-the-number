@@ -132,7 +132,7 @@ export async function renderDecorate(root, { user } = {}) {
 
   let owned = [];
   let equipped = {};
-  let busy = false;
+  let equipSeq = 0;
 
   function paint() {
     const eqBox = root.querySelector("#decEquipped");
@@ -175,9 +175,7 @@ export async function renderDecorate(root, { user } = {}) {
               : item.source === "starter"
                 ? "เริ่มต้น"
                 : item.source || "";
-        return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}"${
-          busy ? " disabled" : ""
-        }>
+        return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}">
           <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
           <b>${esc(item.name)}</b>
@@ -189,28 +187,24 @@ export async function renderDecorate(root, { user } = {}) {
 
     ownBox.querySelectorAll("[data-id]").forEach((btn) => {
       btn.onclick = async () => {
-        if (busy) return;
         const id = btn.getAttribute("data-id");
         const item = owned.find((x) => x.id === id);
         if (!item) return;
+        if (equipped[item.kind] && equipped[item.kind].id === item.id) return;
 
-        const prev = {
-          title: equipped.title || null,
-          frame: equipped.frame || null,
-          effect: equipped.effect || null
-        };
-        // Optimistic: update equipped + preview immediately.
+        // Allow rapid clicks: UI updates immediately, latest request wins.
+        equipSeq += 1;
+        const seq = equipSeq;
         equipped = Object.assign({}, equipped, { [item.kind]: item });
         if (user) user.equipped = equipped;
-        busy = true;
         paint();
-        setMsg("กำลังสวมใส่…", true);
+        setMsg("สวมใส่แล้ว", true);
 
         const r = await api("/api/v1/cosmetics/equip", {
           method: "POST",
           body: JSON.stringify({ cosmeticId: id })
         });
-        busy = false;
+        if (seq !== equipSeq) return;
         if (r.res.ok && r.data) {
           owned = Array.isArray(r.data.owned) ? r.data.owned : owned;
           equipped = r.data.equipped || equipped;
@@ -219,10 +213,8 @@ export async function renderDecorate(root, { user } = {}) {
           paint();
           return;
         }
-        equipped = prev;
-        if (user) user.equipped = equipped;
         setMsg((r.data && r.data.error) || "ไม่สำเร็จ", false);
-        paint();
+        await load();
       };
     });
   }
