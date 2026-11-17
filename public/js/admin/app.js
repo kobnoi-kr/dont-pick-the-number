@@ -153,7 +153,7 @@ async function boot() {
     me.res.ok &&
     (roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator"));
   if (!ok) {
-    location.href = "/app.html";
+    location.href = "/login.html?next=/admin.html";
     return;
   }
   // Prefer permissions from admin/me if available
@@ -171,5 +171,5 @@ async function boot() {
 }
 
 boot().catch(() => {
-  location.href = "/app.html";
+  location.href = "/login.html?next=/admin.html";
 });

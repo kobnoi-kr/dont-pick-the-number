@@ -38,6 +38,10 @@
   function $(id){ return document.getElementById(id); }
   const msg=$("msg");
   const err=qs("error");
+  const next=qs("next");
+  if(next==="/admin.html" || (next&&next.indexOf("/admin")===0)){
+    setMsg(msg, "ล็อกอินด้วยบัญชีแอดมิน (Google/Discord) แล้วจะเข้าหน้า Admin ได้", true);
+  }
   if(err){
     const map={
       provider_already_linked:"บัญชี Google/Discord นี้ถูกผูกกับบัญชีอื่นแล้ว — กดโลโก้อีกครั้งเพื่อเข้าบัญชีนั้น หรือเล่น Guest ใหม่แล้วลองใหม่",
@@ -49,12 +53,48 @@
     setMsg(msg, map[err]||("เข้าสู่ระบบไม่สำเร็จ: "+err), false);
   }
 
+  // After OAuth, bounce back to admin if requested
+  try{
+    const me=await fetch("/api/v1/auth/me",{credentials:"same-origin",headers:{Accept:"application/json"}});
+    if(me.ok){
+      const data=await me.json();
+      const roles=(data.user&&data.user.roles)||[];
+      const isAdmin=roles.includes("admin")||roles.includes("super_admin")||roles.includes("moderator");
+      if(isAdmin && (next==="/admin.html" || (next&&next.indexOf("/admin")===0))){
+        location.href="/admin.html";
+        return;
+      }
+    }
+  }catch(_){}
+
   const providers=await loadProviders();
   if(!providers.authEnabled){
     setMsg(msg, "Auth ยังไม่เปิด (ตั้ง DATABASE_URL)", false);
   }
   if(!(providers.providers||[]).includes("google")) $("googleBtn").style.display="none";
   if(!(providers.providers||[]).includes("discord")) $("discordBtn").style.display="none";
+
+  // Remember next so after OAuth return we can send them to admin
+  if(next && next.charAt(0)==="/"){
+    try{ sessionStorage.setItem("nv-login-next", next); }catch(_){}
+  }
+  const storedNext=(function(){ try{ return sessionStorage.getItem("nv-login-next"); }catch(_){ return null; } })();
+  if(storedNext && !next){
+    // OAuth came back to /login.html without query — check me and redirect
+    try{
+      const me=await fetch("/api/v1/auth/me",{credentials:"same-origin",headers:{Accept:"application/json"}});
+      if(me.ok){
+        const data=await me.json();
+        const roles=(data.user&&data.user.roles)||[];
+        const isAdmin=roles.includes("admin")||roles.includes("super_admin")||roles.includes("moderator");
+        if(isAdmin && storedNext.indexOf("/admin")===0){
+          try{ sessionStorage.removeItem("nv-login-next"); }catch(_){}
+          location.href=storedNext;
+          return;
+        }
+      }
+    }catch(_){}
+  }
 })();
 </script>
 </body>

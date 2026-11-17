@@ -44,6 +44,20 @@ function setAvatar(el, user) {
       if (user.displayName || user.username) {
         localStorage.setItem("dpn-name", user.displayName || user.username);
       }
+      // After OAuth login, continue to admin if that was the intent
+      try {
+        const next = sessionStorage.getItem("nv-login-next");
+        const roles = user.roles || [];
+        const isAdmin =
+          roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+        if (next && next.indexOf("/admin") === 0 && isAdmin) {
+          sessionStorage.removeItem("nv-login-next");
+          location.href = next;
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     label.textContent = "เข้าสู่ระบบ";
