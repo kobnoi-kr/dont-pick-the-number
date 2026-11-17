@@ -80,20 +80,28 @@ export function setPageTitle(view) {
 export function wireShell({ onNavigate, onLogout }) {
   const sidebar = document.getElementById("sidebar");
   const backdrop = document.getElementById("backdrop");
-  const closeMenu = () => {
-    sidebar.classList.remove("open");
-    backdrop.classList.add("hidden");
+  let scrollY = 0;
+  const setMenuOpen = (open) => {
+    sidebar.classList.toggle("open", open);
+    if (backdrop) backdrop.classList.toggle("hidden", !open);
+    if (open) {
+      scrollY = window.scrollY || window.pageYOffset || 0;
+      document.body.classList.add("nav-open");
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      document.body.classList.remove("nav-open");
+      document.body.style.top = "";
+      window.scrollTo(0, scrollY);
+    }
   };
-  const openMenu = () => {
-    sidebar.classList.add("open");
-    backdrop.classList.remove("hidden");
-  };
+  const closeMenu = () => setMenuOpen(false);
+  const openMenu = () => setMenuOpen(true);
 
   document.getElementById("menuToggle").onclick = () => {
     if (sidebar.classList.contains("open")) closeMenu();
     else openMenu();
   };
-  backdrop.onclick = closeMenu;
+  if (backdrop) backdrop.onclick = closeMenu;
 
   function bindNav(root) {
     if (!root) return;

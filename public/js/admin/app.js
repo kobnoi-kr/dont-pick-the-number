@@ -127,28 +127,38 @@ async function showView(view) {
 }
 
 function wireShell() {
+  const menu = document.getElementById("menuToggle");
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("backdrop");
+  let scrollY = 0;
+  const setMenuOpen = (open) => {
+    if (!sidebar) return;
+    sidebar.classList.toggle("open", open);
+    if (backdrop) backdrop.classList.toggle("hidden", !open);
+    if (open) {
+      scrollY = window.scrollY || window.pageYOffset || 0;
+      document.body.classList.add("nav-open");
+      document.body.style.top = `-${scrollY}px`;
+    } else {
+      document.body.classList.remove("nav-open");
+      document.body.style.top = "";
+      window.scrollTo(0, scrollY);
+    }
+  };
   document.querySelectorAll("#sideNav [data-view]").forEach((btn) => {
     btn.onclick = () => {
       location.hash = "#" + btn.getAttribute("data-view");
+      setMenuOpen(false);
     };
   });
   window.addEventListener("hashchange", () => {
     showView(location.hash.replace(/^#/, "") || "overview");
   });
-  const menu = document.getElementById("menuToggle");
-  const sidebar = document.getElementById("sidebar");
-  const backdrop = document.getElementById("backdrop");
   if (menu && sidebar) {
-    menu.onclick = () => {
-      sidebar.classList.toggle("open");
-      if (backdrop) backdrop.classList.toggle("hidden", !sidebar.classList.contains("open"));
-    };
+    menu.onclick = () => setMenuOpen(!sidebar.classList.contains("open"));
   }
   if (backdrop) {
-    backdrop.onclick = () => {
-      sidebar.classList.remove("open");
-      backdrop.classList.add("hidden");
-    };
+    backdrop.onclick = () => setMenuOpen(false);
   }
   const logout = document.getElementById("sideLogout");
   if (logout) {

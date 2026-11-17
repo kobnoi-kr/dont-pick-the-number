@@ -136,51 +136,55 @@ export async function renderRooms(root, { openCreate, user } = {}) {
     if (b) b.onclick = () => openCreate && openCreate();
   } else {
     liveBox.innerHTML = `
-      <table class="table">
-        <thead><tr><th>ห้อง</th><th>โฮสต์</th><th>ผู้เล่น</th><th>เกม</th><th>สถานะ</th><th></th></tr></thead>
-        <tbody>
-          ${live
-            .map((r) => {
-              const priv = r.visibility === "private";
-              const hasCode = /^\d{6}$/.test(String(r.code || ""));
-              const adminBypass = staff && priv && hasCode;
-              const codeLabel = priv
-                ? adminBypass
-                  ? "🔒 " + r.code + " · แอดมิน"
-                  : "🔒 ล็อก"
-                : r.code || "—";
-              let actions = "";
-              if (r.joinable) {
-                if (priv && !adminBypass) {
-                  actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
-                } else if (hasCode) {
-                  actions = `<button class="btn sm" data-join="${esc(r.code)}">เข้าร่วม</button>
-                       <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`;
-                } else {
-                  actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
-                }
-              } else if (r.phase !== "lobby" && r.phase !== "over") {
-                if (hasCode) {
-                  actions = `<a class="btn ${adminBypass ? "sm" : "ghost sm"}" href="${playUrl({ code: r.code, watch: true })}">${adminBypass ? "เข้าชม" : "ดูสด"}</a>`;
-                } else {
-                  actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
-                }
+      <div class="room-card-list">
+        ${live
+          .map((r) => {
+            const priv = r.visibility === "private";
+            const hasCode = /^\d{6}$/.test(String(r.code || ""));
+            const adminBypass = staff && priv && hasCode;
+            const codeLabel = priv
+              ? adminBypass
+                ? "🔒 " + r.code + " · แอดมิน"
+                : "🔒 ล็อก"
+              : r.code || "—";
+            let actions = "";
+            if (r.joinable) {
+              if (priv && !adminBypass) {
+                actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
+              } else if (hasCode) {
+                actions = `<button class="btn sm" data-join="${esc(r.code)}">เข้าร่วม</button>
+                     <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`;
               } else {
-                actions = `<button class="btn sm" disabled>เต็ม</button>`;
+                actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
               }
-              return `
-            <tr>
-              <td><b>${esc(r.title || "Room")}</b><div class="tiny">${codeLabel} · ${priv ? "Private" : "Public"}</div></td>
-              <td>${esc(r.host || "—")}</td>
-              <td>${r.count}/${r.max}</td>
-              <td>${modeLabel(r.cat)}</td>
-              <td>${statusPill(r)}</td>
-              <td><div class="row-actions">${actions}</div></td>
-            </tr>`;
-            })
-            .join("")}
-        </tbody>
-      </table>`;
+            } else if (r.phase !== "lobby" && r.phase !== "over") {
+              if (hasCode) {
+                actions = `<a class="btn ${adminBypass ? "sm" : "ghost sm"}" href="${playUrl({ code: r.code, watch: true })}">${adminBypass ? "เข้าชม" : "ดูสด"}</a>`;
+              } else {
+                actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
+              }
+            } else {
+              actions = `<button class="btn sm" disabled>เต็ม</button>`;
+            }
+            return `
+          <article class="room-card">
+            <div class="room-card-top">
+              <div class="room-card-title">
+                <b>${esc(r.title || "Room")}</b>
+                <div class="tiny">${codeLabel} · ${priv ? "Private" : "Public"}</div>
+              </div>
+              ${statusPill(r)}
+            </div>
+            <div class="room-card-meta">
+              <span><em>โฮสต์</em> ${esc(r.host || "—")}</span>
+              <span><em>ผู้เล่น</em> ${r.count}/${r.max}</span>
+              <span><em>เกม</em> ${modeLabel(r.cat)}</span>
+            </div>
+            <div class="room-card-actions">${actions}</div>
+          </article>`;
+          })
+          .join("")}
+      </div>`;
   }
 
   liveBox.querySelectorAll("[data-join]").forEach((btn) => {
@@ -209,23 +213,29 @@ export async function renderRooms(root, { openCreate, user } = {}) {
     pastBox.innerHTML = `<div class="empty">ยังไม่มีประวัติเกม<br><span class="tiny">สร้างห้องแล้วเล่นจนจบอย่างน้อย 1 รอบ ถึงจะมีประวัติ</span></div>`;
   } else {
     pastBox.innerHTML = `
-      <table class="table">
-        <thead><tr><th>ห้อง</th><th>เกม</th><th>ผู้เล่น</th><th>เมื่อ</th><th></th></tr></thead>
-        <tbody>
-          ${created
-            .map(
-              (g) => `
-            <tr>
-              <td><b>${esc(g.title)}</b><div class="tiny">${esc(g.code)} · ${g.visibility === "private" ? "Private" : "Public"}</div></td>
-              <td>${modeLabel(g.gameMode)}</td>
-              <td>${g.playerCount}</td>
-              <td class="tiny">${g.endedAt ? esc(new Date(g.endedAt).toLocaleString()) : "—"}</td>
-              <td><button class="btn ghost sm" data-recreate="${esc(g.gameMode)}">สร้างใหม่</button></td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>`;
+      <div class="room-card-list">
+        ${created
+          .map(
+            (g) => `
+          <article class="room-card">
+            <div class="room-card-top">
+              <div class="room-card-title">
+                <b>${esc(g.title)}</b>
+                <div class="tiny">${esc(g.code)} · ${g.visibility === "private" ? "Private" : "Public"}</div>
+              </div>
+            </div>
+            <div class="room-card-meta">
+              <span><em>เกม</em> ${modeLabel(g.gameMode)}</span>
+              <span><em>ผู้เล่น</em> ${g.playerCount}</span>
+              <span><em>เมื่อ</em> ${g.endedAt ? esc(new Date(g.endedAt).toLocaleString("th-TH")) : "—"}</span>
+            </div>
+            <div class="room-card-actions">
+              <button class="btn ghost sm" data-recreate="${esc(g.gameMode)}">สร้างใหม่</button>
+            </div>
+          </article>`
+          )
+          .join("")}
+      </div>`;
     pastBox.querySelectorAll("[data-recreate]").forEach((btn) => {
       btn.onclick = () => openCreate && openCreate({ cat: btn.getAttribute("data-recreate") });
     });

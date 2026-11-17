@@ -879,6 +879,21 @@ td.row-actions > a.btn:last-child {
   .panel-right { order: 2; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
 }
+body.nav-open {
+  overflow: hidden;
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  touch-action: none;
+}
+body.nav-open .sidebar {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
 @media (max-width: 860px) {
   .app {
     grid-template-columns: 1fr;
@@ -892,6 +907,9 @@ td.row-actions > a.btn:last-child {
     z-index: 50;
     transform: translateX(-105%);
     transition: transform .2s ease;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   .sidebar.open { transform: translateX(0); }
   .menu-toggle { display: inline-grid; place-items: center; }
@@ -905,6 +923,18 @@ td.row-actions > a.btn:last-child {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 45;
   }
   .home-link { display: none; }
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .page-head .btn { width: 100%; }
+  .join-card .join-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .join-card .join-row .btn { width: 100%; }
+  .table-wrap { margin: 0 -4px; }
 }
 
 .sidebar-brand .brand-link {
@@ -990,6 +1020,69 @@ td.row-actions > a.btn:last-child {
 .lib-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .lib-top h3 { margin: 0; font-size: 1.05rem; }
 .lib-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+.room-card-list {
+  display: grid;
+  gap: 10px;
+}
+.room-card {
+  border: 1px solid var(--nv-border);
+  background: rgba(255,255,255,0.02);
+  border-radius: 14px;
+  padding: 12px 12px 10px;
+}
+.room-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.room-card-title {
+  min-width: 0;
+  flex: 1;
+}
+.room-card-title b {
+  display: block;
+  font-size: 0.98rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-card-title .tiny {
+  margin-top: 3px;
+  color: var(--nv-muted);
+  line-height: 1.35;
+  word-break: break-word;
+}
+.room-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--nv-text-2);
+}
+.room-card-meta em {
+  font-style: normal;
+  color: var(--nv-muted);
+  margin-right: 4px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.room-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.room-card-actions .btn {
+  flex: 1 1 auto;
+  min-width: 110px;
+  justify-content: center;
+}
+
 .join-card .join-row {
   display: flex;
   gap: 8px;
