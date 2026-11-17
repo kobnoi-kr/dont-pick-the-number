@@ -40,7 +40,7 @@ function asMaxRooms(v) {
 
 async function loadPublicSettings(force = false) {
   const now = Date.now();
-  if (!force && now - cache.at < CACHE_MS) return cache;
+  if (!force && cache.at && now - cache.at < CACHE_MS) return cache;
   if (!authEnabled()) {
     cache = {
       at: now,

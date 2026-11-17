@@ -822,6 +822,13 @@ async function handleAdminApi(req, res, pathname) {
         }
       }
       invalidatePublicSettingsCache();
+      // Force refresh so open/close server takes effect immediately
+      try {
+        const { loadPublicSettings } = require("../system/public-settings");
+        await loadPublicSettings(true);
+      } catch {
+        /* ignore */
+      }
       await writeAdminLog(prisma, {
         adminId: auth.user.id,
         action: "settings.update",
