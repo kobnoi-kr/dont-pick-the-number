@@ -12,6 +12,8 @@ let cache = {
   maintenanceMessage: "",
   maxRoomsDisplay: 50
 };
+/** @type {Promise<object>|null} */
+let inflight = null;
 
 function asBool(v) {
   if (v === true || v === false) return v;
@@ -41,6 +43,7 @@ function asMaxRooms(v) {
 async function loadPublicSettings(force = false) {
   const now = Date.now();
   if (!force && cache.at && now - cache.at < CACHE_MS) return cache;
+  if (!force && inflight) return inflight;
   if (!authEnabled()) {
     cache = {
       at: now,
@@ -50,34 +53,43 @@ async function loadPublicSettings(force = false) {
     };
     return cache;
   }
+  const run = (async () => {
+    try {
+      const prisma = await getPrisma();
+      const rows = await prisma.systemSetting.findMany({
+        where: {
+          key: { in: ["maintenance_enabled", "maintenance_message", "max_rooms_display"] }
+        }
+      });
+      const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      const message = asMessage(map.maintenance_message);
+      let enabled = Object.prototype.hasOwnProperty.call(map, "maintenance_enabled")
+        ? asBool(map.maintenance_enabled)
+        : !!message;
+      // Empty message cannot be "on"
+      if (!message) enabled = false;
+      cache = {
+        at: Date.now(),
+        maintenanceEnabled: enabled,
+        maintenanceMessage: message,
+        maxRoomsDisplay: asMaxRooms(map.max_rooms_display)
+      };
+    } catch {
+      cache.at = Date.now();
+    }
+    return cache;
+  })();
+  inflight = run;
   try {
-    const prisma = await getPrisma();
-    const rows = await prisma.systemSetting.findMany({
-      where: {
-        key: { in: ["maintenance_enabled", "maintenance_message", "max_rooms_display"] }
-      }
-    });
-    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    const message = asMessage(map.maintenance_message);
-    let enabled = Object.prototype.hasOwnProperty.call(map, "maintenance_enabled")
-      ? asBool(map.maintenance_enabled)
-      : !!message;
-    // Empty message cannot be "on"
-    if (!message) enabled = false;
-    cache = {
-      at: now,
-      maintenanceEnabled: enabled,
-      maintenanceMessage: message,
-      maxRoomsDisplay: asMaxRooms(map.max_rooms_display)
-    };
-  } catch {
-    cache.at = now;
+    return await run;
+  } finally {
+    if (inflight === run) inflight = null;
   }
-  return cache;
 }
 
 function invalidatePublicSettingsCache() {
   cache.at = 0;
+  inflight = null;
 }
 
 async function getMaintenanceState() {

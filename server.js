@@ -195,8 +195,30 @@ const roomInvites = new Map();
 const inviteByUser = new Map();
 const INVITE_MS = 60000;
 
+const WS_BUF_SOFT = 256 * 1024;
+const WS_BUF_HARD = 1024 * 1024;
+
 function send(ws, obj) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  if (!ws || ws.readyState !== 1) return false;
+  try {
+    // Slow clients that can't drain should not grow unbounded send buffers.
+    if (typeof ws.bufferedAmount === "number" && ws.bufferedAmount > WS_BUF_HARD) {
+      try {
+        ws.close(1013, "slow_client");
+      } catch {
+        /* ignore */
+      }
+      return false;
+    }
+    if (typeof ws.bufferedAmount === "number" && ws.bufferedAmount > WS_BUF_SOFT) {
+      // Drop non-critical lobby-only spam; still try to deliver game state.
+      if (obj && (obj.t === "lobby" || obj.t === "maintenance:countdown")) return false;
+    }
+    ws.send(JSON.stringify(obj));
+    return true;
+  } catch {
+    return false;
+  }
 }
 async function notifyFriendPresence(userId, online) {
   if (!authEnabled()) return;
@@ -373,14 +395,18 @@ function makeBot(room) {
     lastSeen: Date.now()
   };
 }
+const SPAN_MAX = 10000;
+const SECRET_COUNT_MAX = 100;
+
 function checkRange(min, max) {
   if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) return "กรอกจำนวนเต็มเท่านั้น";
   if (min >= max) return "เลขต่ำสุดต้องน้อยกว่าเลขสูงสุด";
-  if (max - min + 1 > 1000000) return "ช่วงตัวเลขต้องไม่เกิน 1,000,000 จำนวน";
+  if (max - min + 1 > SPAN_MAX) return "ช่วงตัวเลขต้องไม่เกิน " + SPAN_MAX.toLocaleString("en-US") + " จำนวน";
   return "";
 }
 function checkCount(min, max, count) {
   if (!Number.isSafeInteger(count) || count < 1) return "จำนวนเลขลับต้องเป็นจำนวนเต็มตั้งแต่ 1";
+  if (count > SECRET_COUNT_MAX) return "จำนวนเลขลับต้องไม่เกิน " + SECRET_COUNT_MAX;
   if (count > max - min + 1) return "จำนวนเลขลับต้องไม่เกินจำนวนตัวเลขในช่วง";
   return "";
 }
@@ -634,15 +660,29 @@ function sendLobby(ws) {
   if (!ws || ws.readyState !== 1) return;
   send(ws, lobbyMsg({ revealPrivate: !!ws.isAdmin }));
 }
-function broadcastLobby() {
-  for (const ws of watchers) sendLobby(ws);
+let lobbyBroadcastTimer = null;
+function broadcastLobby(immediate = false) {
+  if (immediate) {
+    if (lobbyBroadcastTimer) {
+      clearTimeout(lobbyBroadcastTimer);
+      lobbyBroadcastTimer = null;
+    }
+    for (const ws of watchers) sendLobby(ws);
+    return;
+  }
+  // Coalesce rapid lobby refreshes (join/leave/setup spam).
+  if (lobbyBroadcastTimer) return;
+  lobbyBroadcastTimer = setTimeout(() => {
+    lobbyBroadcastTimer = null;
+    for (const ws of watchers) sendLobby(ws);
+  }, 40);
 }
-function broadcast(room) {
+function broadcast(room, opts = {}) {
   for (const player of room.players) send(player.ws, snap(room, player));
   if (Array.isArray(room.spectators)) {
     for (const sp of room.spectators) send(sp.ws, snap(room, null, { spectator: true }));
   }
-  broadcastLobby();
+  if (opts.lobby !== false) broadcastLobby(!!opts.lobbyImmediate);
   if (room.phase === "over") {
     persistFinishedGame(room, scoreOf).catch(() => {});
   }
@@ -668,8 +708,9 @@ function scheduleDelete(room) {
     if (room.players.some((player) => player.connected)) return;
     if (Array.isArray(room.spectators) && room.spectators.length) return;
     cancelSpin(room);
+    clearTurnTimer(room);
     rooms.delete(room.code);
-    broadcastLobby();
+    broadcastLobby(true);
   }, delay);
 }
 function attach(ws, room, player) {
@@ -1150,13 +1191,13 @@ function onSetup(ws, msg) {
     if (patch.rangeMode === "9999") { room.min = 1; room.max = 9999; }
   }
   if (room.rangeMode === "custom") {
-    const min = setInt(patch, "min", -1000000000, 1000000000);
-    const max = setInt(patch, "max", -1000000000, 1000000000);
+    const min = setInt(patch, "min", -1000000, 1000000);
+    const max = setInt(patch, "max", -1000000, 1000000);
     if (min != null) room.min = min;
     if (max != null) room.max = max;
   }
   const winTarget = setInt(patch, "winTarget", 1, 999);
-  const secretCount = setInt(patch, "secretCount", 1, 1000000);
+  const secretCount = setInt(patch, "secretCount", 1, SECRET_COUNT_MAX);
   const pickEach = setInt(patch, "pickEach", 1, 99);
   const turnSec = setInt(patch, "turnSec", 0, 120);
   if (winTarget != null) room.winTarget = winTarget;
@@ -1164,7 +1205,7 @@ function onSetup(ws, msg) {
   if (pickEach != null) room.pickEach = pickEach;
   if (turnSec != null) room.turnSec = turnSec;
   if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
-  broadcast(room);
+  broadcast(room, { lobby: false });
 }
 function onSpinOrder(ws) {
   const ctx = seat(ws);
@@ -1907,15 +1948,15 @@ setInterval(() => {
         room.players = keep;
         transferHost(room);
         cancelSpin(room);
+        clearTurnTimer(room);
         room.order = [];
         room.rot = 0;
         if (!keep.length) scheduleDelete(room);
-        else broadcast(room);
-        broadcastLobby();
+        else broadcast(room, { lobbyImmediate: true });
       }
     } else if (skipToConnected(room)) {
       armTurnTimer(room);
-      broadcast(room);
+      broadcast(room, { lobby: false });
     }
     if (room.players.length && !hasHumanOnline(room)) scheduleDelete(room);
   }
@@ -2289,6 +2330,7 @@ function scheduleMaintenanceKick(message, seconds = 15) {
   };
   fanOutAllClients(payload);
   // Keep pulsing so late joiners / missed sockets still see the countdown.
+  // Pulse a bit slower than 1Hz to cut fan-out load; UI still paints locally.
   maintenanceKickPulse = setInterval(() => {
     const next = maintenanceCountdownPayload();
     if (!next) {
@@ -2296,7 +2338,7 @@ function scheduleMaintenanceKick(message, seconds = 15) {
       return;
     }
     fanOutAllClients(next);
-  }, 1000);
+  }, 1500);
   maintenanceKickTimer = setTimeout(() => {
     maintenanceKickTimer = null;
     clearMaintenancePulse();

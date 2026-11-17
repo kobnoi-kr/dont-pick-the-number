@@ -1,4 +1,4 @@
-const PAGE=100, SPAN_MAX=1000000, PLAYER_MAX=30, STORE="dpn-players", STORE_SCORES="dpn-scores", STORE_WHEEL="dpn-wheel-scores";
+const PAGE=100, SPAN_MAX=10000, PLAYER_MAX=30, STORE="dpn-players", STORE_SCORES="dpn-scores", STORE_WHEEL="dpn-wheel-scores";
 const WHEEL_COLORS=["#2563eb","#dc2626","#16a34a","#d97706","#7c3aed","#db2777","#0891b2","#65a30d","#ea580c","#4f46e5","#be123c","#0d9488"];
 const BAND_A="#9f1239", BAND_B="#111827", DEAD_SLICE="#475569";
 let gameMin=1, gameMax=99, secrets=[], secretAll=[], secretTotal=1, winTarget=3, pointAll=true, lo, hi, picked, pageFrom=1, useCustom=false, pickMin=1, pickMax=99;
@@ -406,7 +406,7 @@ function choice(){
 function check(min,max){
   if(min==null||max==null) return "กรอกจำนวนเต็มเท่านั้น";
   if(min>=max) return "เลขต่ำสุดต้องน้อยกว่าเลขสูงสุด";
-  if(max-min+1>SPAN_MAX) return "ช่วงตัวเลขต้องไม่เกิน 1,000,000 จำนวน";
+  if(max-min+1>SPAN_MAX) return "ช่วงตัวเลขต้องไม่เกิน 10,000 จำนวน";
   return "";
 }
 function readSecretCount(){

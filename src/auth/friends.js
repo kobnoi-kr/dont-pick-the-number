@@ -356,7 +356,14 @@ async function areFriends(prisma, userA, userB) {
   return !!row;
 }
 
+/** @type {Map<string, { at: number, ids: string[] }>} */
+const friendIdsCache = new Map();
+const FRIEND_IDS_TTL_MS = 15000;
+
 async function listAcceptedFriendIds(prisma, userId) {
+  const key = String(userId || "");
+  const hit = friendIdsCache.get(key);
+  if (hit && Date.now() - hit.at < FRIEND_IDS_TTL_MS) return hit.ids.slice();
   const rows = await prisma.friendship.findMany({
     where: {
       status: "accepted",
@@ -368,7 +375,13 @@ async function listAcceptedFriendIds(prisma, userId) {
   for (const row of rows) {
     ids.push(row.requesterId === userId ? row.addresseeId : row.requesterId);
   }
-  return ids;
+  friendIdsCache.set(key, { at: Date.now(), ids });
+  // Soft cap: drop oldest-ish entries if map grows large
+  if (friendIdsCache.size > 2000) {
+    const first = friendIdsCache.keys().next().value;
+    if (first != null) friendIdsCache.delete(first);
+  }
+  return ids.slice();
 }
 
 async function handleFriendsOnline(req, res) {

@@ -97,6 +97,16 @@ function allowGuestCreate(ip, limitPerHour) {
   return true;
 }
 
+/** Drop expired IP windows so scanners cannot grow heap forever. */
+function pruneGuestCreateHits() {
+  const windowStart = Date.now() - HOUR_MS;
+  for (const [key, hits] of guestCreateHits) {
+    const next = (hits || []).filter((t) => t >= windowStart);
+    if (!next.length) guestCreateHits.delete(key);
+    else if (next.length !== hits.length) guestCreateHits.set(key, next);
+  }
+}
+
 async function cleanupExpiredSessions(prisma) {
   const result = await prisma.session.deleteMany({
     where: {
@@ -272,6 +282,7 @@ function startCleanupScheduler() {
   const tick = async () => {
     if (!authEnabled()) return;
     try {
+      pruneGuestCreateHits();
       const prisma = await getPrisma();
       const settings = await loadCleanupSettings(prisma);
       if (!settings.guestCleanupEnabled && !settings.sessionCleanupEnabled && !settings.activityLogEnabled) {
@@ -307,6 +318,7 @@ module.exports = {
   loadCleanupSettings,
   getGuestSessionTtlSec,
   allowGuestCreate,
+  pruneGuestCreateHits,
   cleanupStats,
   runCleanup,
   startCleanupScheduler,
