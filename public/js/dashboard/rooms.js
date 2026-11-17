@@ -159,7 +159,7 @@ export async function renderRooms(root, { openCreate } = {}) {
               <td>${r.count}/${r.max}</td>
               <td>${modeLabel(r.cat)}</td>
               <td>${statusPill(r)}</td>
-              <td class="row-actions">${actions}</td>
+              <td><div class="row-actions">${actions}</div></td>
             </tr>`;
             })
             .join("")}

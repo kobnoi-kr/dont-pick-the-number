@@ -331,16 +331,47 @@ textarea:focus {
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 .table th, .table td {
   text-align: left;
   padding: 10px 8px;
   border-bottom: 1px solid var(--nv-border);
   font-size: 0.9rem;
+  vertical-align: middle;
 }
 .table th { color: var(--nv-muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .table tr:hover td { background: rgba(255,255,255,0.02); }
+/* Keep table cells as table-cells — display:flex on <td> breaks header/row lines */
+td.row-actions,
+td.actions-cell {
+  display: table-cell;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+td.row-actions > .row-actions,
+td.actions-cell > .row-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  vertical-align: middle;
+}
+td.actions-cell > .btn,
+td.actions-cell > a.btn,
+td.row-actions > .btn,
+td.row-actions > a.btn {
+  display: inline-flex;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+td.actions-cell > .btn:last-child,
+td.actions-cell > a.btn:last-child,
+td.row-actions > .btn:last-child,
+td.row-actions > a.btn:last-child {
+  margin-right: 0;
+}
 .pill {
   display: inline-flex;
   align-items: center;
@@ -607,7 +638,12 @@ textarea:focus {
   border-radius: 12px;
   padding: 12px 14px;
 }
-.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
 .home-link { margin-left: auto; }
 .btn.block { display: block; width: 100%; text-align: center; }
 .danger-outline { border-color: #7f1d1d !important; color: #fca5a5 !important; }
@@ -638,10 +674,7 @@ textarea:focus {
 .table-wrap { overflow-x: auto; }
 .click-row { cursor: pointer; }
 .actions-cell {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  text-align: right;
 }
 .status-pill {
   display: inline-block;
