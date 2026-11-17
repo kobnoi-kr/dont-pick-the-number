@@ -52,6 +52,7 @@
     <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu"><i class="fi fi-rr-menu-burger" aria-hidden="true"></i></button>
     <h1 id="pageTitle">Overview</h1>
     <a class="btn ghost sm home-link" href="/">หน้าแรก</a>
+    <button type="button" class="icon-btn hidden" id="chatBtn" aria-label="Chat"><i class="fi fi-rr-comment" aria-hidden="true"></i><span class="badge-dot hidden" id="chatDot"></span></button>
     <button type="button" class="icon-btn" id="notifBtn" aria-label="Notifications"><i class="fi fi-rr-bell" aria-hidden="true"></i><span class="badge-dot hidden" id="notifDot"></span></button>
     <button type="button" class="icon-btn" id="userMenuBtn" aria-label="Account"><i class="fi fi-rr-circle-user" aria-hidden="true"></i></button>
   </header>
@@ -75,6 +76,31 @@
 </nav>
 
 <div id="backdrop" class="backdrop hidden"></div>
+
+<div id="chatPanel" class="card chat-panel hidden">
+  <div id="chatListView">
+    <div class="chat-head">
+      <div>
+        <h3 class="chat-title">แชทเพื่อน</h3>
+        <p class="chat-sub">เฉพาะเพื่อนที่ยอมรับแล้ว · เก็บ 3 วัน</p>
+      </div>
+    </div>
+    <div id="chatConvList" class="chat-conv-list"></div>
+    <p class="empty tiny chat-empty" id="chatEmpty">ยังไม่มีเพื่อน — ไปเพิ่มเพื่อนก่อน</p>
+  </div>
+  <div id="chatThreadView" class="hidden">
+    <div class="chat-head chat-thread-head">
+      <button type="button" class="btn ghost sm" id="chatThreadBack" aria-label="กลับ">←</button>
+      <h3 class="chat-title" id="chatThreadTitle">แชท</h3>
+    </div>
+    <div id="chatThreadMsgs" class="chat-thread-msgs"></div>
+    <form id="chatThreadForm" class="chat-thread-form" autocomplete="off">
+      <input id="chatThreadInput" type="text" maxlength="280" placeholder="พิมพ์ข้อความ…" aria-label="ข้อความ">
+      <button class="btn sm" type="submit">ส่ง</button>
+    </form>
+    <p class="msg tiny" id="chatThreadMsg"></p>
+  </div>
+</div>
 
 <div id="notifPanel" class="card notif-panel hidden">
   <div class="notif-head">

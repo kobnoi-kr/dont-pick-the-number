@@ -7,6 +7,7 @@ import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
+import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
 import { showRoomInviteBanner } from "./invites.js";
 import {
@@ -153,6 +154,10 @@ window.addEventListener("hashchange", () => {
 
 onDashboardMessage((msg) => {
   if (msg.t === "lobby" && state.view === "rooms") navigate("rooms");
+  if (msg.t === "chat:dm") {
+    onChatDmPush(msg);
+    return;
+  }
   if (msg.t === "notification:new") {
     onNotificationPush(msg);
     refreshNotifications();
@@ -244,9 +249,11 @@ onDashboardMessage((msg) => {
   }
 
   wireNotifications();
+  wireChat(state.user);
   connectDashboardWs();
   loadAnnouncementToasts().catch(() => {});
   startAnnouncementPoll(25000);
+  refreshChatUnread().catch(() => {});
   const q = new URLSearchParams(location.search);
   if (q.get("create") === "1" || q.get("cat")) {
     openCreateModal({ cat: q.get("cat") || "secret", lockCat: !!q.get("cat") });

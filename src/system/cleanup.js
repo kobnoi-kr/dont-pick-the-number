@@ -216,6 +216,7 @@ async function runCleanup(prisma, opts = {}) {
     let sessionsDeleted = 0;
     let guestsDeleted = 0;
     let activityDeleted = 0;
+    let dmDeleted = 0;
 
     if (force || settings.sessionCleanupEnabled) {
       sessionsDeleted = await cleanupExpiredSessions(prisma);
@@ -227,6 +228,12 @@ async function runCleanup(prisma, opts = {}) {
       const { cleanupActivityLogs } = require("./activity-log");
       activityDeleted = await cleanupActivityLogs(prisma, settings.activityLogRetentionDays);
     }
+    try {
+      const { cleanupDirectMessages } = require("../chat/routes");
+      dmDeleted = await cleanupDirectMessages(prisma, 3);
+    } catch {
+      dmDeleted = 0;
+    }
 
     lastRun = {
       at: startedAt.toISOString(),
@@ -234,6 +241,7 @@ async function runCleanup(prisma, opts = {}) {
       sessionsDeleted,
       guestsDeleted,
       activityDeleted,
+      dmDeleted,
       settings,
       forced: force
     };

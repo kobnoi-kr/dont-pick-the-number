@@ -541,6 +541,9 @@ async function handleAuthApi(req, res, pathname) {
 
     const friendsHandled = await handleFriendsApi(req, res, pathname);
     if (friendsHandled) return true;
+    const { handleChatApi } = require("../chat/routes");
+    const chatHandled = await handleChatApi(req, res, pathname);
+    if (chatHandled) return true;
 
     const unlink = pathname.match(/^\/api\/v1\/account\/unlink\/(google|discord)$/);
     if (unlink) return await handleUnlink(req, res, unlink[1]);

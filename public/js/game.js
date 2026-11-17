@@ -12,6 +12,9 @@ const SPIN_SOUND="/audio/spinner-sound.mp3";
 const BOMB_SOUND="/audio/roblox-death-sound_1.mp3";
 const COOLDOWN_SOUND="/audio/beep.mp3";
 const WIN_SOUND="/audio/roblox-old-winning-sound-effect.mp3";
+const ROOM_CHAT_SOUND="/audio/snapchat-message.mp3";
+const ROOM_CHAT_MS=6000;
+const roomChatBubbles=new Map(); /* pid -> { body, until, timer } */
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("/audio/Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
@@ -307,6 +310,47 @@ function show(n){
   if(stage) stage.classList.toggle("lobby-stage", lobby);
   const card=document.querySelector("main.card");
   if(card) card.classList.toggle("lobby-card", lobby);
+  paintRoomChatBar();
+}
+function paintRoomChatBar(){
+  const bar=$("roomChatBar");
+  const hint=$("roomChatHint");
+  const inRoom=onlineMode&&!spectating&&document.body.classList.contains("room-bg");
+  const registered=canUseFriends();
+  if(bar) bar.classList.toggle("hidden", !(inRoom&&registered));
+  if(hint) hint.classList.toggle("hidden", !(inRoom&&!registered));
+}
+function showRoomChatBubble(fromId, body){
+  const pid=String(fromId||"");
+  const text=String(body||"").trim();
+  if(!pid||!text) return;
+  const prev=roomChatBubbles.get(pid);
+  if(prev&&prev.timer) clearTimeout(prev.timer);
+  const until=Date.now()+ROOM_CHAT_MS;
+  const timer=setTimeout(()=>{
+    roomChatBubbles.delete(pid);
+    document.querySelectorAll('[data-pid="'+CSS.escape(pid)+'"] .pchat-bubble').forEach(el=>el.remove());
+  }, ROOM_CHAT_MS);
+  roomChatBubbles.set(pid, { body:text, until, timer });
+  paintRoomChatBubbles();
+}
+function paintRoomChatBubbles(){
+  const now=Date.now();
+  roomChatBubbles.forEach((entry, pid)=>{
+    if(entry.until<=now){
+      roomChatBubbles.delete(pid);
+      return;
+    }
+    document.querySelectorAll('[data-pid="'+CSS.escape(pid)+'"]').forEach(wrap=>{
+      let bubble=wrap.querySelector(".pchat-bubble");
+      if(!bubble){
+        bubble=document.createElement("span");
+        bubble.className="pchat-bubble";
+        wrap.appendChild(bubble);
+      }
+      bubble.textContent=entry.body;
+    });
+  });
 }
 function isHost(){ return !!(myId&&myId===hostId); }
 function myName(){
@@ -919,6 +963,7 @@ function renderLobbyGrid(){
     }
     const avWrap=document.createElement("div");
     avWrap.className="lobby-av-wrap"+(champ?" champion":"");
+    if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
     if(champ){
       const mark=document.createElement("span");
@@ -984,6 +1029,7 @@ function renderPlayers(){
     }
     const avWrap=document.createElement("span");
     avWrap.className="pavatar-wrap"+(isAutoUser?" is-auto":"")+(champ?" champion":"");
+    if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.appendChild(face);
     if(isAutoUser){
       const autoTag=document.createElement("span");
@@ -1089,6 +1135,8 @@ function renderPlayers(){
     if(addBtn) addBtn.disabled=spinning||wheelSpinning||locked;
   }
   paintAutoButtons();
+  paintRoomChatBubbles();
+  paintRoomChatBar();
 }
 function paintAutoButtons(){
   const show=onlineMode&&(netPhase==="play"||netPhase==="pick");
@@ -1948,6 +1996,7 @@ function paintAuthBar(user){
     }
   }
   if(loginLink) loginLink.classList.toggle("hidden", registered);
+  paintRoomChatBar();
 }
 function canUseFriends(){
   return !!(authUser&&authUser.accountType==="registered");
@@ -2850,6 +2899,11 @@ function connect(){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนรับคำเชิญแล้ว";
     }else if(msg.t==="inviteDeclined"){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
+    }else if(msg.t==="roomChat"){
+      if(msg.fromId){
+        showRoomChatBubble(msg.fromId, msg.body||"");
+        if(msg.fromId!==myId) playClip(ROOM_CHAT_SOUND);
+      }
     }else if(msg.t==="err"){
       if(!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent=msg.message||"";
       else if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent=msg.message||"";
@@ -3030,6 +3084,21 @@ async function bootOnline(){
     loginLink.onclick=()=>{
       if(authUser&&authUser.accountType==="guest") openAuthChoiceModal();
       else location.href="/login";
+    };
+  }
+  const roomChatForm=$("roomChatBar");
+  if(roomChatForm){
+    roomChatForm.onsubmit=e=>{
+      e.preventDefault();
+      if(!canUseFriends()){
+        paintRoomChatBar();
+        return;
+      }
+      const input=$("roomChatInput");
+      const body=(input&&input.value?input.value:"").trim().replace(/\s+/g," ").slice(0,48);
+      if(!body) return;
+      send({t:"roomChat",body});
+      if(input) input.value="";
     };
   }
   const authChoiceLink=$("authChoiceLink");

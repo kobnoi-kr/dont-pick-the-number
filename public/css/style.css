@@ -638,3 +638,94 @@ img.auth-avatar.on{display:block;object-fit:cover}
 @media (prefers-reduced-motion:reduce){
   .dial canvas,.numdial canvas{transition:none !important}
 }
+
+/* In-room floating chat */
+.room-chat-bar{
+  position:fixed;
+  left:50%;
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);
+  z-index:35;
+  display:flex;
+  gap:8px;
+  width:min(420px, calc(100vw - 24px));
+  padding:8px;
+  border-radius:16px;
+  background:rgba(12,16,28,.92);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 12px 36px rgba(0,0,0,.45);
+  backdrop-filter:blur(10px);
+}
+.room-chat-bar.hidden{display:none !important}
+.room-chat-bar input{
+  flex:1;
+  min-width:0;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:.92rem;
+}
+.room-chat-bar .btn{margin:0;width:auto;padding:10px 14px}
+.room-chat-hint{
+  position:fixed;
+  left:50%;
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);
+  z-index:34;
+  margin:0;
+  padding:8px 12px;
+  border-radius:999px;
+  font-size:.78rem;
+  color:var(--muted);
+  background:rgba(12,16,28,.85);
+  border:1px solid rgba(255,255,255,.1);
+  pointer-events:none;
+}
+.room-chat-hint.hidden{display:none !important}
+
+/* Chat bubble above avatar — max width = avatar, 6s lifetime via JS */
+.pchat-bubble{
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 4px);
+  transform:translateX(-50%);
+  z-index:6;
+  max-width:100%;
+  width:max-content;
+  padding:3px 5px;
+  border-radius:8px;
+  font-size:.58rem;
+  font-weight:700;
+  line-height:1.25;
+  letter-spacing:.01em;
+  text-align:center;
+  color:#fff;
+  background:rgba(15,23,42,.95);
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 4px 12px rgba(0,0,0,.35);
+  word-break:break-word;
+  overflow:hidden;
+  pointer-events:none;
+  animation:pchatIn .18s ease-out;
+}
+.pchat-bubble::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:100%;
+  transform:translateX(-50%);
+  border:5px solid transparent;
+  border-top-color:rgba(15,23,42,.95);
+}
+.lobby-av-wrap{overflow:visible}
+.lobby-av-wrap .pchat-bubble{
+  font-size:.65rem;
+  padding:4px 6px;
+  border-radius:10px;
+}
+@keyframes pchatIn{
+  from{opacity:0;transform:translateX(-50%) translateY(4px)}
+  to{opacity:1;transform:translateX(-50%) translateY(0)}
+}

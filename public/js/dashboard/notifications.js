@@ -334,6 +334,8 @@ export function wireNotifications() {
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    const chatPanel = document.getElementById("chatPanel");
+    if (chatPanel) chatPanel.classList.add("hidden");
     const willOpen = panel.classList.contains("hidden");
     panel.classList.toggle("hidden", !willOpen);
     if (willOpen) await refreshNotifications();

@@ -1643,7 +1643,20 @@ async function onHello(ws, msg) {
   ws.token = token;
   ws.pendingName = cleanName(msg.name);
   ws.dashboard = !!msg.dashboard;
+  ws.accountType = "";
   if (token) trackPresence(ws, token);
+  if (token && authEnabled()) {
+    try {
+      const prisma = await getPrisma();
+      const u = await prisma.user.findUnique({
+        where: { id: token },
+        select: { accountType: true, status: true }
+      });
+      if (u && u.status === "active") ws.accountType = String(u.accountType || "");
+    } catch {
+      ws.accountType = "";
+    }
+  }
   await refreshAdminFlag(ws);
   const avatarUrl = cleanAvatar(msg.avatarUrl);
   const pendingMaint = maintenanceCountdownPayload();
@@ -1815,6 +1828,41 @@ function onMessage(ws, raw) {
   if (msg.t === "auto") return onAuto(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
+  if (msg.t === "roomChat") return onRoomChat(ws, msg);
+}
+function onRoomChat(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || !ctx.player || !ctx.room) return fail(ws, "เข้าห้องก่อน");
+  if (ctx.player.bot) return;
+  // Guests cannot send room chat — registered accounts only.
+  if (!ws.accountType || ws.accountType !== "registered") {
+    return fail(ws, "เข้าสู่ระบบก่อนถึงจะพิมพ์แชทในห้องได้");
+  }
+  const text = String(msg.body || msg.text || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 48);
+  if (!text) return;
+  const limited = (() => {
+    try {
+      const { rateLimit } = require("./src/auth/rate-limit");
+      return rateLimit("roomchat:" + ctx.player.id, 20, 30 * 1000);
+    } catch {
+      return { ok: true };
+    }
+  })();
+  if (!limited.ok) return fail(ws, "พิมพ์ถี่เกินไป");
+  const payload = {
+    t: "roomChat",
+    fromId: ctx.player.id,
+    fromName: ctx.player.name,
+    body: text,
+    at: Date.now()
+  };
+  for (const player of ctx.room.players) send(player.ws, payload);
+  if (Array.isArray(ctx.room.spectators)) {
+    for (const sp of ctx.room.spectators) send(sp.ws, payload);
+  }
 }
 function isDashboardAsset(name) {
   const n = String(name || "").replace(/^\/+/, "").replace(/\\/g, "/");
