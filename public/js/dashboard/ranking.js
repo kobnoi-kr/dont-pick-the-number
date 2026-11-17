@@ -36,15 +36,23 @@ function metricLabel(sort) {
   return "แต้ม";
 }
 
-function formatCountdown(ms) {
-  if (ms <= 0) return "รีเซ็ตแล้ว";
-  const total = Math.floor(ms / 1000);
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (d > 0) return `${d}วัน ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function countdownParts(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return {
+    d: Math.floor(total / 86400),
+    h: Math.floor((total % 86400) / 3600),
+    m: Math.floor((total % 3600) / 60),
+    s: total % 60
+  };
+}
+
+function calendarCountdownHtml() {
+  return `<div class="rank-cal-cd" id="rankCooldown" aria-label="นับถอยหลัง">
+    <div class="rank-cal-unit"><b data-cd="d">00</b><span>วัน</span></div>
+    <div class="rank-cal-unit"><b data-cd="h">00</b><span>ชม</span></div>
+    <div class="rank-cal-unit"><b data-cd="m">00</b><span>นาที</span></div>
+    <div class="rank-cal-unit"><b data-cd="s">00</b><span>วิ</span></div>
+  </div>`;
 }
 
 function rowHtml(row, sort, meId) {
@@ -106,7 +114,7 @@ export async function renderRanking(root, { user }) {
     <div class="page-head">
       <div>
         <h2 style="margin:0">Ranking</h2>
-        <p class="muted" style="margin:6px 0 0">จัดอันดับบัญชีที่ล็อกอิน · ตามเวลาไทย (Asia/Bangkok)</p>
+        <p class="muted" style="margin:6px 0 0">จัดอันดับท็อปแรงค์ · ตามเวลาไทย</p>
       </div>
     </div>
     ${
@@ -116,10 +124,6 @@ export async function renderRanking(root, { user }) {
               <button type="button" class="rank-tab on" data-period="weekly">Weekly</button>
               <button type="button" class="rank-tab" data-period="monthly">Monthly</button>
             </div>
-            <div class="rank-cooldown" id="rankCooldown">
-              <span class="rank-cooldown-label" id="rankCdLabel">รีเซ็ต Weekly ใน</span>
-              <b class="rank-cooldown-time" id="rankCdTime">—:—:—</b>
-            </div>
             <div class="rank-sorts" role="group" aria-label="จัดด้วย">
               ${SORTS.map(
                 (s) =>
@@ -127,9 +131,12 @@ export async function renderRanking(root, { user }) {
               ).join("")}
             </div>
           </div>
-          <div id="rankPodium" class="rank-podium-wrap"></div>
+          <div class="rank-podium-wrap">
+            ${calendarCountdownHtml()}
+            <div id="rankPodium"></div>
+          </div>
           <div class="card rank-card">
-            <div class="rank-rest-label">อันดับ 4 ขึ้นไป</div>
+            <div class="rank-rest-label">อันดับ 4 ลงไป</div>
             <div id="rankList"><div class="loading">Loading…</div></div>
             <div id="rankMe" class="rank-me hidden"></div>
           </div>`
@@ -144,13 +151,20 @@ export async function renderRanking(root, { user }) {
   const listEl = root.querySelector("#rankList");
   const meEl = root.querySelector("#rankMe");
   const podiumEl = root.querySelector("#rankPodium");
-  const cdLabel = root.querySelector("#rankCdLabel");
-  const cdTime = root.querySelector("#rankCdTime");
+  const cdRoot = root.querySelector("#rankCooldown");
 
   function tickCountdown() {
-    if (!cdTime) return;
+    if (!cdRoot) return;
     const left = resetsAtMs - Date.now();
-    cdTime.textContent = formatCountdown(left);
+    const p = countdownParts(left);
+    const set = (key, val) => {
+      const el = cdRoot.querySelector(`[data-cd="${key}"]`);
+      if (el) el.textContent = String(val).padStart(2, "0");
+    };
+    set("d", p.d);
+    set("h", p.h);
+    set("m", p.m);
+    set("s", p.s);
     if (left <= 0 && countdownTimer) {
       clearInterval(countdownTimer);
       countdownTimer = null;
@@ -164,10 +178,6 @@ export async function renderRanking(root, { user }) {
       countdownTimer = null;
     }
     resetsAtMs = iso ? new Date(iso).getTime() : 0;
-    if (cdLabel) {
-      cdLabel.textContent =
-        period === "monthly" ? "รีเซ็ต Monthly ใน (สิ้นเดือน เวลาไทย)" : "รีเซ็ต Weekly ใน (จันทร์ 00:00 เวลาไทย)";
-    }
     tickCountdown();
     countdownTimer = setInterval(tickCountdown, 1000);
   }
@@ -201,7 +211,7 @@ export async function renderRanking(root, { user }) {
 
     if (!rest.length) {
       listEl.innerHTML = top.length
-        ? `<div class="empty tiny" style="margin:0">ยังไม่มีอันดับ 4 ขึ้นไป</div>`
+        ? `<div class="empty tiny" style="margin:0">ยังไม่มีอันดับ 4 ลงไป</div>`
         : `<div class="empty">ยังไม่มีสถิติในช่วงนี้</div>`;
     } else {
       listEl.innerHTML = `<div class="rank-list">${rest.map((r) => rowHtml(r, sort, meId)).join("")}</div>`;
