@@ -1637,6 +1637,51 @@ body.nav-open .sidebar .nav {
 }
 .table-wrap { overflow-x: auto; }
 .click-row { cursor: pointer; }
+.click-row:hover { background: rgba(107, 136, 255, 0.08); }
+
+.user-detail-card {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+}
+.user-card-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.user-card-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin: 4px 36px 12px 0;
+}
+.user-card-av {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+  border: 1px solid var(--nv-border);
+}
+.user-card-av.ph {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background: rgba(107, 136, 255, 0.25);
+  color: #fff;
+}
+.user-card-id { min-width: 0; flex: 1; }
+.user-card-meta { margin-bottom: 4px; line-height: 1.5; }
+.user-card-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--nv-border);
+}
+.user-card-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
 .actions-cell {
   text-align: right;
 }

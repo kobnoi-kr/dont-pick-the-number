@@ -1,6 +1,15 @@
 import { api } from "/js/dashboard/api.js";
 import { esc, fmtDate, statusPill, hasPerm } from "./util.js";
 
+function avHtml(u) {
+  const name = u.displayName || u.username || "?";
+  const letter = String(name).slice(0, 1).toUpperCase();
+  if (u.avatarUrl) {
+    return `<img class="user-card-av" src="${esc(u.avatarUrl)}" alt="" width="56" height="56" referrerpolicy="no-referrer">`;
+  }
+  return `<div class="user-card-av ph" aria-hidden="true">${esc(letter)}</div>`;
+}
+
 export async function renderUsers(root, { user }) {
   root.innerHTML = `
     <div class="card">
@@ -21,10 +30,26 @@ export async function renderUsers(root, { user }) {
         </select>
         <button type="button" class="btn sm" id="uSearch">ค้นหา</button>
       </div>
+      <p class="tiny muted" style="margin:10px 0 0">กดแถวผู้ใช้เพื่อเปิดการ์ดจัดการ</p>
       <div id="uList" class="loading" style="margin-top:12px">Loading…</div>
     </div>
-    <div id="uDetail" class="card hidden" style="margin-top:16px"></div>
+    <div id="uDetailModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card user-detail-card" id="uDetailPanel">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
   `;
+
+  const modal = root.querySelector("#uDetailModal");
+  const panel = root.querySelector("#uDetailPanel");
+
+  function closeDetail() {
+    modal.classList.add("hidden");
+  }
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeDetail();
+  });
 
   async function load() {
     const q = root.querySelector("#uQ").value.trim();
@@ -51,7 +76,7 @@ export async function renderUsers(root, { user }) {
               users.length
                 ? users
                     .map(
-                      (u) => `<tr class="click-row" data-id="${esc(u.id)}">
+                      (u) => `<tr class="click-row" data-id="${esc(u.id)}" title="เปิดการ์ดผู้ใช้">
                 <td>
                   <b>${esc(u.displayName || u.username)}</b>
                   <div class="tiny">@${esc(u.username)}${u.email ? " · " + esc(u.email) : ""}</div>
@@ -75,33 +100,51 @@ export async function renderUsers(root, { user }) {
   }
 
   async function openDetail(id) {
-    const panel = root.querySelector("#uDetail");
-    panel.classList.remove("hidden");
+    modal.classList.remove("hidden");
     panel.innerHTML = `<div class="loading">Loading…</div>`;
     const { res, data } = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, { method: "GET" });
     if (!res.ok) {
-      panel.innerHTML = `<div class="empty">ไม่พบผู้ใช้</div>`;
+      panel.innerHTML = `
+        <div class="row-between">
+          <div class="empty">ไม่พบผู้ใช้</div>
+          <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
+        </div>`;
+      panel.querySelector("#uClose").onclick = closeDetail;
       return;
     }
     const u = data.user;
+    const st = data.stats;
     const canBan = hasPerm(user, "users.ban");
     const canUnban = hasPerm(user, "users.unban");
     const canDelete = hasPerm(user, "users.delete");
     const canRoles = hasPerm(user, "admins.manage");
     const canRename = canBan;
+    const canResetExp = hasPerm(user, "users.reset_exp") || canBan;
+
     panel.innerHTML = `
-      <div class="row-between">
-        <div>
+      <button type="button" class="textbtn user-card-close" id="uClose" aria-label="ปิด">ปิด</button>
+      <div class="user-card-head">
+        ${avHtml(u)}
+        <div class="user-card-id">
           <h2 style="margin:0">${esc(u.displayName || u.username)}</h2>
-          <div class="tiny">@${esc(u.username)} · ${statusPill(u.status)} · ${(u.roles || []).map(esc).join(", ")}</div>
+          <div class="tiny">@${esc(u.username)} · ${statusPill(u.status)}</div>
+          <div class="tiny" style="margin-top:4px">${esc((u.roles || []).join(" · ") || "—")}</div>
           <div class="tiny" style="margin-top:4px">Level ${Number(u.level) || 1} · ${Number(u.exp) || 0} EXP</div>
         </div>
-        <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
+      </div>
+      <div class="user-card-meta tiny muted">
+        ${u.email ? `<div>Email: ${esc(u.email)}</div>` : ""}
+        <div>Joined: ${esc(fmtDate(u.createdAt))} · Sessions: ${u.sessionCount != null ? u.sessionCount : "—"}</div>
+        ${
+          st
+            ? `<div>Games: ${st.totalGames || 0} · Won: ${st.gamesWon || 0} · Points: ${st.totalPoints || 0}</div>`
+            : ""
+        }
       </div>
       ${
-        hasPerm(user, "users.reset_exp") || canBan
-          ? `<div style="margin-top:16px">
-        <h3 style="margin:0 0 8px">Level / EXP</h3>
+        canResetExp
+          ? `<div class="user-card-section">
+        <h3>Level / EXP</h3>
         <p class="tiny muted" style="margin:0 0 10px">ลบ EXP แล้วเลเวลจะกลับไป 1</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
           <button type="button" class="btn ghost sm danger-outline" id="uResetExp">ลบ EXP</button>
@@ -112,10 +155,10 @@ export async function renderUsers(root, { user }) {
       }
       ${
         canRename
-          ? `<div style="margin-top:16px">
-        <h3 style="margin:0 0 8px">เปลี่ยนชื่อ</h3>
-        <p class="tiny muted" style="margin:0 0 10px">Username ใช้ระบุบัญชี (a-z, 0-9, . _ -) · Display name คือชื่อที่แสดง · ไม่ผูกกันอัตโนมัติ</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          ? `<div class="user-card-section">
+        <h3>เปลี่ยนชื่อ</h3>
+        <p class="tiny muted" style="margin:0 0 10px">Username (a-z 0-9 . _ -) · Display name ไม่ผูกกันอัตโนมัติ</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
           <label class="tiny">Username
             <input class="input" id="uUsername" maxlength="64" value="${esc(u.username || "")}" />
           </label>
@@ -130,7 +173,7 @@ export async function renderUsers(root, { user }) {
       </div>`
           : ""
       }
-      <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">
+      <div class="user-card-section actions" style="display:flex;flex-wrap:wrap;gap:8px">
         ${canUnban ? `<button type="button" class="btn sm" data-status="active">Unban / Activate</button>` : ""}
         ${canBan ? `<button type="button" class="btn ghost sm" data-status="suspended">Suspend</button>` : ""}
         ${canBan ? `<button type="button" class="btn danger sm" data-status="banned">Ban</button>` : ""}
@@ -139,7 +182,7 @@ export async function renderUsers(root, { user }) {
       </div>
       ${
         canRoles
-          ? `<div style="margin-top:16px">
+          ? `<div class="user-card-section">
         <h3>Roles</h3>
         <div class="perm-checks" id="uRoles">
           ${["player", "moderator", "admin", "super_admin"]
@@ -154,7 +197,8 @@ export async function renderUsers(root, { user }) {
           : ""
       }
     `;
-    panel.querySelector("#uClose").onclick = () => panel.classList.add("hidden");
+
+    panel.querySelector("#uClose").onclick = closeDetail;
     panel.querySelectorAll("[data-status]").forEach((btn) => {
       btn.onclick = async () => {
         const status = btn.getAttribute("data-status");
@@ -167,6 +211,7 @@ export async function renderUsers(root, { user }) {
         await load();
       };
     });
+
     const resetExp = panel.querySelector("#uResetExp");
     if (resetExp) {
       resetExp.onclick = async () => {
@@ -192,6 +237,7 @@ export async function renderUsers(root, { user }) {
         await load();
       };
     }
+
     const saveName = panel.querySelector("#uSaveName");
     if (saveName) {
       saveName.onclick = async () => {
@@ -236,6 +282,7 @@ export async function renderUsers(root, { user }) {
         await load();
       };
     }
+
     const revoke = panel.querySelector("#uRevoke");
     if (revoke) {
       revoke.onclick = async () => {
@@ -244,6 +291,7 @@ export async function renderUsers(root, { user }) {
         await openDetail(id);
       };
     }
+
     const saveRoles = panel.querySelector("#uSaveRoles");
     if (saveRoles) {
       saveRoles.onclick = async () => {
