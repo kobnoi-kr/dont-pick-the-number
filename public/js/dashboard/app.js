@@ -8,6 +8,7 @@ import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
+import { showRoomInviteBanner } from "./invites.js";
 import { enforceMaintenanceGate, applyLiveMaintenance } from "/js/maintenance-gate.js";
 
 const state = {
@@ -152,6 +153,7 @@ onDashboardMessage((msg) => {
     onLiveAnnouncement(msg.announcement);
     refreshNotifications();
   }
+  if (msg.t === "roomInvite") showRoomInviteBanner(msg);
   if (msg.t === "maintenance" && msg.enabled !== false) {
     const roles = (state.user && state.user.roles) || [];
     const isAdmin =

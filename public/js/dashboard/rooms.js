@@ -70,7 +70,13 @@ function openPrivateJoinModal(roomTitle) {
   requestAnimationFrame(() => input.focus());
 }
 
-export async function renderRooms(root, { openCreate } = {}) {
+function isStaff(user) {
+  const roles = (user && user.roles) || [];
+  return roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+}
+
+export async function renderRooms(root, { openCreate, user } = {}) {
+  const staff = isStaff(user);
   root.innerHTML = `
     <section class="page-head">
       <div>
@@ -136,19 +142,31 @@ export async function renderRooms(root, { openCreate } = {}) {
           ${live
             .map((r) => {
               const priv = r.visibility === "private";
-              const codeLabel = priv ? "🔒 ล็อก" : r.code || "—";
+              const hasCode = /^\d{6}$/.test(String(r.code || ""));
+              const adminBypass = staff && priv && hasCode;
+              const codeLabel = priv
+                ? adminBypass
+                  ? "🔒 " + r.code + " · แอดมิน"
+                  : "🔒 ล็อก"
+                : r.code || "—";
               let actions = "";
               if (r.joinable) {
-                if (priv) {
+                if (priv && !adminBypass) {
                   actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
-                } else {
-                  actions = `<button class="btn sm" data-join="${esc(r.code)}">เข้า</button>
+                } else if (hasCode) {
+                  actions = `<button class="btn sm" data-join="${esc(r.code)}">${adminBypass ? "เข้าชม" : "เข้า"}</button>
                        <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`;
+                } else {
+                  actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
                 }
               } else if (r.phase !== "lobby" && r.phase !== "over") {
-                actions = priv
-                  ? `<button class="btn ghost sm" disabled>ส่วนตัว</button>`
-                  : `<a class="btn ghost sm" href="${playUrl({ code: r.code, watch: true })}">ดูสด</a>`;
+                if (priv && !adminBypass) {
+                  actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
+                } else if (hasCode) {
+                  actions = `<a class="btn ghost sm" href="${playUrl({ code: r.code, watch: true })}">${adminBypass ? "เข้าชม" : "ดูสด"}</a>`;
+                } else {
+                  actions = `<button class="btn ghost sm" disabled>ส่วนตัว</button>`;
+                }
               } else {
                 actions = `<button class="btn sm" disabled>เต็ม</button>`;
               }

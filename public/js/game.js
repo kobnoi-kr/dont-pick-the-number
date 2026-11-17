@@ -219,10 +219,12 @@ function readPlayParams(){
   let setup=null;
   try{ if(q.get("setup")) setup=JSON.parse(q.get("setup")); }catch(e){}
   pendingSetup=setup;
+  const inviteId=String(q.get("invite")||"").trim();
   if(watch&&(/^\d{6}$/.test(code)||q.get("spectate"))){
     spectating=true;
     pendingAction={type:"watch",code:code||String(q.get("spectate")||"").replace(/\D/g,"").slice(0,6)};
-  }else if(/^\d{6}$/.test(code)) pendingAction={type:"join",code};
+  }else if(inviteId) pendingAction={type:"acceptInvite",inviteId};
+  else if(/^\d{6}$/.test(code)) pendingAction={type:"join",code};
   else if(create==="public"||create==="private") pendingAction={type:"create",visibility:create};
 }
 function runPendingAction(){
@@ -234,11 +236,13 @@ function runPendingAction(){
     send({t:"create",visibility:pendingAction.visibility,name,token:myToken(),avatarUrl:myAvatar(),setup:pendingSetup||undefined});
   }else if(pendingAction.type==="watch"){
     send({t:"watch",code:pendingAction.code,token:myToken(),name,avatarUrl:myAvatar()});
+  }else if(pendingAction.type==="acceptInvite"){
+    send({t:"acceptInvite",inviteId:pendingAction.inviteId,name,token:myToken(),avatarUrl:myAvatar()});
   }
   pendingAction=null;
   try{
     const u=new URL(location.href);
-    ["code","create","watch","spectate","setup","name"].forEach(k=>u.searchParams.delete(k));
+    ["code","create","watch","spectate","setup","name","invite"].forEach(k=>u.searchParams.delete(k));
     history.replaceState({}, "", u.pathname+(u.search||""));
   }catch(e){}
 }
@@ -1848,21 +1852,28 @@ function renderInviteFriendList(){
 }
 function showRoomInvite(msg){
   pendingRoomInvite=msg;
+  const banner=$("roomInviteBanner");
+  if(!banner) return;
   const av=$("roomInviteAvatar");
-  if(msg.fromAvatar){
-    av.src=msg.fromAvatar;
-    av.classList.add("on");
-  }else{
-    av.removeAttribute("src");
-    av.classList.remove("on");
+  if(av){
+    if(msg.fromAvatar){
+      av.src=msg.fromAvatar;
+      av.classList.add("on");
+    }else{
+      av.removeAttribute("src");
+      av.classList.remove("on");
+    }
   }
-  $("roomInviteFrom").textContent=(msg.fromName||"เพื่อน")+" เชิญคุณ";
-  $("roomInviteRoom").textContent=msg.roomTitle||"ห้องส่วนตัว";
-  $("roomInviteModal").classList.remove("hidden");
+  const from=$("roomInviteFrom");
+  const room=$("roomInviteRoom");
+  if(from) from.textContent=(msg.fromName||"เพื่อน")+" ชวนคุณเข้าห้อง";
+  if(room) room.textContent=msg.roomTitle||"ห้องส่วนตัว";
+  banner.classList.remove("hidden");
 }
 function hideRoomInvite(){
   pendingRoomInvite=null;
-  $("roomInviteModal").classList.add("hidden");
+  const banner=$("roomInviteBanner");
+  if(banner) banner.classList.add("hidden");
 }
 async function ensureAuth(){
   if(authBoot) return authBoot;
@@ -2424,6 +2435,8 @@ function renderLobby(msg){
   if(empty) empty.classList.toggle("hidden",found.length>0);
   found.forEach(room=>{
     const priv=room.visibility==="private";
+    const hasCode=/^\d{6}$/.test(String(room.code||""));
+    const adminBypass=priv&&hasCode;
     const li=document.createElement("li");
     li.className="room"+(priv?" locked":"");
     const meta=document.createElement("div");
@@ -2442,18 +2455,33 @@ function renderLobby(msg){
     const state=room.phase==="lobby"?"รอผู้เล่น":"กำลังเล่น";
     const vis=priv?"ส่วนตัว":"สาธารณะ";
     sub.textContent=priv
-      ?("ล็อก · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max)
+      ?(adminBypass
+        ?("แอดมิน · "+room.code+" · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max)
+        :("ล็อก · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max))
       :(room.code+" · "+vis+" · "+cat+" · "+state+" · "+room.count+"/"+room.max);
     meta.append(title,sub);
     const btn=document.createElement("button");
     btn.type="button";
     btn.className="btn";
-    btn.textContent=room.joinable?(priv?"ใส่รหัส":"เข้า"):(room.phase==="lobby"?"เต็ม":"กำลังเล่น");
-    btn.disabled=!room.joinable;
-    btn.onclick=()=>{
-      if(priv) openCodeModal("ห้องของ "+(room.host||"เพื่อน")+" ล็อกอยู่ · ใส่รหัส 6 หลัก");
-      else joinCode(room.code);
-    };
+    const midGame=room.phase!=="lobby"&&room.phase!=="over";
+    if(room.joinable){
+      btn.textContent=priv&&!adminBypass?"ใส่รหัส":(adminBypass?"เข้าชม":"เข้า");
+      btn.disabled=false;
+      btn.onclick=()=>{
+        if(priv&&!adminBypass) openCodeModal("ห้องของ "+(room.host||"เพื่อน")+" ล็อกอยู่ · ใส่รหัส 6 หลัก");
+        else joinCode(room.code);
+      };
+    }else if(midGame&&adminBypass){
+      btn.textContent="เข้าชม";
+      btn.disabled=false;
+      btn.onclick=()=>{
+        spectating=true;
+        send({t:"watch",code:room.code,token:myToken(),name:typedName()||localStorage.getItem("dpn-name")||"",avatarUrl:myAvatar()});
+      };
+    }else{
+      btn.textContent=room.phase==="lobby"?"เต็ม":(priv?"ส่วนตัว":"กำลังเล่น");
+      btn.disabled=true;
+    }
     li.append(meta,btn);
     list.appendChild(li);
   });
@@ -2750,7 +2778,9 @@ async function bootOnline(){
   }
   $("inviteModalClose").onclick=()=>closeInviteModal();
   $("inviteModal").addEventListener("click",e=>{ if(e.target===$("inviteModal")) closeInviteModal(); });
-  $("roomInviteAccept").onclick=()=>{
+  const acceptBtn=$("roomInviteAccept");
+  const declineBtn=$("roomInviteDecline");
+  if(acceptBtn) acceptBtn.onclick=()=>{
     if(!pendingRoomInvite) return;
     const inviteId=pendingRoomInvite.inviteId;
     hideRoomInvite();
@@ -2761,16 +2791,10 @@ async function bootOnline(){
       avatarUrl:myAvatar()
     });
   };
-  $("roomInviteDecline").onclick=()=>{
+  if(declineBtn) declineBtn.onclick=()=>{
     if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
     hideRoomInvite();
   };
-  $("roomInviteModal").addEventListener("click",e=>{
-    if(e.target===$("roomInviteModal")){
-      if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
-      hideRoomInvite();
-    }
-  });
   const bindVol=(id, delta)=>{
     const el=$(id);
     let armed=false;

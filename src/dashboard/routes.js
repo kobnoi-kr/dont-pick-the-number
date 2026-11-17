@@ -312,7 +312,8 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     const user = await optionalUser(req);
-    const live = (game ? game.listLobbyRooms() : []).filter((r) => r.joinable || r.phase !== "over");
+    const revealPrivate = !!(user && isAdminUser(user));
+    const live = (game ? game.listLobbyRooms({ revealPrivate }) : []).filter((r) => r.joinable || r.phase !== "over");
     let created = [];
     if (user && authEnabled()) {
       const prisma = await getPrisma();
@@ -471,7 +472,9 @@ async function handleDashboardApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
-    sendJson(res, 200, { games: game ? game.listLiveGames() : [] });
+    const user = await optionalUser(req);
+    const revealPrivate = !!(user && isAdminUser(user));
+    sendJson(res, 200, { games: game ? game.listLiveGames({ revealPrivate }) : [] });
     return true;
   }
 

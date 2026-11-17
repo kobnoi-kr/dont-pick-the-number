@@ -29,6 +29,7 @@ export function playUrl(opts = {}) {
   if (opts.code) q.set("code", opts.code);
   if (opts.create) q.set("create", opts.create);
   if (opts.watch) q.set("watch", "1");
+  if (opts.invite) q.set("invite", opts.invite);
   if (opts.name) q.set("name", opts.name);
   if (opts.setup) q.set("setup", JSON.stringify(opts.setup));
   const s = q.toString();

@@ -297,19 +297,17 @@
     <p id="inviteModalMsg" class="msg"></p>
   </div>
 </div>
-<div id="roomInviteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="roomInviteTitle">
-  <div class="modal-card">
-    <h3 id="roomInviteTitle">คำเชิญเข้าห้อง</h3>
-    <div class="invite-from">
-      <img id="roomInviteAvatar" class="auth-avatar on" alt="" width="40" height="40">
-      <div>
-        <p id="roomInviteFrom" class="invite-from-name"></p>
-        <p id="roomInviteRoom" class="sub" style="margin:0;text-align:left"></p>
-      </div>
+<div id="roomInviteBanner" class="invite-banner hidden" role="dialog" aria-live="polite" aria-labelledby="roomInviteTitle">
+  <div class="invite-banner-card">
+    <img id="roomInviteAvatar" class="auth-avatar on invite-banner-av" alt="" width="40" height="40">
+    <div class="invite-banner-body">
+      <div id="roomInviteTitle" class="invite-banner-kicker">มีคนชวนเข้าห้อง</div>
+      <p id="roomInviteFrom" class="invite-banner-from"></p>
+      <p id="roomInviteRoom" class="invite-banner-room"></p>
     </div>
-    <div class="invite-actions">
-      <button type="button" id="roomInviteAccept" class="btn">เข้าห้อง</button>
-      <button type="button" id="roomInviteDecline" class="btn ghost">ปฏิเสธ</button>
+    <div class="invite-banner-actions">
+      <button type="button" id="roomInviteAccept" class="btn sm">ตกลง</button>
+      <button type="button" id="roomInviteDecline" class="btn ghost sm">ปฏิเสธ</button>
     </div>
   </div>
 </div>

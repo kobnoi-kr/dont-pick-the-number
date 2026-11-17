@@ -524,7 +524,8 @@ function snap(room, player, opts) {
   };
   return base;
 }
-function lobbyMsg() {
+function lobbyMsg(opts = {}) {
+  const revealPrivate = !!opts.revealPrivate;
   const list = [];
   for (const room of rooms.values()) {
     if (!room.players.some((item) => item.connected)) continue;
@@ -532,7 +533,7 @@ function lobbyMsg() {
     const count = room.players.filter((item) => item.connected).length;
     const priv = room.visibility === "private";
     list.push({
-      code: priv ? "" : room.code,
+      code: priv && !revealPrivate ? "" : room.code,
       visibility: priv ? "private" : "public",
       title: roomLabel(room),
       host: host ? host.name : "",
@@ -561,9 +562,25 @@ setInterval(() => {
     })
     .catch(() => {});
 }, 5000);
+async function refreshAdminFlag(ws) {
+  const token = validToken(ws.token) ? ws.token : "";
+  if (!token) {
+    ws.isAdmin = false;
+    return false;
+  }
+  try {
+    ws.isAdmin = !!(await userBypassesMaintenance(token));
+  } catch {
+    ws.isAdmin = false;
+  }
+  return !!ws.isAdmin;
+}
+function sendLobby(ws) {
+  if (!ws || ws.readyState !== 1) return;
+  send(ws, lobbyMsg({ revealPrivate: !!ws.isAdmin }));
+}
 function broadcastLobby() {
-  const msg = lobbyMsg();
-  for (const ws of watchers) send(ws, msg);
+  for (const ws of watchers) sendLobby(ws);
 }
 function broadcast(room) {
   for (const player of room.players) send(player.ws, snap(room, player));
@@ -1003,7 +1020,7 @@ function releaseSocket(ws, notify) {
   if (notify) {
     watchers.add(ws);
     send(ws, { t: "left" });
-    send(ws, lobbyMsg());
+    sendLobby(ws);
   }
   if (room.phase === "lobby") broadcast(room);
   else {
@@ -1017,7 +1034,7 @@ function tellLobby(sock) {
   if (!sock || sock.readyState !== 1) return;
   watchers.add(sock);
   send(sock, { t: "left" });
-  send(sock, lobbyMsg());
+  sendLobby(sock);
 }
 function takeOut(room, player, ws, notify) {
   const name = player.name;
@@ -1414,13 +1431,19 @@ function detachSpectator(ws) {
     if (room.spectators.length !== before) broadcastLobby();
   }
 }
-function onWatch(ws, msg) {
+async function onWatch(ws, msg) {
   const code = String(msg.code || "").trim();
   if (!/^\d{6}$/.test(code)) return fail(ws, "รหัสต้องเป็นตัวเลข 6 หลัก");
   const room = rooms.get(code);
   if (!room) return fail(ws, "ไม่พบห้องนี้");
   if (room.phase === "lobby") return fail(ws, "เกมยังไม่เริ่ม — เข้าเป็นผู้เล่นแทน");
-  if (room.visibility === "private") return fail(ws, "ห้องส่วนตัวไม่เปิดให้ชม");
+  if (room.visibility === "private") {
+    const token = validToken(msg.token) ? msg.token : validToken(ws.token) ? ws.token : "";
+    if (token) ws.token = token;
+    const admin = ws.isAdmin || (token && (await userBypassesMaintenance(token)));
+    if (!admin) return fail(ws, "ห้องส่วนตัวไม่เปิดให้ชม");
+    ws.isAdmin = true;
+  }
   detachSpectator(ws);
   const seatCtx = seat(ws);
   if (seatCtx) takeOut(seatCtx.room, seatCtx.player, ws, false);
@@ -1437,7 +1460,7 @@ function onUnwatch(ws) {
   detachSpectator(ws);
   watchers.add(ws);
   send(ws, { t: "left" });
-  send(ws, lobbyMsg());
+  sendLobby(ws);
 }
 async function onJoin(ws, msg) {
   const code = String(msg.code || "").trim();
@@ -1468,11 +1491,12 @@ async function onJoin(ws, msg) {
   }
   attach(ws, room, player);
 }
-function onHello(ws, msg) {
+async function onHello(ws, msg) {
   const token = validToken(msg.token) ? msg.token : "";
   ws.token = token;
   ws.pendingName = cleanName(msg.name);
   if (token) trackPresence(ws, token);
+  await refreshAdminFlag(ws);
   const avatarUrl = cleanAvatar(msg.avatarUrl);
   if (token) {
     const found = findSeat(token);
@@ -1483,14 +1507,14 @@ function onHello(ws, msg) {
     }
   }
   watchers.add(ws);
-  send(ws, lobbyMsg());
+  sendLobby(ws);
 }
 function onLeave(ws) {
   const ctx = seat(ws);
   if (!ctx) {
     watchers.add(ws);
     send(ws, { t: "left" });
-    send(ws, lobbyMsg());
+    sendLobby(ws);
     return;
   }
   takeOut(ctx.room, ctx.player, ws, true);
@@ -1610,10 +1634,10 @@ function onMessage(ws, raw) {
   let msg;
   try { msg = JSON.parse(raw.toString()); } catch (err) { return; }
   if (!msg || typeof msg !== "object") return;
-  if (msg.t === "hello") return onHello(ws, msg);
+  if (msg.t === "hello") return void onHello(ws, msg);
   if (msg.t === "create") return onCreate(ws, msg);
   if (msg.t === "join") return onJoin(ws, msg);
-  if (msg.t === "watch") return onWatch(ws, msg);
+  if (msg.t === "watch") return void onWatch(ws, msg);
   if (msg.t === "unwatch") return onUnwatch(ws);
   if (msg.t === "leave") return onLeave(ws);
   if (msg.t === "friendsOnline") return void onFriendsOnline(ws);
@@ -1768,12 +1792,13 @@ setInterval(() => {
   }
 }, 1000);
 
-function lobbyRoomRow(room) {
+function lobbyRoomRow(room, opts = {}) {
+  const revealPrivate = !!opts.revealPrivate;
   const host = room.players.find((item) => item.id === room.hostId);
   const count = room.players.filter((item) => item.connected).length;
   const priv = room.visibility === "private";
   return {
-    code: priv && room.phase === "lobby" ? "" : room.code,
+    code: priv && !revealPrivate ? "" : room.code,
     visibility: priv ? "private" : "public",
     title: roomLabel(room),
     host: host ? host.name : "",
@@ -1815,23 +1840,25 @@ function adminRoomRow(room) {
 }
 
 attachGameApi({
-  listLobbyRooms() {
+  listLobbyRooms(opts = {}) {
+    const revealPrivate = !!opts.revealPrivate;
     const list = [];
     for (const room of rooms.values()) {
       if (!room.players.some((item) => item.connected) && !(room.spectators && room.spectators.length)) continue;
-      list.push(lobbyRoomRow(room));
+      list.push(lobbyRoomRow(room, { revealPrivate }));
     }
     list.sort((a, b) => (b.created || 0) - (a.created || 0));
     const maxShow = Number(lobbyMsg._maxRooms) || 50;
     return list.slice(0, maxShow);
   },
-  listLiveGames() {
+  listLiveGames(opts = {}) {
+    const revealPrivate = !!opts.revealPrivate;
     const list = [];
     for (const room of rooms.values()) {
       if (room.phase === "lobby" || room.phase === "over") continue;
-      if (room.visibility === "private") continue;
+      if (room.visibility === "private" && !revealPrivate) continue;
       if (!room.players.some((item) => item.connected)) continue;
-      list.push(lobbyRoomRow(room));
+      list.push(lobbyRoomRow(room, { revealPrivate }));
     }
     const maxShow = Number(lobbyMsg._maxRooms) || 50;
     return list.slice(0, maxShow);

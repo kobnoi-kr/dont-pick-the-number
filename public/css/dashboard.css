@@ -770,6 +770,72 @@ td.row-actions > a.btn:last-child {
 }
 .announce-banner b { display: block; margin-bottom: 4px; }
 
+.invite-banner{
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 140;
+  width: min(440px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.invite-banner.hidden{ display: none !important; }
+.invite-banner-card{
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(12, 18, 32, .96);
+  border: 1px solid var(--nv-border);
+  box-shadow: 0 14px 40px rgba(0,0,0,.45);
+  animation: inviteIn .22s ease;
+}
+@keyframes inviteIn{
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.invite-banner-av{
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,.08);
+}
+.invite-banner-av:not(.on){ display: none; }
+.invite-banner-body{ min-width: 0; flex: 1; }
+.invite-banner-kicker{
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--nv-muted);
+  margin-bottom: 2px;
+}
+.invite-banner-from{ margin: 0; font-weight: 800; line-height: 1.25; }
+.invite-banner-room{
+  margin: 2px 0 0;
+  font-size: .88rem;
+  color: var(--nv-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invite-banner-actions{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.invite-banner-actions .btn{ margin: 0; white-space: nowrap; }
+@media (max-width: 480px){
+  .invite-banner-card{ flex-wrap: wrap; }
+  .invite-banner-actions{ flex-direction: row; width: 100%; }
+  .invite-banner-actions .btn{ flex: 1; }
+}
+
 .toast-host {
   position: fixed;
   top: 16px;

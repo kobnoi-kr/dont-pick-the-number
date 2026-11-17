@@ -304,6 +304,38 @@ img.auth-avatar.on{display:block;object-fit:cover}
 .invite-from-name{margin:0;font-weight:750}
 .invite-actions{display:flex;flex-direction:column;gap:8px}
 .invite-actions .btn{margin:0}
+.invite-banner{
+  position:fixed;top:14px;left:50%;transform:translateX(-50%);
+  z-index:140;width:min(440px,calc(100vw - 24px));pointer-events:none;
+}
+.invite-banner.hidden{display:none !important}
+.invite-banner-card{
+  pointer-events:auto;display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:14px;
+  background:rgba(12,18,32,.96);border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 14px 40px rgba(0,0,0,.45);backdrop-filter:blur(10px);
+  animation:inviteIn .22s ease;
+}
+@keyframes inviteIn{
+  from{opacity:0;transform:translateY(-10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.invite-banner-av{flex:0 0 auto;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.08)}
+.invite-banner-av:not(.on){display:none}
+.invite-banner-body{min-width:0;flex:1}
+.invite-banner-kicker{
+  font-size:.7rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted,#9aa4b2);margin-bottom:2px;
+}
+.invite-banner-from{margin:0;font-weight:800;line-height:1.25}
+.invite-banner-room{margin:2px 0 0;font-size:.88rem;color:var(--muted,#9aa4b2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.invite-banner-actions{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
+.invite-banner-actions .btn{margin:0;white-space:nowrap}
+@media (max-width:480px){
+  .invite-banner-card{flex-wrap:wrap}
+  .invite-banner-actions{flex-direction:row;width:100%}
+  .invite-banner-actions .btn{flex:1}
+}
 .grid button.wait:disabled{opacity:1;background:var(--chip);color:var(--text);cursor:not-allowed}
 .prow.off{opacity:.45}
 .turnbar.you{color:var(--mark)}
