@@ -100,8 +100,12 @@ function paintCats() {
   }).join("");
 
   wrap.querySelectorAll("[data-cat]").forEach((btn) => {
-    btn.onclick = () => {
-      activeCat = btn.getAttribute("data-cat") || "all";
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const next = btn.getAttribute("data-cat") || "all";
+      if (next === activeCat) return;
+      activeCat = next;
       paintCats();
       renderList();
     };
@@ -160,25 +164,41 @@ function renderList() {
 
   list.querySelectorAll(".notif-item").forEach((li) => {
     li.onclick = async (e) => {
+      e.stopPropagation();
       if (e.target.closest("[data-del]") || e.target.closest(".notif-check")) return;
       const id = li.getAttribute("data-id");
       await api("/api/v1/notifications/" + id, {
         method: "PATCH",
         body: JSON.stringify({ read: true })
       });
-      refreshNotifications();
+      // Soft update: keep panel open and preserve category/scroll.
+      const row = cacheItems.find((n) => n.id === id);
+      if (row) row.readAt = new Date().toISOString();
+      paintCats();
+      renderList();
+      const dot = document.getElementById("notifDot");
+      if (dot) dot.classList.toggle("hidden", !cacheItems.some((n) => !n.readAt));
     };
   });
   list.querySelectorAll("[data-del]").forEach((btn) => {
     btn.onclick = async (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      await api("/api/v1/notifications/" + btn.getAttribute("data-del"), { method: "DELETE" });
-      refreshNotifications();
+      const id = btn.getAttribute("data-del");
+      await api("/api/v1/notifications/" + id, { method: "DELETE" });
+      cacheItems = cacheItems.filter((n) => n.id !== id);
+      paintCats();
+      renderList();
+      const dot = document.getElementById("notifDot");
+      if (dot) dot.classList.toggle("hidden", !cacheItems.some((n) => !n.readAt));
     };
   });
   list.querySelectorAll("input[data-pick]").forEach((box) => {
     box.onclick = (e) => e.stopPropagation();
-    box.onchange = () => syncSelectionUi();
+    box.onchange = (e) => {
+      e.stopPropagation();
+      syncSelectionUi();
+    };
   });
   list.querySelectorAll(".notif-check").forEach((lab) => {
     lab.onclick = (e) => e.stopPropagation();
@@ -225,25 +245,38 @@ export function wireNotifications() {
 
   paintCats();
 
-  btn.onclick = async () => {
-    panel.classList.toggle("hidden");
-    if (!panel.classList.contains("hidden")) await refreshNotifications();
-  };
+  // Keep panel open while interacting; re-render used to detach click targets
+  // and the document outside-click handler then closed the panel.
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  panel.addEventListener("mousedown", (e) => e.stopPropagation());
+
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const willOpen = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !willOpen);
+    if (willOpen) await refreshNotifications();
+  });
+
   document.addEventListener("click", (e) => {
     if (panel.classList.contains("hidden")) return;
-    if (panel.contains(e.target) || btn.contains(e.target)) return;
+    if (btn.contains(e.target) || panel.contains(e.target)) return;
+    // Detached nodes (after re-render) are not "contained" — ignore those.
+    if (e.target && e.target.isConnected === false) return;
     panel.classList.add("hidden");
   });
 
   if (markAll) {
-    markAll.onclick = async () => {
+    markAll.onclick = async (e) => {
+      e.stopPropagation();
       await api("/api/v1/notifications/read-all", { method: "POST", body: "{}" });
       refreshNotifications();
     };
   }
 
   if (deleteAll) {
-    deleteAll.onclick = async () => {
+    deleteAll.onclick = async (e) => {
+      e.stopPropagation();
       if (!confirm("ลบการแจ้งเตือนทั้งหมด?")) return;
       await api("/api/v1/notifications/delete-all", { method: "POST", body: "{}" });
       activeCat = "all";
@@ -252,7 +285,8 @@ export function wireNotifications() {
   }
 
   if (deleteSelected) {
-    deleteSelected.onclick = async () => {
+    deleteSelected.onclick = async (e) => {
+      e.stopPropagation();
       const ids = selectedIds();
       if (!ids.length) return;
       if (!confirm(`ลบข้อความที่เลือก ${ids.length} รายการ?`)) return;
@@ -265,7 +299,8 @@ export function wireNotifications() {
   }
 
   if (selectAll) {
-    selectAll.onchange = () => {
+    selectAll.onchange = (e) => {
+      e.stopPropagation();
       const on = selectAll.checked;
       document.querySelectorAll("#notifList input[data-pick]").forEach((box) => {
         box.checked = on;
