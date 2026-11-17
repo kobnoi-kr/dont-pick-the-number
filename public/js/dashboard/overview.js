@@ -30,17 +30,18 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
-        <div>
-          <h2 style="margin:0">Top Weekly</h2>
-          <p class="muted tiny" style="margin:4px 0 0">Top 1–3 สัปดาห์นี้ (จันทร์–อาทิตย์ เวลาไทย)</p>
-        </div>
+        <h2 style="margin:0">Top Weekly</h2>
         <a class="btn ghost sm" href="#ranking">ดูทั้งหมด</a>
       </div>
-      <div class="rank-cooldown" id="ovRankCd" style="margin-top:12px">
-        <span class="rank-cooldown-label">รีเซ็ต Weekly ใน (จันทร์ 00:00 เวลาไทย)</span>
-        <b class="rank-cooldown-time" id="ovRankCdTime">—:—:—</b>
+      <div class="rank-podium-wrap" style="margin-top:12px">
+        <div class="rank-cal-cd${guest ? " hidden" : ""}" id="ovRankCd" aria-label="นับถอยหลัง">
+          <div class="rank-cal-unit"><b data-cd="d">00</b><span>วัน</span></div>
+          <div class="rank-cal-unit"><b data-cd="h">00</b><span>ชม</span></div>
+          <div class="rank-cal-unit"><b data-cd="m">00</b><span>นาที</span></div>
+          <div class="rank-cal-unit"><b data-cd="s">00</b><span>วิ</span></div>
+        </div>
+        <div id="ovTopRank"><div class="loading">Loading…</div></div>
       </div>
-      <div id="ovTopRank" style="margin-top:12px"><div class="loading">Loading…</div></div>
     </div>
     <div class="content-grid">
       <div class="card">
@@ -96,18 +97,16 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
   }
 
   const topBox = root.querySelector("#ovTopRank");
-  const cdTimeEl = root.querySelector("#ovRankCdTime");
   const cdWrap = root.querySelector("#ovRankCd");
 
-  function formatCountdown(ms) {
-    if (ms <= 0) return "รีเซ็ตแล้ว";
-    const total = Math.floor(ms / 1000);
-    const d = Math.floor(total / 86400);
-    const h = Math.floor((total % 86400) / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    if (d > 0) return `${d}วัน ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  function countdownParts(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    return {
+      d: Math.floor(total / 86400),
+      h: Math.floor((total % 86400) / 3600),
+      m: Math.floor((total % 3600) / 60),
+      s: total % 60
+    };
   }
 
   function ovAvatar(row) {
@@ -144,10 +143,18 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
     } else {
       const lb = await api("/api/v1/leaderboard/weekly?sort=points&limit=3", { method: "GET" });
       const rows = (lb.data && lb.data.rows) || [];
-      if (lb.data && lb.data.resetsAt && cdTimeEl) {
+      if (lb.data && lb.data.resetsAt && cdWrap) {
         const resetsAtMs = new Date(lb.data.resetsAt).getTime();
         const tick = () => {
-          cdTimeEl.textContent = formatCountdown(resetsAtMs - Date.now());
+          const p = countdownParts(resetsAtMs - Date.now());
+          const set = (key, val) => {
+            const el = cdWrap.querySelector(`[data-cd="${key}"]`);
+            if (el) el.textContent = String(val).padStart(2, "0");
+          };
+          set("d", p.d);
+          set("h", p.h);
+          set("m", p.m);
+          set("s", p.s);
         };
         tick();
         const t = setInterval(tick, 1000);
