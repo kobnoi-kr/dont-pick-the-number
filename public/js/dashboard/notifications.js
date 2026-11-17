@@ -291,9 +291,11 @@ function paintNotifSoundToggle() {
   const btn = document.getElementById("notifSoundToggle");
   if (!btn) return;
   const muted = isAdminNotifMuted();
-  btn.textContent = muted ? "เสียงแอดมิน: ปิด" : "เสียงแอดมิน: เปิด";
-  btn.setAttribute("aria-pressed", muted ? "true" : "false");
   btn.classList.toggle("is-muted", muted);
+  btn.setAttribute("aria-pressed", muted ? "true" : "false");
+  btn.title = muted ? "ปิดเสียงข้อความแอดมินอยู่ — กดเพื่อเปิด" : "เปิดเสียงข้อความแอดมิน — กดเพื่อปิด";
+  btn.setAttribute("aria-label", muted ? "เปิดเสียงข้อความแอดมิน" : "ปิดเสียงข้อความแอดมิน");
+  btn.innerHTML = `<i class="fi fi-rr-bell" aria-hidden="true"></i>`;
 }
 
 /** Live WS: play ping only for admin reply messages. */

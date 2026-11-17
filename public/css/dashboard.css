@@ -828,9 +828,38 @@ td.row-actions > a.btn:last-child {
   font-size: 0.78rem;
   color: var(--nv-muted);
 }
+.notif-sound-btn {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.notif-sound-btn .fi {
+  position: relative;
+  display: inline-flex;
+  font-size: 1.05rem;
+  line-height: 1;
+}
 #notifSoundToggle.is-muted {
   color: #fca5a5;
   border-color: rgba(239, 68, 68, 0.35);
+}
+/* Bell with diagonal slash when muted */
+#notifSoundToggle.is-muted .fi::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.15em;
+  height: 2px;
+  background: currentColor;
+  border-radius: 2px;
+  transform: translate(-50%, -50%) rotate(-40deg);
+  box-shadow: 0 0 0 1px rgba(15, 18, 28, 0.85);
+  pointer-events: none;
 }
 .notif-head-actions {
   display: flex;
