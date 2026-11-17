@@ -8,28 +8,112 @@ function esc(s) {
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
 
+function itemColor(item) {
+  if (!item) return "#94a3b8";
+  if (item.meta && item.meta.color) return String(item.meta.color);
+  if (item.cssClass === "title-weekly-1" || item.cssClass === "title-monthly-1") return "#fbbf24";
+  if (item.cssClass === "title-weekly-2" || item.cssClass === "title-monthly-2") return "#cbd5e1";
+  if (item.cssClass === "title-weekly-3" || item.cssClass === "title-monthly-3") return "#cd7f32";
+  if (item.cssClass === "frame-gold") return "#fbbf24";
+  if (item.cssClass === "effect-sparkle") return "#a78bfa";
+  return "#94a3b8";
+}
+
+function avHtml(user, letter) {
+  if (user && user.avatarUrl) {
+    return `<img class="dec-av-img" src="${esc(user.avatarUrl)}" alt="" referrerpolicy="no-referrer">`;
+  }
+  return `<span class="dec-av-letter">${esc(letter || "?")}</span>`;
+}
+
+function thumbHtml(item, user) {
+  const kind = item && item.kind;
+  const color = itemColor(item);
+  const letter = ((user && (user.displayName || user.username)) || "?").slice(0, 1).toUpperCase();
+  if (kind === "title") {
+    return `<span class="dec-thumb-pill" style="border-color:${esc(color)};color:${esc(color)}">${esc(
+      (item && item.name) || "—"
+    )}</span>`;
+  }
+  if (kind === "frame") {
+    const cls = item && item.cssClass ? " " + item.cssClass : "";
+    return `<div class="dec-thumb-av-wrap${cls}" style="--dec-accent:${esc(color)}">${avHtml(user, letter)}</div>`;
+  }
+  if (kind === "effect") {
+    const cls = item && item.cssClass ? " " + item.cssClass : "";
+    return `<div class="dec-thumb-av-wrap effect${cls}" style="--dec-accent:${esc(color)}">${avHtml(user, letter)}</div>`;
+  }
+  return `<span class="tiny">—</span>`;
+}
+
+function previewHtml(user, eq) {
+  const name = (user && (user.displayName || user.username)) || "ผู้เล่น";
+  const uname = user && user.username ? "@" + user.username : "@—";
+  const letter = String(name).slice(0, 1).toUpperCase();
+  const title = eq.title;
+  const frame = eq.frame;
+  const effect = eq.effect;
+  const titleColor = itemColor(title);
+  const frameCls = frame && frame.cssClass ? " " + frame.cssClass : "";
+  const effectCls = effect && effect.cssClass ? " " + effect.cssClass : "";
+  return `
+    <div class="dec-preview-card">
+      <div class="dec-preview-head">
+        <div class="dec-preview-av-wrap${frameCls}${effectCls}" style="--dec-accent:${esc(itemColor(frame))}">
+          ${avHtml(user, letter)}
+        </div>
+        <div class="dec-preview-id">
+          <b class="dec-preview-name">${esc(name)}</b>
+          <span class="dec-preview-user">${esc(uname)}</span>
+          <div class="nv-pills dec-preview-pills">
+            <span class="nv-pill title${title && title.cssClass ? " " + esc(title.cssClass) : ""}" style="border-color:${esc(
+              titleColor
+            )};color:${esc(titleColor)}">${esc((title && title.name) || "—")}</span>
+            ${
+              frame
+                ? `<span class="nv-pill">${esc(frame.name)}</span>`
+                : ""
+            }
+            ${
+              effect && effect.cssClass
+                ? `<span class="nv-pill">${esc(effect.name)}</span>`
+                : ""
+            }
+          </div>
+        </div>
+      </div>
+      <p class="tiny muted" style="margin:12px 0 0">พรีวิวว่าคนอื่นจะเห็นโปรไฟล์คุณแบบนี้</p>
+    </div>
+  `;
+}
+
 export async function renderDecorate(root, { user } = {}) {
   const guest = !user || user.accountType === "guest";
   root.innerHTML = `
     <section class="page-head">
       <div>
         <h2 style="margin:0">ตกแต่งโปรไฟล์</h2>
-        <p class="muted" style="margin:6px 0 0">ใส่ยศ · กรอบ · เอฟเฟกต์ (ของที่ได้รับจาก Ranking / Shop)</p>
+        <p class="muted" style="margin:6px 0 0">ใส่ยศ · กรอบ · เอฟเฟกต์ — ยศเลเวลเก็บได้เรื่อยๆ ไม่ถูกลบ</p>
       </div>
     </section>
     ${
       guest
         ? `<div class="card empty">เข้าสู่ระบบด้วยบัญชีจริงเพื่อตกแต่งโปรไฟล์</div>`
         : `<p class="msg" id="decMsg"></p>
-           <div class="content-grid">
+           <div class="dec-layout">
              <div class="card">
                <h3 style="margin-top:0">ที่สวมอยู่</h3>
                <div id="decEquipped" class="dec-equipped"><div class="loading">Loading…</div></div>
              </div>
              <div class="card">
-               <h3 style="margin-top:0">คลังของฉัน</h3>
-               <div id="decOwned" class="dec-grid"><div class="loading">Loading…</div></div>
+               <h3 style="margin-top:0">พรีวิวโปรไฟล์</h3>
+               <div id="decPreview"><div class="loading">Loading…</div></div>
              </div>
+           </div>
+           <div class="card" style="margin-top:14px">
+             <h3 style="margin-top:0">คลังของฉัน</h3>
+             <p class="tiny muted" style="margin:0 0 10px">กดการ์ดเพื่อสวมใส่ · ของที่ยศเลเวลปลดล็อกจะอยู่ที่นี่ถาวร</p>
+             <div id="decOwned" class="dec-inv-grid"><div class="loading">Loading…</div></div>
            </div>`
     }
   `;
@@ -45,18 +129,25 @@ export async function renderDecorate(root, { user } = {}) {
     const { res, data } = await api("/api/v1/cosmetics/me", { method: "GET" });
     const eqBox = root.querySelector("#decEquipped");
     const ownBox = root.querySelector("#decOwned");
+    const preview = root.querySelector("#decPreview");
     if (!res.ok) {
       eqBox.innerHTML = `<div class="empty">โหลดไม่สำเร็จ</div>`;
       ownBox.innerHTML = "";
+      if (preview) preview.innerHTML = "";
       return;
     }
     const eq = data.equipped || {};
+    if (preview) preview.innerHTML = previewHtml(user, eq);
+
     eqBox.innerHTML = ["title", "frame", "effect"]
       .map((kind) => {
         const item = eq[kind];
         return `<div class="dec-eq-row">
-          <span class="tiny">${KIND_LABEL[kind]}</span>
-          <b>${item ? esc(item.name) : "—"}</b>
+          <div class="dec-eq-visual">${thumbHtml(item, user)}</div>
+          <div class="dec-eq-meta">
+            <span class="tiny">${KIND_LABEL[kind]}</span>
+            <b>${item ? esc(item.name) : "—"}</b>
+          </div>
         </div>`;
       })
       .join("");
@@ -72,10 +163,19 @@ export async function renderDecorate(root, { user } = {}) {
           (eq.title && eq.title.id === item.id) ||
           (eq.frame && eq.frame.id === item.id) ||
           (eq.effect && eq.effect.id === item.id);
-        return `<button type="button" class="dec-item${equipped ? " on" : ""}" data-id="${esc(item.id)}">
+        const srcLabel =
+          item.source === "level"
+            ? "ยศเลเวล"
+            : item.source === "ranking_weekly" || item.source === "ranking_monthly"
+              ? "Ranking"
+              : item.source === "starter"
+                ? "เริ่มต้น"
+                : item.source || "";
+        return `<button type="button" class="dec-inv-card${equipped ? " on" : ""}" data-id="${esc(item.id)}">
+          <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
           <b>${esc(item.name)}</b>
-          <span class="tiny muted">${esc(item.description || item.source || "")}</span>
+          <span class="tiny muted">${esc(srcLabel)}</span>
           <span class="dec-wear">${equipped ? "สวมอยู่" : "สวมใส่"}</span>
         </button>`;
       })
@@ -89,7 +189,12 @@ export async function renderDecorate(root, { user } = {}) {
           body: JSON.stringify({ cosmeticId: id })
         });
         setMsg(r.res.ok ? "สวมใส่แล้ว" : (r.data && r.data.error) || "ไม่สำเร็จ", r.res.ok);
-        if (r.res.ok) load();
+        if (r.res.ok) {
+          if (r.data && r.data.equipped && user) {
+            user.equipped = r.data.equipped;
+          }
+          load();
+        }
       };
     });
   }

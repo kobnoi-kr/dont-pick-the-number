@@ -161,6 +161,50 @@ async function grantCosmetic(prisma, userId, cosmeticId, source) {
   });
 }
 
+function levelTitleCosmeticId(level) {
+  return "title.level." + Number(level);
+}
+
+/** Upsert level-title cosmetics from Level config. Never deletes old titles. */
+async function syncLevelTitleCosmetics(prisma, levels) {
+  const list = Array.isArray(levels) ? levels : [];
+  for (const row of list) {
+    const level = Number(row && row.level) || 0;
+    if (level < 1) continue;
+    const id = levelTitleCosmeticId(level);
+    const name = String((row && row.title) || "Level " + level).trim().slice(0, 64) || "Level " + level;
+    const color = String((row && row.color) || "#94a3b8");
+    const item = {
+      id,
+      kind: "title",
+      name,
+      description: "ยศเลเวล " + level + " (เก็บได้ถาวร)",
+      shopPrice: null,
+      cssClass: "title-level-" + level,
+      meta: { color, level, source: "level" }
+    };
+    await prisma.cosmetic.upsert({
+      where: { id },
+      update: {
+        kind: item.kind,
+        name: item.name,
+        description: item.description,
+        cssClass: item.cssClass,
+        meta: item.meta
+      },
+      create: item
+    });
+  }
+}
+
+/** Grant every unlocked level title up to current level — keeps forever. */
+async function grantLevelTitlesUpTo(prisma, userId, level) {
+  const max = Math.max(0, Number(level) || 0);
+  for (let lv = 1; lv <= max; lv++) {
+    await grantCosmetic(prisma, userId, levelTitleCosmeticId(lv), "level");
+  }
+}
+
 async function ensureStarterCosmetics(prisma, userId) {
   await grantCosmetic(prisma, userId, "title.rookie", "starter");
   await grantCosmetic(prisma, userId, "frame.basic", "starter");
@@ -182,6 +226,20 @@ async function ensureStarterCosmetics(prisma, userId) {
 async function loadUserCosmetics(prisma, userId) {
   await ensureCosmeticsCatalog(prisma);
   await ensureStarterCosmetics(prisma, userId);
+  try {
+    const { loadLevelConfig } = require("./levels");
+    const config = await loadLevelConfig(prisma);
+    await syncLevelTitleCosmetics(prisma, config.levels);
+  } catch {
+    /* ignore */
+  }
+  const userLite = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { level: true }
+  });
+  if (userLite && userLite.level) {
+    await grantLevelTitlesUpTo(prisma, userId, userLite.level);
+  }
   const owned = await prisma.userCosmetic.findMany({
     where: { userId },
     include: { cosmetic: true },
@@ -301,6 +359,9 @@ module.exports = {
   ensureCosmeticsCatalog,
   ensureStarterCosmetics,
   grantCosmetic,
+  levelTitleCosmeticId,
+  syncLevelTitleCosmetics,
+  grantLevelTitlesUpTo,
   loadUserCosmetics,
   handleCosmeticsApi
 };

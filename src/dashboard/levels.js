@@ -92,9 +92,18 @@ async function loadLevelConfig(prisma) {
 
 async function ensureLevelConfig(prisma) {
   const existing = await prisma.systemSetting.findUnique({ where: { key: "level_config" } });
-  if (existing) return normalizeConfig(existing.value);
-  const value = normalizeConfig(DEFAULT_LEVEL_CONFIG);
-  await prisma.systemSetting.create({ data: { key: "level_config", value } });
+  let value;
+  if (existing) value = normalizeConfig(existing.value);
+  else {
+    value = normalizeConfig(DEFAULT_LEVEL_CONFIG);
+    await prisma.systemSetting.create({ data: { key: "level_config", value } });
+  }
+  try {
+    const { syncLevelTitleCosmetics } = require("./cosmetics");
+    await syncLevelTitleCosmetics(prisma, value.levels);
+  } catch {
+    /* ignore */
+  }
   return value;
 }
 
@@ -150,6 +159,14 @@ async function awardExp(prisma, userId, { won } = {}) {
     data: { exp: nextExp, level: after.level }
   });
 
+  try {
+    const { grantLevelTitlesUpTo, syncLevelTitleCosmetics } = require("./cosmetics");
+    await syncLevelTitleCosmetics(prisma, config.levels);
+    await grantLevelTitlesUpTo(prisma, userId, after.level);
+  } catch {
+    /* ignore */
+  }
+
   if (after.level > before.level) {
     await prisma.notification
       .create({
@@ -157,13 +174,13 @@ async function awardExp(prisma, userId, { won } = {}) {
           userId,
           type: "level_up",
           title: `ขึ้นเลเวล ${after.level} แล้ว!`,
-          body: `ยศใหม่: ${after.title} — ดูความคืบหน้าได้ที่เมนู Level`,
+          body: `ได้ยศ「${after.title}」เก็บเข้าคลังแล้ว — สวมใส่ได้ที่เมนู ตกแต่ง`,
           payload: {
             kind: "level",
             level: after.level,
             title: after.title,
             color: after.color,
-            href: "/app#level"
+            href: "/app#decorate"
           }
         }
       })
@@ -253,6 +270,12 @@ async function handleAdminLevelsApi(req, res, pathname) {
       update: { value: config },
       create: { key: "level_config", value: config }
     });
+    try {
+      const { syncLevelTitleCosmetics } = require("./cosmetics");
+      await syncLevelTitleCosmetics(prisma, config.levels);
+    } catch {
+      /* ignore */
+    }
     try {
       await writeAdminLog(prisma, {
         adminId: auth.user.id,
