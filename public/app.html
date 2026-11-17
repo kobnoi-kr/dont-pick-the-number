@@ -30,6 +30,11 @@
       <a class="admin-nav hidden" id="adminNavBtn" href="/admin"><i class="fi fi-rr-shield-check ico" aria-hidden="true"></i> Admin Dashboard</a>
     </nav>
     <div class="sidebar-foot">
+      <p class="sidebar-legal sidebar-legal-line">
+        <a href="/terms">ข้อกำหนด</a><span class="sep">·</span>
+        <a href="/faq">FAQ</a><span class="sep">·</span>
+        <button type="button" class="linkish" id="contactAdminBtn">ติดต่อแอดมิน</button>
+      </p>
       <div class="sidebar-user">
         <div id="sideAvatar" class="avatar-fallback">?</div>
         <div class="meta">
@@ -40,7 +45,6 @@
           <img src="/images/power-off.png" alt="" width="18" height="18" decoding="async">
         </button>
       </div>
-      <p class="sidebar-legal"><a href="/terms">ข้อกำหนด</a> · <a href="/faq">FAQ</a></p>
     </div>
   </aside>
 
@@ -127,6 +131,26 @@
       <button type="button" class="btn ghost" id="crCancel">ยกเลิก</button>
       <button type="button" class="btn" id="crSubmit">เข้าล็อบบี้</button>
     </div>
+  </div>
+</div>
+
+<div id="contactModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+  <div class="modal-card">
+    <h3 id="contactTitle">ติดต่อแอดมิน</h3>
+    <p class="muted">ส่งข้อความถึงทีมแอดมิน — จะไปโชว์ใน Admin Dashboard</p>
+    <form id="contactForm" class="form-grid" autocomplete="off">
+      <label>หัวข้อ
+        <input class="input" id="contactSubject" maxlength="128" placeholder="เช่น ปัญหาห้อง / ถูกแบนผิด">
+      </label>
+      <label>ข้อความ
+        <textarea class="input" id="contactMessage" rows="5" maxlength="2000" placeholder="อธิบายรายละเอียด…" required></textarea>
+      </label>
+      <p class="msg" id="contactMsg"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="contactCancel">ยกเลิก</button>
+        <button type="submit" class="btn">ส่งข้อความ</button>
+      </div>
+    </form>
   </div>
 </div>
 

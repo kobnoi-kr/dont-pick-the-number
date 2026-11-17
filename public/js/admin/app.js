@@ -10,6 +10,7 @@ import { renderAnnouncements } from "./announcements.js";
 import { renderPermissions } from "./permissions.js";
 import { renderSystem } from "./system.js";
 import { renderLogs } from "./logs.js";
+import { renderInbox } from "./inbox.js";
 import { renderSettings } from "./settings.js";
 
 const TITLES = {
@@ -20,6 +21,7 @@ const TITLES = {
   games: "Game Management",
   rooms: "Room Management",
   announcements: "Announcements",
+  inbox: "ข้อความติดต่อ",
   permissions: "Admin & Permissions",
   system: "System Management",
   logs: "Activity Logs",
@@ -120,6 +122,7 @@ async function showView(view) {
   else if (next === "games") await renderGames(root, ctx);
   else if (next === "rooms") await renderRooms(root, ctx);
   else if (next === "announcements") await renderAnnouncements(root);
+  else if (next === "inbox") await renderInbox(root);
   else if (next === "permissions") await renderPermissions(root, ctx);
   else if (next === "system") await renderSystem(root, ctx);
   else if (next === "logs") await renderLogs(root);
@@ -166,6 +169,47 @@ function wireShell() {
       await api("/api/v1/auth/logout", { method: "POST", body: "{}" });
       location.href = "/";
     };
+  }
+
+  const contactBtn = document.getElementById("contactAdminBtn");
+  const contactModal = document.getElementById("contactModal");
+  if (contactBtn && contactModal) {
+    const form = document.getElementById("contactForm");
+    const cancel = document.getElementById("contactCancel");
+    const msg = document.getElementById("contactMsg");
+    const open = () => {
+      if (msg) msg.textContent = "";
+      contactModal.classList.remove("hidden");
+    };
+    const close = () => contactModal.classList.add("hidden");
+    contactBtn.onclick = open;
+    if (cancel) cancel.onclick = close;
+    contactModal.addEventListener("click", (e) => {
+      if (e.target === contactModal) close();
+    });
+    if (form) {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const subject = (document.getElementById("contactSubject")?.value || "").trim();
+        const message = (document.getElementById("contactMessage")?.value || "").trim();
+        if (message.length < 5) {
+          if (msg) msg.textContent = "พิมพ์ข้อความอย่างน้อย 5 ตัวอักษร";
+          return;
+        }
+        if (msg) msg.textContent = "กำลังส่ง…";
+        const r = await api("/api/v1/contact", {
+          method: "POST",
+          body: JSON.stringify({ subject, message })
+        });
+        if (!r.res.ok) {
+          if (msg) msg.textContent = r.res.status === 429 ? "ส่งบ่อยเกินไป" : "ส่งไม่สำเร็จ";
+          return;
+        }
+        if (msg) msg.textContent = "ส่งแล้ว";
+        form.reset();
+        setTimeout(close, 800);
+      };
+    }
   }
 }
 

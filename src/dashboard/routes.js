@@ -824,6 +824,40 @@ async function handleDashboardApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/contact") {
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    const ip = clientIp(req);
+    const limited = rateLimit("contact:" + (auth.user.id || ip), 5, 60 * 60 * 1000);
+    if (!limited.ok) {
+      tooMany(res, limited.retryAfterSec || 3600);
+      return true;
+    }
+    const body = await readJsonBody(req).catch(() => null);
+    const message = String((body && body.message) || "").trim().slice(0, 2000);
+    const subject = String((body && body.subject) || "").trim().slice(0, 128);
+    if (message.length < 5) {
+      sendJson(res, 400, { error: "invalid_message" });
+      return true;
+    }
+    const prisma = await getPrisma();
+    const row = await prisma.contactMessage.create({
+      data: {
+        userId: auth.user.id,
+        subject: subject || "ติดต่อแอดมิน",
+        message,
+        status: "open",
+        ipAddress: ip ? String(ip).slice(0, 64) : null
+      }
+    });
+    sendJson(res, 201, { id: row.id, ok: true });
+    return true;
+  }
+
   return false;
 }
 

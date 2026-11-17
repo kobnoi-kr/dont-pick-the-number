@@ -1078,6 +1078,69 @@ async function handleAdminApi(req, res, pathname) {
   }
 
   // —— Logs ——
+  if (pathname === "/api/v1/admin/inbox") {
+    const auth = await requirePermission(req, res, "users.view");
+    if (!auth) return true;
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const url = new URL(req.url || "/", "http://localhost");
+    const status = (url.searchParams.get("status") || "").trim();
+    const take = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 80) || 80));
+    const where = {};
+    if (status && ["open", "read", "closed"].includes(status)) where.status = status;
+    const [messages, openCount] = await Promise.all([
+      prisma.contactMessage.findMany({
+        where,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { id: true, displayName: true, username: true, accountType: true } }
+        }
+      }),
+      prisma.contactMessage.count({ where: { status: "open" } })
+    ]);
+    sendJson(res, 200, { messages, openCount });
+    return true;
+  }
+
+  const inboxMatch = pathname.match(/^\/api\/v1\/admin\/inbox\/([^/]+)$/);
+  if (inboxMatch) {
+    const auth = await requirePermission(req, res, "users.view");
+    if (!auth) return true;
+    const id = inboxMatch[1];
+    if (method(req) === "PATCH") {
+      const body = await readJsonBody(req).catch(() => null);
+      const next = body && body.status;
+      if (!["open", "read", "closed"].includes(next)) {
+        sendJson(res, 400, { error: "invalid_status" });
+        return true;
+      }
+      const data = { status: next };
+      if (next === "read" || next === "closed") data.readAt = new Date();
+      if (next === "open") data.readAt = null;
+      const row = await prisma.contactMessage.update({
+        where: { id },
+        data,
+        include: {
+          user: { select: { id: true, displayName: true, username: true, accountType: true } }
+        }
+      });
+      await writeAdminLog(prisma, {
+        adminId: auth.user.id,
+        action: "inbox.set_status",
+        targetId: id,
+        metadata: { status: next },
+        ipAddress: ip
+      });
+      sendJson(res, 200, { message: row });
+      return true;
+    }
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
   if (pathname === "/api/v1/admin/logs") {
     const auth = await requirePermission(req, res, "logs.view");
     if (!auth) return true;
