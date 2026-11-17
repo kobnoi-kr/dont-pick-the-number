@@ -28,12 +28,10 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
       <div class="stat"><div class="label">ห้องที่สร้าง</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
       <div class="stat"><div class="label">แต้มรวม</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
     </div>
-    <div class="card" style="margin-bottom:18px">
-      <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
-        <h2 style="margin:0">Top Weekly</h2>
-        <a class="btn ghost sm" href="#ranking">ดูทั้งหมด</a>
-      </div>
-      <div class="rank-podium-wrap" style="margin-top:12px">
+    <div class="card ov-top-weekly" style="margin-bottom:18px">
+      <a class="btn ghost sm ov-top-all" href="#ranking">ดูทั้งหมด</a>
+      <div class="rank-podium-wrap">
+        <h2 class="ov-top-title">Top Weekly</h2>
         <div class="rank-cal-cd${guest ? " hidden" : ""}" id="ovRankCd" aria-label="นับถอยหลัง">
           <div class="rank-cal-unit"><b data-cd="d">00</b><span>วัน</span></div>
           <div class="rank-cal-unit"><b data-cd="h">00</b><span>ชม</span></div>
