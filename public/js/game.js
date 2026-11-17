@@ -2142,8 +2142,11 @@ async function openPlayerProfileModal(userId){
   const u=data.user||{};
   const st=data.stats;
   const rel=data.relation||{status:"none"};
-  if(title) title.textContent=u.displayName||"ผู้เล่น";
-  if(userEl) userEl.textContent=u.username?("@"+u.username):"";
+  if(title) title.textContent=String(u.displayName||u.username||"ผู้เล่น").trim()||"ผู้เล่น";
+  if(userEl){
+    const uname=String(u.username||"").trim();
+    userEl.textContent=uname?("@"+uname):"@—";
+  }
   paintPills(u);
   setProfileAv(u.avatarUrl||null, String(u.displayName||"?").slice(0,1).toUpperCase());
   if(tenure) tenure.textContent=formatAccountTenure(u.createdAt);

@@ -279,8 +279,14 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   font-weight:800;font-size:1.4rem;color:var(--muted);box-shadow:none
 }
 .player-profile-id{min-width:0;flex:1}
-.player-profile-id h3{margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.player-profile-id .sub{margin:4px 0 0;text-align:left}
+.player-profile-id h3{
+  margin:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:1.2rem
+}
+.player-profile-id .sub,
+.player-profile-username{
+  margin:4px 0 0;text-align:left;display:block !important;color:var(--muted);font-size:.92rem
+}
 .player-profile-id .nv-pills{margin-top:8px}
 .player-profile-stats{
   display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px;
