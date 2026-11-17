@@ -293,15 +293,18 @@ function show(n){
   const lobby=n==="start";
   const side=document.querySelector(".side");
   if(side) side.classList.toggle("hidden",!inRoom||lobby);
-  // In-game: keep a slim status bar (no code / leave). Lobby has its own leave.
+  // In-game: slim status bar + power quit. Lobby has its own leave.
   const bar=$("roombar");
+  const inGame=inRoom&&!lobby;
   if(bar){
     bar.classList.toggle("hidden",!inRoom||lobby);
-    bar.classList.toggle("in-game", inRoom&&!lobby);
+    bar.classList.toggle("in-game", inGame);
   }
   if($("roomCode")) $("roomCode").classList.toggle("hidden", true);
   if($("copyCode")) $("copyCode").classList.toggle("hidden", true);
   if($("leaveRoom")) $("leaveRoom").classList.toggle("hidden", true);
+  if($("quitGameBtn")) $("quitGameBtn").classList.toggle("hidden", !inGame);
+  if(!inGame) closeQuitGameModal();
   $("roomNote").classList.toggle("hidden",!inRoom||lobby);
   document.body.classList.toggle("lobby-mode", lobby);
   // Full-bleed art behind lobby + active match screens.
@@ -2508,6 +2511,36 @@ function leaveCurrentRoom(){
   wantRoom=false;
   send({t:"leave"});
 }
+function openQuitGameModal(){
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="over";
+  if(!onlineMode||!inGame) return;
+  const modal=$("quitGameModal");
+  if(modal) modal.classList.remove("hidden");
+}
+function closeQuitGameModal(){
+  const modal=$("quitGameModal");
+  if(modal) modal.classList.add("hidden");
+}
+/** Quick exit during an active match (host included — server transfers host). */
+function quitGameNow(){
+  closeQuitGameModal();
+  closePlayerProfileModal();
+  closeWinnerModal();
+  invalidateWheel();
+  clearActiveRoom();
+  enterIntent=false;
+  wantRoom=false;
+  pendingAction=null;
+  if(spectating){
+    send({t:"unwatch"});
+  }else{
+    send({t:"leave"});
+  }
+  // Fallback navigate if "left" is delayed/lost.
+  setTimeout(()=>{
+    if(netPhase!=="gate"&&!wantRoom) location.replace("/app#rooms");
+  }, 600);
+}
 function showErr(message){
   if(netPhase==="gate"){
     const el=$("gateMsg");
@@ -2650,6 +2683,7 @@ function applySnap(s){
   netPhase=s.phase||"lobby";
   // Profile card is lobby-only — never stay open during play/pick/wheel/over.
   if(netPhase!=="lobby") closePlayerProfileModal();
+  if(netPhase==="lobby"||netPhase==="gate") closeQuitGameModal();
   if(s.phase==="over") clearActiveRoom();
   else rememberActiveRoom(s.code);
   // Already seated (hello reattach) — drop matching pending join/watch/resume.
@@ -3265,6 +3299,12 @@ async function bootOnline(){
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
   if($("leaveRoom")) $("leaveRoom").onclick=()=>leaveCurrentRoom();
   if($("lobbyLeaveBtn")) $("lobbyLeaveBtn").onclick=()=>leaveCurrentRoom();
+  if($("quitGameBtn")) $("quitGameBtn").onclick=()=>openQuitGameModal();
+  if($("quitGameCancel")) $("quitGameCancel").onclick=()=>closeQuitGameModal();
+  if($("quitGameConfirm")) $("quitGameConfirm").onclick=()=>quitGameNow();
+  if($("quitGameModal")) $("quitGameModal").addEventListener("click",e=>{
+    if(e.target===$("quitGameModal")) closeQuitGameModal();
+  });
   $("renameRoomBtn").onclick=()=>openRenameRoom();
   $("renameRoomCancel").onclick=()=>closeRenameRoom();
   $("renameRoomForm").onsubmit=e=>{

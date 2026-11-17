@@ -20,6 +20,7 @@
     </div>
     <span id="roomCount" class="roomcount"></span>
     <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
+    <button type="button" id="quitGameBtn" class="quit-power-btn hidden" title="ออกจากเกม" aria-label="ออกจากเกมด่วน">⏻</button>
   </div>
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
@@ -300,6 +301,16 @@
     </div>
     <p class="hint" id="playerProfileHint"></p>
     <div class="modal-actions-row" id="playerProfileActs"></div>
+  </div>
+</div>
+<div id="quitGameModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="quitGameTitle">
+  <div class="modal-card">
+    <h3 id="quitGameTitle">ออกจากเกม?</h3>
+    <p class="sub">ต้องการออกจริงๆไหม? คุณจะออกจากห้องนี้ทันที</p>
+    <div class="modal-actions-row">
+      <button type="button" id="quitGameCancel" class="btn ghost">ยกเลิก</button>
+      <button type="button" id="quitGameConfirm" class="btn danger">ออกเกม</button>
+    </div>
   </div>
 </div>
 <div id="deleteRoomModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteRoomTitle">

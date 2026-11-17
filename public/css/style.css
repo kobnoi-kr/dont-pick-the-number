@@ -534,6 +534,36 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .roombar.in-game #roomCode,
 .roombar.in-game #copyCode,
 .roombar.in-game #leaveRoom{display:none !important}
+.roombar.in-game #quitGameBtn{display:inline-flex !important}
+.quit-power-btn{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  width:40px;
+  height:40px;
+  margin:0 0 0 auto;
+  padding:0;
+  border-radius:12px;
+  border:1px solid rgba(239,68,68,.45);
+  background:rgba(239,68,68,.12);
+  color:#fca5a5;
+  font-size:1.25rem;
+  line-height:1;
+  cursor:pointer;
+  flex:0 0 auto;
+}
+.quit-power-btn:hover{
+  background:rgba(239,68,68,.22);
+  border-color:rgba(239,68,68,.7);
+  color:#fecaca;
+}
+.quit-power-btn:focus-visible{outline:2px solid #ef4444;outline-offset:2px}
+.btn.danger{
+  background:#dc2626;
+  border-color:#b91c1c;
+  color:#fff;
+}
+.btn.danger:hover{background:#ef4444}
 .roommeta{display:flex;align-items:center;gap:8px;min-width:0}
 .badge{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:750}
 .badge.private{border-color:var(--mark);color:var(--mark)}
