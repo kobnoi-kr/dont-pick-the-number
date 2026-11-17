@@ -117,7 +117,7 @@ function hideMaintenanceCountdown() {
 }
 
 /**
- * Top banner: server closing in N seconds.
+ * Center overlay: Maintenance in 15, 14, 13...
  * msg: { message, seconds, endsAt, cancelled? }
  */
 export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
@@ -126,7 +126,6 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     return;
   }
   ensureStyles();
-  // Admins still see the warning so they know the kick is coming.
   const endsAt =
     Number(msg.endsAt) ||
     Date.now() + Math.max(1, Number(msg.seconds) || 15) * 1000;
@@ -134,45 +133,65 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
   if (!el) {
     el = document.createElement("div");
     el.id = "nvMaintCountdown";
-    el.setAttribute("role", "status");
+    el.setAttribute("role", "alertdialog");
     el.setAttribute("aria-live", "assertive");
+    el.setAttribute("aria-modal", "true");
     document.body.appendChild(el);
   }
   el.style.cssText = [
     "position:fixed",
-    "top:14px",
-    "left:50%",
-    "transform:translateX(-50%)",
-    "z-index:99980",
-    "width:min(460px,calc(100vw - 24px))",
-    "pointer-events:none"
+    "inset:0",
+    "z-index:99985",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "padding:24px",
+    "background:rgba(6,8,18,.72)",
+    "backdrop-filter:blur(6px)",
+    "pointer-events:auto"
   ].join(";");
   const message =
-    msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาบันทึก/จบเกมก่อน";
+    msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาเตรียมออกจากห้อง";
 
+  let lastSec = -1;
   const paint = () => {
     const leftMs = Math.max(0, endsAt - Date.now());
-    const sec = Math.ceil(leftMs / 1000);
-    el.innerHTML = `
-      <div style="
-        pointer-events:auto;display:flex;align-items:center;gap:12px;
-        padding:12px 14px;border-radius:14px;
-        background:rgba(40,16,16,.96);border:1px solid rgba(239,68,68,.45);
-        box-shadow:0 14px 40px rgba(0,0,0,.5);color:#fee2e2;
-        font-family:system-ui,Segoe UI,sans-serif">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.7rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.85;margin-bottom:2px">
+    const sec = Math.max(0, Math.ceil(leftMs / 1000));
+    if (sec !== lastSec) {
+      lastSec = sec;
+      el.innerHTML = `
+        <div style="
+          width:min(420px,100%);text-align:center;color:#fee2e2;
+          font-family:system-ui,Segoe UI,sans-serif;
+          background:#1a1018;border:1px solid rgba(239,68,68,.5);
+          border-radius:20px;padding:28px 24px 24px;
+          box-shadow:0 24px 70px rgba(0,0,0,.55)">
+          <div style="
+            display:inline-block;margin-bottom:10px;padding:4px 12px;border-radius:999px;
+            background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.4);
+            font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">
+            MAINTENANCE
+          </div>
+          <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:#fecaca">
+            Maintenance in
+          </div>
+          <div style="
+            font-size:4.2rem;line-height:1;font-weight:900;
+            font-variant-numeric:tabular-nums;letter-spacing:.04em;
+            color:#fff;text-shadow:0 0 24px rgba(239,68,68,.45);margin:8px 0 10px">
+            ${sec}
+          </div>
+          <div style="font-size:.95rem;font-weight:700;color:#fca5a5;margin-bottom:12px">
             ปิดเซิร์ฟใน ${sec} วินาที
           </div>
-          <div style="font-weight:700;line-height:1.35;white-space:pre-wrap">${esc(message)}</div>
-          ${bypass ? `<div style="margin-top:4px;font-size:.8rem;opacity:.75">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>` : ""}
-        </div>
-        <div style="
-          flex:0 0 auto;min-width:52px;height:52px;border-radius:12px;
-          display:flex;align-items:center;justify-content:center;
-          background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);
-          font-size:1.45rem;font-weight:900;font-variant-numeric:tabular-nums">${sec}</div>
-      </div>`;
+          <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(message)}</p>
+          ${
+            bypass
+              ? `<div style="margin-top:12px;font-size:.82rem;opacity:.8">แอดมิน: คุณจะไม่ถูกบล็อกหลังปิด</div>`
+              : ""
+          }
+        </div>`;
+    }
     if (sec <= 0) {
       hideMaintenanceCountdown();
     }
@@ -180,7 +199,7 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
 
   if (countdownTimer) clearInterval(countdownTimer);
   paint();
-  countdownTimer = setInterval(paint, 250);
+  countdownTimer = setInterval(paint, 200);
 }
 
 export default enforceMaintenanceGate;

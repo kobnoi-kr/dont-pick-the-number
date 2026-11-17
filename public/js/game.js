@@ -940,6 +940,12 @@ function renderPlayers(){
     deleteBtn.classList.toggle("hidden",!isHost()||netPhase!=="lobby");
     deleteBtn.disabled=!hostLobby;
   }
+  // Host closes via ลบห้อง — only joiners get ออกจากห้อง
+  const leaveBtn=$("lobbyLeaveBtn");
+  if(leaveBtn){
+    leaveBtn.classList.toggle("hidden", isHost() || spectating);
+  }
+  if($("leaveRoom")) $("leaveRoom").classList.toggle("hidden", true);
   if($("pname")) $("pname").disabled=spinning||wheelSpinning||locked;
   if($("addForm")){
     const addBtn=$("addForm").querySelector("button");
@@ -2059,6 +2065,10 @@ function leaveCurrentRoom(){
   if(spectating){
     send({t:"unwatch"});
     location.replace("/app.html#rooms");
+    return;
+  }
+  if(isHost()){
+    showErr("โฮสต์ออกห้องไม่ได้ — ใช้ปุ่มลบห้อง หรือโอนโฮสต์ก่อน");
     return;
   }
   enterIntent=false;
