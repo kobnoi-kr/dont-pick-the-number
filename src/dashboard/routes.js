@@ -723,6 +723,50 @@ async function handleDashboardApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/notifications/delete-all") {
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    if (!authEnabled()) {
+      sendJson(res, 200, { ok: true, deleted: 0 });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    const prisma = await getPrisma();
+    const result = await prisma.notification.deleteMany({ where: { userId: auth.user.id } });
+    sendJson(res, 200, { ok: true, deleted: result.count || 0 });
+    return true;
+  }
+
+  if (pathname === "/api/v1/notifications/delete-many") {
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    if (!authEnabled()) {
+      sendJson(res, 200, { ok: true, deleted: 0 });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    const body = await readJsonBody(req).catch(() => null);
+    const ids = Array.isArray(body && body.ids)
+      ? body.ids.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 100)
+      : [];
+    if (!ids.length) {
+      sendJson(res, 400, { error: "ids_required" });
+      return true;
+    }
+    const prisma = await getPrisma();
+    const result = await prisma.notification.deleteMany({
+      where: { userId: auth.user.id, id: { in: ids } }
+    });
+    sendJson(res, 200, { ok: true, deleted: result.count || 0 });
+    return true;
+  }
+
   const notifOne = pathname.match(/^\/api\/v1\/notifications\/([0-9a-f-]{36})$/i);
   if (notifOne) {
     if (!authEnabled()) {
