@@ -748,6 +748,8 @@ function finishRound(room) {
     hist: null,
     again: won ? "เริ่มแมตช์ใหม่" : "เล่นอีกครั้ง",
     reset: won,
+    winners: won ? champs.slice() : [],
+    winTarget: room.winTarget,
     mode: ""
   };
 }
@@ -905,6 +907,8 @@ function finishWheel(room) {
     hist: room.wheelLog.map((item) => ({ n: item.n, who: item.who })),
     again: won ? "เริ่มแมตช์ใหม่" : "รอบถัดไป",
     reset: won,
+    winners: won && winner ? [winner] : [],
+    winTarget: room.winTarget,
     mode: "wheel"
   };
 }

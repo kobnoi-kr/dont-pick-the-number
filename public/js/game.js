@@ -11,6 +11,7 @@ const POP_SOUND="/audio/pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="/audio/spinner-sound.mp3";
 const BOMB_SOUND="/audio/roblox-death-sound_1.mp3";
 const COOLDOWN_SOUND="/audio/beep.mp3";
+const WIN_SOUND="/audio/roblox-old-winning-sound-effect.mp3";
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("/audio/Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
@@ -91,7 +92,8 @@ function warmClips(){
     loadClip(SPIN_SOUND),
     loadClip(POP_SOUND),
     loadClip(BOMB_SOUND),
-    loadClip(COOLDOWN_SOUND)
+    loadClip(COOLDOWN_SOUND),
+    loadClip(WIN_SOUND)
   ]);
   return audioWarm;
 }
@@ -324,6 +326,57 @@ function setLocalChampions(names){
 }
 function clearLocalChampions(){
   lastWinners=[];
+  resetWinCelebration();
+}
+let lastWinCelebrateKey="";
+function escHtml(s){
+  return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function winnerAvatarHtml(name){
+  const meta=playerByName(name);
+  const av=meta&&meta.avatarUrl?String(meta.avatarUrl):"";
+  const label=escHtml(name||"?");
+  const face=av
+    ? `<img class="winner-av" src="${escHtml(av)}" alt="" width="84" height="84" referrerpolicy="no-referrer">`
+    : `<div class="winner-av" aria-hidden="true">${escHtml(String(name||"?").slice(0,1).toUpperCase())}</div>`;
+  return `<div class="winner-av-wrap">
+    <div class="winner-av-ring champion">${face}</div>
+    <div class="winner-av-name">${label}</div>
+  </div>`;
+}
+function closeWinnerModal(){
+  const modal=$("winnerModal");
+  if(modal) modal.classList.add("hidden");
+}
+function openWinnerModal(names, opts={}){
+  const list=Array.isArray(names)?names.filter(Boolean):[];
+  if(!list.length) return;
+  const modal=$("winnerModal");
+  if(!modal) return;
+  const title=$("winnerModalTitle");
+  const note=$("winnerModalNote");
+  const box=$("winnerModalAvatars");
+  const champText=list.length<=1?list[0]:list.length===2?list.join(" กับ "):list.slice(0,-1).join(", ")+" และ "+list[list.length-1];
+  if(title) title.textContent=champText+" ชนะแล้ว!";
+  if(note){
+    const target=opts.winTarget!=null?opts.winTarget:winTarget;
+    note.textContent=opts.note||("ถึง "+target+" แต้ม");
+  }
+  if(box) box.innerHTML=list.map(winnerAvatarHtml).join("");
+  modal.classList.remove("hidden");
+}
+function celebrateMatchWin(names, opts={}){
+  const list=Array.isArray(names)?names.filter(Boolean):[];
+  if(!list.length) return;
+  const key=[roomCode||"local", winTarget, list.slice().sort().join("|")].join("::");
+  if(key===lastWinCelebrateKey) return;
+  lastWinCelebrateKey=key;
+  openWinnerModal(list, opts);
+  playClip(WIN_SOUND);
+}
+function resetWinCelebration(){
+  lastWinCelebrateKey="";
+  closeWinnerModal();
 }
 function screenOpen(id){
   const el=$(id);
@@ -639,6 +692,7 @@ function finishRound(){
   }else if(won){
     $("overTitle").textContent=champText+" ชนะแล้ว!";
     $("overNote").textContent="ถึง "+winTarget+" แต้ม";
+    celebrateMatchWin(champs,{winTarget,note:"ถึง "+winTarget+" แต้ม"});
   }else if(alive.length===1){
     $("overTitle").textContent=alive[0]+" เป็นคนสุดท้าย";
     $("overNote").textContent="ได้ 1 แต้ม";
@@ -1168,6 +1222,7 @@ function invalidateWheel(){
 }
 function leaveGame(){
   invalidateWheel();
+  closeWinnerModal();
   // Offline: returning from a finished match that hit winTarget clears scores.
   if(!$("over").classList.contains("hidden") && $("again").dataset.reset==="1"){
     players.forEach(name=>{ scores[name]=0; });
@@ -1504,6 +1559,7 @@ function finishWheel(){
   if(won){
     $("overTitle").textContent=winner+" ชนะแล้ว!";
     $("overNote").textContent="ถึง "+winTarget+" แต้ม";
+    celebrateMatchWin([winner],{winTarget,note:"ถึง "+winTarget+" แต้ม"});
   }else if(winner){
     $("overTitle").textContent=winner+" เป็นคนสุดท้าย";
     $("overNote").textContent="ได้ 1 แต้ม";
@@ -1777,14 +1833,20 @@ $("doSpin").onclick=spinNumber;
 $("wheelRepick").onclick=repickNumbers;
 $("wheelLeave").onclick=leaveGame;
 $("again").onclick=()=>{
+  closeWinnerModal();
   if($("again").dataset.reset==="1"){
     players.forEach(name=>{ scores[name]=0; });
     saveScores();
+    resetWinCelebration();
   }
   if($("again").dataset.mode==="wheel") startPick(wheelMin, wheelMax);
   else begin(gameMin, gameMax, secretTotal);
 };
 $("back").onclick=leaveGame;
+if($("winnerModalClose")) $("winnerModalClose").onclick=()=>closeWinnerModal();
+if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
+  if(e.target===$("winnerModal")) closeWinnerModal();
+});
 $("leave").onclick=leaveGame;
 $("addForm").onsubmit=e=>{ e.preventDefault(); addPlayers($("pname").value); };
 $("spin").onclick=spinWheel;
@@ -2430,6 +2492,19 @@ function applySnap(s){
     renderScores($("finalScores"));
     show("over");
     renderPlayers();
+    if(s.over.reset){
+      const winners=Array.isArray(s.over.winners)&&s.over.winners.length
+        ? s.over.winners
+        : playerMeta.filter(p=>p&&p.champion).map(p=>p.name);
+      if(winners.length){
+        celebrateMatchWin(winners,{
+          winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
+          note:s.over.note||""
+        });
+      }
+    }else{
+      closeWinnerModal();
+    }
   }
   hostLocks();
   paintInviteBtn();
@@ -2887,7 +2962,11 @@ async function bootOnline(){
   if($("deleteRoomModal")) $("deleteRoomModal").addEventListener("click",e=>{
     if(e.target===$("deleteRoomModal")) closeDeleteRoomModal();
   });
-  $("again").onclick=()=>{ if(isHost()) send({t:"again"}); };
+  $("again").onclick=()=>{ closeWinnerModal(); if(isHost()) send({t:"again"}); };
+  if($("winnerModalClose")) $("winnerModalClose").onclick=()=>closeWinnerModal();
+  if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
+    if(e.target===$("winnerModal")) closeWinnerModal();
+  });
   ["leave","back","wheelLeave","pickLeave"].forEach(id=>{ $(id).onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
   $("pickUndo").onclick=()=>send({t:"undo"});
