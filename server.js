@@ -25,6 +25,10 @@ const HOST = process.env.HOST || "0.0.0.0";
 /** Admin dashboard — default localhost-only so public users cannot reach it */
 const ADMIN_PORT = Number(process.env.ADMIN_PORT || 9100);
 const ADMIN_HOST = process.env.ADMIN_HOST || "127.0.0.1";
+/** When admin port is off (e.g. Render), serve dashboard on the public port (APIs still role-gated). */
+const PUBLIC_DASHBOARD =
+  process.env.PUBLIC_DASHBOARD === "1" ||
+  (process.env.PUBLIC_DASHBOARD !== "0" && !(ADMIN_PORT > 0));
 const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 const SEAT_MS = 45000;
@@ -1587,6 +1591,19 @@ function sendStaticFile(res, name) {
   });
 }
 
+function writeDashboardRuntimeConfig(res) {
+  const publicWs =
+    process.env.ADMIN_PUBLIC_WS_HOST ||
+    process.env.RENDER_EXTERNAL_HOSTNAME ||
+    ("127.0.0.1:" + PORT);
+  res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(
+    "window.NV_PUBLIC_WS_HOST=" +
+      JSON.stringify(publicWs) +
+      ";window.NV_ADMIN_DASHBOARD=true;\n"
+  );
+}
+
 async function servePublic(req, res) {
   if (!hostAllowed(req)) {
     rejectWrongHost(req, res);
@@ -1594,11 +1611,17 @@ async function servePublic(req, res) {
   }
   const url = new URL(req.url || "/", "http://localhost");
   const pathname = decodeURIComponent(url.pathname);
+  if (PUBLIC_DASHBOARD && pathname === "/js/dashboard/runtime-config.js") {
+    writeDashboardRuntimeConfig(res);
+    return;
+  }
   if (pathname.startsWith("/api/")) {
     const handled = await handleAuthApi(req, res, pathname);
     if (handled) return;
-    // Dashboard APIs are admin-port only
-    if (
+    if (PUBLIC_DASHBOARD) {
+      const dash = await handleDashboardApi(req, res, pathname);
+      if (dash) return;
+    } else if (
       pathname.startsWith("/api/v1/dashboard") ||
       pathname.startsWith("/api/v1/rooms") ||
       pathname.startsWith("/api/v1/live-games") ||
@@ -1608,6 +1631,7 @@ async function servePublic(req, res) {
       pathname.startsWith("/api/v1/settings") ||
       pathname.startsWith("/api/v1/notifications")
     ) {
+      // Dashboard APIs are admin-port only unless PUBLIC_DASHBOARD=1
       res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ error: "not_found" }));
       return;
@@ -1617,7 +1641,7 @@ async function servePublic(req, res) {
     return;
   }
   let name = pathname === "/" ? PUBLIC_PAGE : pathname.replace(/^\/+/, "");
-  if (isDashboardAsset(name)) {
+  if (!PUBLIC_DASHBOARD && isDashboardAsset(name)) {
     res.writeHead(302, { Location: "/play.html" });
     res.end();
     return;
@@ -1630,15 +1654,7 @@ async function serveAdmin(req, res) {
   const url = new URL(req.url || "/", "http://localhost");
   const pathname = decodeURIComponent(url.pathname);
   if (pathname === "/js/dashboard/runtime-config.js") {
-    const publicWs =
-      process.env.ADMIN_PUBLIC_WS_HOST ||
-      ("127.0.0.1:" + PORT);
-    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
-    res.end(
-      "window.NV_PUBLIC_WS_HOST=" +
-        JSON.stringify(publicWs) +
-        ";window.NV_ADMIN_DASHBOARD=true;\n"
-    );
+    writeDashboardRuntimeConfig(res);
     return;
   }
   if (pathname.startsWith("/api/")) {

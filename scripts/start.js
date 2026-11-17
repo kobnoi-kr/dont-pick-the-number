@@ -7,7 +7,15 @@ const path = require("path");
 
 async function ensureEmbeddedPg() {
   if (process.env.EMBEDDED_PG !== "1") return;
-  const { startEmbeddedPostgres } = require("./embedded-pg");
+  let startEmbeddedPostgres;
+  try {
+    ({ startEmbeddedPostgres } = require("./embedded-pg"));
+  } catch (err) {
+    throw new Error(
+      "EMBEDDED_PG=1 but embedded-postgres is not installed (optionalDependency). " +
+        (err && err.message ? err.message : err)
+    );
+  }
   const { url } = await startEmbeddedPostgres();
   process.env.DATABASE_URL = url;
   console.log("DATABASE_URL ready (embedded Postgres)");

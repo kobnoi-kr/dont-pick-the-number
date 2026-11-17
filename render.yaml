@@ -19,8 +19,18 @@ services:
         value: "1"
       - key: ALLOWED_HOSTS
         value: numverse.click,www.numverse.click
+      - key: EMBEDDED_PG
+        value: "0"
+      - key: ADMIN_PORT
+        value: "0"
+      - key: PUBLIC_DASHBOARD
+        value: "1"
+      - key: DASHBOARD_ADMIN_ONLY
+        value: "1"
+      - key: SUPER_ADMIN_EMAILS
+        value: kimgamerchannal@gmail.com
       - key: AUTH_SECRET
         generateValue: true
-      # Optional: set DATABASE_URL in Render dashboard to enable Auth
+      # Set DATABASE_URL (+ Google/Discord OAuth) in the Render dashboard
       # - key: DATABASE_URL
       #   sync: false
