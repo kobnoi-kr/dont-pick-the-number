@@ -794,6 +794,14 @@ function renderLobbyGrid(){
     avWrap.className="lobby-av-wrap";
     avWrap.innerHTML=crown;
     avWrap.appendChild(av);
+    const pts=Math.max(0, Number(meta&&meta.score!=null?meta.score:scores[name])||0);
+    if(pts>0){
+      const badge=document.createElement("span");
+      badge.className="lobby-score-badge";
+      badge.textContent=String(pts);
+      badge.title=pts+" แต้ม";
+      avWrap.appendChild(badge);
+    }
     if(connected){
       const dot=document.createElement("span");
       dot.className="lobby-online-dot";
