@@ -299,6 +299,8 @@ function show(n){
   if($("leaveRoom")) $("leaveRoom").classList.toggle("hidden", true);
   $("roomNote").classList.toggle("hidden",!inRoom||lobby);
   document.body.classList.toggle("lobby-mode", lobby);
+  // Full-bleed art behind lobby + active match screens.
+  document.body.classList.toggle("room-bg", inRoom);
   const stage=document.querySelector(".stage");
   if(stage) stage.classList.toggle("lobby-stage", lobby);
   const card=document.querySelector("main.card");
