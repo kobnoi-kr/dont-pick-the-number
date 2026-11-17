@@ -13,6 +13,30 @@ function isElevatedAdmin(user) {
   return roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
 }
 
+const ROLE_RANK = ["super_admin", "admin", "moderator", "player"];
+const ROLE_LABEL = {
+  super_admin: "SUPER ADMIN",
+  admin: "ADMIN",
+  moderator: "MODERATOR",
+  player: "PLAYER"
+};
+
+function primaryRole(user) {
+  const roles = (user && user.roles) || [];
+  if (!roles.length) {
+    return user && user.accountType === "guest" ? "guest" : "player";
+  }
+  for (const name of ROLE_RANK) {
+    if (roles.includes(name)) return name;
+  }
+  return roles[0];
+}
+
+function roleLabel(user) {
+  const role = primaryRole(user);
+  return ROLE_LABEL[role] || String(role || "PLAYER").replace(/_/g, " ").toUpperCase();
+}
+
 export function paintUser(user) {
   const name = (user && (user.displayName || user.username)) || "Player";
   const sideName = document.getElementById("sideName");
@@ -22,7 +46,8 @@ export function paintUser(user) {
   const adminNav = document.getElementById("adminNavBtn");
   if (sideName) sideName.textContent = name;
   if (sideStatus) {
-    sideStatus.textContent = user && user.accountType === "registered" ? "สมาชิก" : "Guest";
+    // Show DB role under the display name (not a static "สมาชิก").
+    sideStatus.textContent = roleLabel(user);
   }
   if (sideAvatar) {
     if (user && user.avatarUrl) {
@@ -35,7 +60,7 @@ export function paintUser(user) {
   }
   const admin = isElevatedAdmin(user);
   if (roleBadge) {
-    roleBadge.textContent = admin ? "ADMIN" : "USER";
+    roleBadge.textContent = roleLabel(user);
     roleBadge.classList.toggle("admin", admin);
   }
   if (adminNav) adminNav.classList.toggle("hidden", !admin);

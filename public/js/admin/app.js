@@ -42,23 +42,37 @@ function paintUser(user) {
   if (sideStatus) {
     const roles = (user && user.roles) || [];
     sideStatus.textContent = roles.includes("super_admin")
-      ? "super admin"
+      ? "SUPER ADMIN"
       : roles.includes("admin")
-        ? "admin"
+        ? "ADMIN"
         : roles.includes("moderator")
-          ? "moderator"
-          : "—";
+          ? "MODERATOR"
+          : roles.includes("player")
+            ? "PLAYER"
+            : roles[0]
+              ? String(roles[0]).replace(/_/g, " ").toUpperCase()
+              : "—";
   }
   if (sideAvatar) {
-    sideAvatar.textContent = (name || "?").slice(0, 1).toUpperCase();
+    if (user && user.avatarUrl) {
+      sideAvatar.outerHTML =
+        `<img id="sideAvatar" src="${user.avatarUrl}" alt="" width="40" height="40" referrerpolicy="no-referrer">`;
+    } else {
+      sideAvatar.textContent = (name || "?").slice(0, 1).toUpperCase();
+    }
   }
   if (roleBadge) {
     const roles = (user && user.roles) || [];
     roleBadge.textContent = roles.includes("super_admin")
-      ? "SUPER"
-      : roles.includes("moderator") && !roles.includes("admin")
-        ? "MOD"
-        : "ADMIN";
+      ? "SUPER ADMIN"
+      : roles.includes("admin")
+        ? "ADMIN"
+        : roles.includes("moderator")
+          ? "MODERATOR"
+          : roles.includes("player")
+            ? "PLAYER"
+            : "ADMIN";
+    roleBadge.classList.toggle("admin", roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator"));
   }
 
   document.querySelectorAll("#sideNav [data-view]").forEach((btn) => {
