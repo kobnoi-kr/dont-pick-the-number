@@ -81,7 +81,8 @@
           <button type="button" class="btn ghost" id="addBot">เพิ่มบอท</button>
           <button type="button" class="btn ghost" id="inviteFriendsBtn">เชิญเพื่อน</button>
           <button type="button" class="btn ghost" id="clearScores">ล้างแต้ม</button>
-          <p class="hint" id="sideHint">โฮสต์ตั้งค่าห้องด้วยไอคอนฟันเฟือง · สุ่มลำดับแล้วค่อยเริ่มเกม</p>
+          <button type="button" class="btn ghost" id="transferHostBtn">โอนโฮสต์</button>
+          <button type="button" class="btn ghost danger-outline" id="deleteRoomBtn">ลบห้อง</button>
         </div>
       </aside>
     </div>
@@ -248,6 +249,16 @@
       </div>
       <button class="btn" type="submit">บันทึกการตั้งค่า</button>
     </form>
+  </div>
+</div>
+
+<div id="transferHostModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="transferHostTitle">
+  <div class="modal-card">
+    <h3 id="transferHostTitle">โอนโฮสต์</h3>
+    <p class="sub">เลือกผู้เล่นที่จะรับโฮสต์</p>
+    <ul class="invite-list" id="transferHostList"></ul>
+    <p class="hint" id="transferHostEmpty">ไม่มีผู้เล่นที่โอนได้</p>
+    <button type="button" id="transferHostClose" class="btn ghost">ปิด</button>
   </div>
 </div>
 

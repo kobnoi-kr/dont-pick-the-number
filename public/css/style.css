@@ -100,6 +100,9 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .lobby-status{font-size:1.05rem;min-height:1.4em;margin:4px 0 10px}
 .lobby-actions-card .btn{margin-top:8px}
 .btn.lobby-start{background:linear-gradient(135deg,#6366f1,#2563eb)}
+.btn.danger-outline{border-color:#7f1d1d!important;color:#fca5a5!important}
+.btn.danger-outline:hover{background:rgba(127,29,29,.2)}
+.btn.sm{width:auto;margin:0;padding:8px 12px;font-size:.88rem}
 .spin-modal{background:rgba(8,12,24,.72);backdrop-filter:blur(4px);z-index:70}
 .spin-card{width:min(100%,420px);text-align:center}
 .spin-dial{margin:8px auto 12px}

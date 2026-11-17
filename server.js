@@ -1253,6 +1253,39 @@ function onGiveHost(ws, msg) {
   broadcast(ctx.room);
   broadcastLobby();
 }
+function onDeleteRoom(ws) {
+  const ctx = seat(ws);
+  if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่ลบห้องได้");
+  const room = ctx.room;
+  if (room.phase !== "lobby") return fail(ws, "ลบห้องได้เฉพาะตอนล็อบบี้");
+  if (room.activeSpin) return fail(ws, "รอวงล้อสุ่มให้จบก่อน");
+  cancelSpin(room);
+  clearTurnTimer(room);
+  if (room.emptyTimer) {
+    clearTimeout(room.emptyTimer);
+    room.emptyTimer = null;
+  }
+  const everyone = room.players.slice();
+  const spectators = Array.isArray(room.spectators) ? room.spectators.slice() : [];
+  rooms.delete(room.code);
+  broadcastLobby();
+  for (const player of everyone) {
+    const sock = player.ws;
+    if (sock) {
+      byWs.delete(sock);
+      player.ws = null;
+      send(sock, { t: "roomClosed", message: "โฮสต์ลบห้องแล้ว" });
+      tellLobby(sock);
+    }
+  }
+  for (const sp of spectators) {
+    const sock = sp.ws;
+    if (!sock) continue;
+    byWs.delete(sock);
+    send(sock, { t: "roomClosed", message: "โฮสต์ลบห้องแล้ว" });
+    tellLobby(sock);
+  }
+}
 function onAddBot(ws) {
   const ctx = seat(ws);
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เพิ่มบอทได้");
@@ -1569,6 +1602,7 @@ function onMessage(ws, raw) {
   if (msg.t === "clear") return onClear(ws);
   if (msg.t === "kick") return onKick(ws, msg);
   if (msg.t === "giveHost") return onGiveHost(ws, msg);
+  if (msg.t === "deleteRoom") return onDeleteRoom(ws);
   if (msg.t === "addBot") return onAddBot(ws);
   if (msg.t === "auto") return onAuto(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);

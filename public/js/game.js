@@ -906,6 +906,18 @@ function renderPlayers(){
   }
   const gear=$("settingsGearBtn");
   if(gear) gear.classList.toggle("hidden",!(isHost()&&netPhase==="lobby"));
+  const hostLobby=isHost()&&netPhase==="lobby"&&!spinning;
+  const transferBtn=$("transferHostBtn");
+  if(transferBtn){
+    const canTransfer=hostLobby&&playerMeta.some(p=>p.id!==myId&&p.connected&&!p.bot);
+    transferBtn.classList.toggle("hidden",!isHost()||netPhase!=="lobby");
+    transferBtn.disabled=!canTransfer;
+  }
+  const deleteBtn=$("deleteRoomBtn");
+  if(deleteBtn){
+    deleteBtn.classList.toggle("hidden",!isHost()||netPhase!=="lobby");
+    deleteBtn.disabled=!hostLobby;
+  }
   if($("pname")) $("pname").disabled=spinning||wheelSpinning||locked;
   if($("addForm")){
     const addBtn=$("addForm").querySelector("button");
@@ -1517,9 +1529,6 @@ function applyCat(next){
   }
   paintGameModeBadge(cat);
   if($("startSub")) $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
-  if($("sideHint")) $("sideHint").textContent=wheel
-    ?"โฮสต์สุ่มลำดับด้วยวงล้อ · แล้วเริ่มเกมวงล้อสุ่มเลข"
-    :"โฮสต์ตั้งค่าด้วยฟันเฟือง · สุ่มลำดับแล้วค่อยเริ่มเกม";
   if(changed){
     loadScores();
     renderPlayers();
@@ -2509,9 +2518,10 @@ function connect(){
       if(!wantRoom&&!spectating&&!pendingAction) showGate();
       else renderLobby(msg);
       if(pendingAction) runPendingAction();
-    }else if(msg.t==="left"){
+    }else if(msg.t==="left"||msg.t==="roomClosed"){
       roomVisibility="";
       paintInviteBtn();
+      if(msg.t==="roomClosed"&&msg.message&&$("err")) $("err").textContent=msg.message;
       location.replace("/app.html#rooms");
       return;
     }else if(msg.t==="renamed"){
@@ -2599,6 +2609,43 @@ async function bootOnline(){
       $("lobbyCopy").textContent="✓";
       setTimeout(()=>{ if($("lobbyCopy")) $("lobbyCopy").textContent="📋"; }, 1200);
     }catch(e){}
+  };
+  function openTransferHostModal(){
+    const modal=$("transferHostModal");
+    const list=$("transferHostList");
+    const empty=$("transferHostEmpty");
+    if(!modal||!list) return;
+    list.textContent="";
+    const candidates=playerMeta.filter(p=>p.id!==myId&&p.connected&&!p.bot);
+    if(empty) empty.classList.toggle("hidden",candidates.length>0);
+    candidates.forEach(p=>{
+      const li=document.createElement("li");
+      li.innerHTML=`<span>${p.name}</span>`;
+      const btn=document.createElement("button");
+      btn.type="button";
+      btn.className="btn sm";
+      btn.textContent="โอนให้คนนี้";
+      btn.onclick=()=>{
+        send({t:"giveHost",id:p.id});
+        modal.classList.add("hidden");
+      };
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+    modal.classList.remove("hidden");
+  }
+  if($("transferHostBtn")) $("transferHostBtn").onclick=()=>{
+    if(!isHost()||netPhase!=="lobby") return;
+    openTransferHostModal();
+  };
+  if($("transferHostClose")) $("transferHostClose").onclick=()=>$("transferHostModal").classList.add("hidden");
+  if($("transferHostModal")) $("transferHostModal").addEventListener("click",e=>{
+    if(e.target===$("transferHostModal")) $("transferHostModal").classList.add("hidden");
+  });
+  if($("deleteRoomBtn")) $("deleteRoomBtn").onclick=()=>{
+    if(!isHost()||netPhase!=="lobby") return;
+    if(!confirm("ลบห้องนี้? ผู้เล่นทุกคนจะถูกเตะออก")) return;
+    send({t:"deleteRoom"});
   };
   $("again").onclick=()=>{ if(isHost()) send({t:"again"}); };
   ["leave","back","wheelLeave","pickLeave"].forEach(id=>{ $(id).onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
