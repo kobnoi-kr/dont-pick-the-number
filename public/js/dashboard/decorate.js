@@ -26,14 +26,26 @@ function avHtml(user, letter) {
   return `<span class="dec-av-letter">${esc(letter || "?")}</span>`;
 }
 
+function titlePillHtml(item, sizeClass) {
+  const color = itemColor(item);
+  const cls = [
+    "dec-title-pill",
+    sizeClass || "",
+    item && item.cssClass ? item.cssClass : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `<span class="${esc(cls)}" style="--title-color:${esc(color)};border-color:${esc(
+    color
+  )};color:${esc(color)}">${esc((item && item.name) || "—")}</span>`;
+}
+
 function thumbHtml(item, user) {
   const kind = item && item.kind;
   const color = itemColor(item);
   const letter = ((user && (user.displayName || user.username)) || "?").slice(0, 1).toUpperCase();
   if (kind === "title") {
-    return `<span class="dec-thumb-pill" style="border-color:${esc(color)};color:${esc(color)}">${esc(
-      (item && item.name) || "—"
-    )}</span>`;
+    return titlePillHtml(item, "dec-title-pill-sm");
   }
   if (kind === "frame") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
@@ -53,7 +65,6 @@ function previewHtml(user, eq) {
   const title = eq.title;
   const frame = eq.frame;
   const effect = eq.effect;
-  const titleColor = itemColor(title);
   const frameCls = frame && frame.cssClass ? " " + frame.cssClass : "";
   const effectCls = effect && effect.cssClass ? " " + effect.cssClass : "";
   return `
@@ -66,14 +77,8 @@ function previewHtml(user, eq) {
           <b class="dec-preview-name">${esc(name)}</b>
           <span class="dec-preview-user">${esc(uname)}</span>
           <div class="nv-pills dec-preview-pills">
-            <span class="nv-pill title${title && title.cssClass ? " " + esc(title.cssClass) : ""}" style="border-color:${esc(
-              titleColor
-            )};color:${esc(titleColor)}">${esc((title && title.name) || "—")}</span>
-            ${
-              frame
-                ? `<span class="nv-pill">${esc(frame.name)}</span>`
-                : ""
-            }
+            ${titlePillHtml(title, "dec-title-pill-md")}
+            ${frame ? `<span class="nv-pill">${esc(frame.name)}</span>` : ""}
             ${
               effect && effect.cssClass
                 ? `<span class="nv-pill">${esc(effect.name)}</span>`
@@ -125,41 +130,40 @@ export async function renderDecorate(root, { user } = {}) {
     msg.classList.toggle("ok", !!ok);
   }
 
-  async function load() {
-    const { res, data } = await api("/api/v1/cosmetics/me", { method: "GET" });
+  let owned = [];
+  let equipped = {};
+  let busy = false;
+
+  function paint() {
     const eqBox = root.querySelector("#decEquipped");
     const ownBox = root.querySelector("#decOwned");
     const preview = root.querySelector("#decPreview");
-    if (!res.ok) {
-      eqBox.innerHTML = `<div class="empty">โหลดไม่สำเร็จ</div>`;
-      ownBox.innerHTML = "";
-      if (preview) preview.innerHTML = "";
-      return;
-    }
-    const eq = data.equipped || {};
+    const eq = equipped || {};
     if (preview) preview.innerHTML = previewHtml(user, eq);
 
-    eqBox.innerHTML = ["title", "frame", "effect"]
-      .map((kind) => {
-        const item = eq[kind];
-        return `<div class="dec-eq-row">
-          <div class="dec-eq-visual">${thumbHtml(item, user)}</div>
-          <div class="dec-eq-meta">
-            <span class="tiny">${KIND_LABEL[kind]}</span>
-            <b>${item ? esc(item.name) : "—"}</b>
-          </div>
-        </div>`;
-      })
-      .join("");
+    if (eqBox) {
+      eqBox.innerHTML = ["title", "frame", "effect"]
+        .map((kind) => {
+          const item = eq[kind];
+          return `<div class="dec-eq-row">
+            <div class="dec-eq-visual">${thumbHtml(item, user)}</div>
+            <div class="dec-eq-meta">
+              <span class="tiny">${KIND_LABEL[kind]}</span>
+              <b>${item ? esc(item.name) : "—"}</b>
+            </div>
+          </div>`;
+        })
+        .join("");
+    }
 
-    const owned = data.owned || [];
+    if (!ownBox) return;
     if (!owned.length) {
       ownBox.innerHTML = `<div class="empty">ยังไม่มีของตกแต่ง</div>`;
       return;
     }
     ownBox.innerHTML = owned
       .map((item) => {
-        const equipped =
+        const isOn =
           (eq.title && eq.title.id === item.id) ||
           (eq.frame && eq.frame.id === item.id) ||
           (eq.effect && eq.effect.id === item.id);
@@ -171,32 +175,73 @@ export async function renderDecorate(root, { user } = {}) {
               : item.source === "starter"
                 ? "เริ่มต้น"
                 : item.source || "";
-        return `<button type="button" class="dec-inv-card${equipped ? " on" : ""}" data-id="${esc(item.id)}">
+        return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}"${
+          busy ? " disabled" : ""
+        }>
           <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
           <b>${esc(item.name)}</b>
           <span class="tiny muted">${esc(srcLabel)}</span>
-          <span class="dec-wear">${equipped ? "สวมอยู่" : "สวมใส่"}</span>
+          <span class="dec-wear">${isOn ? "สวมอยู่" : "สวมใส่"}</span>
         </button>`;
       })
       .join("");
 
     ownBox.querySelectorAll("[data-id]").forEach((btn) => {
       btn.onclick = async () => {
+        if (busy) return;
         const id = btn.getAttribute("data-id");
+        const item = owned.find((x) => x.id === id);
+        if (!item) return;
+
+        const prev = {
+          title: equipped.title || null,
+          frame: equipped.frame || null,
+          effect: equipped.effect || null
+        };
+        // Optimistic: update equipped + preview immediately.
+        equipped = Object.assign({}, equipped, { [item.kind]: item });
+        if (user) user.equipped = equipped;
+        busy = true;
+        paint();
+        setMsg("กำลังสวมใส่…", true);
+
         const r = await api("/api/v1/cosmetics/equip", {
           method: "POST",
           body: JSON.stringify({ cosmeticId: id })
         });
-        setMsg(r.res.ok ? "สวมใส่แล้ว" : (r.data && r.data.error) || "ไม่สำเร็จ", r.res.ok);
-        if (r.res.ok) {
-          if (r.data && r.data.equipped && user) {
-            user.equipped = r.data.equipped;
-          }
-          load();
+        busy = false;
+        if (r.res.ok && r.data) {
+          owned = Array.isArray(r.data.owned) ? r.data.owned : owned;
+          equipped = r.data.equipped || equipped;
+          if (user) user.equipped = equipped;
+          setMsg("สวมใส่แล้ว", true);
+          paint();
+          return;
         }
+        equipped = prev;
+        if (user) user.equipped = equipped;
+        setMsg((r.data && r.data.error) || "ไม่สำเร็จ", false);
+        paint();
       };
     });
+  }
+
+  async function load() {
+    const { res, data } = await api("/api/v1/cosmetics/me", { method: "GET" });
+    const eqBox = root.querySelector("#decEquipped");
+    const ownBox = root.querySelector("#decOwned");
+    const preview = root.querySelector("#decPreview");
+    if (!res.ok) {
+      if (eqBox) eqBox.innerHTML = `<div class="empty">โหลดไม่สำเร็จ</div>`;
+      if (ownBox) ownBox.innerHTML = "";
+      if (preview) preview.innerHTML = "";
+      return;
+    }
+    owned = Array.isArray(data.owned) ? data.owned : [];
+    equipped = data.equipped || {};
+    if (user) user.equipped = equipped;
+    paint();
   }
 
   await load();

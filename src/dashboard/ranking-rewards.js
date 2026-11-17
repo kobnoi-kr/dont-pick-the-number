@@ -113,8 +113,12 @@ async function grantPeriodRewards(prisma, period) {
         where: { id: userId },
         select: { equippedTitleId: true }
       });
-      // Auto-equip if they still use the starter title.
-      if (user && (!user.equippedTitleId || user.equippedTitleId === "title.rookie")) {
+      // Auto-equip if they still use the starter / level-1 title.
+      const starterTitles = new Set(["title.rookie", "title.level.1"]);
+      if (
+        user &&
+        (!user.equippedTitleId || starterTitles.has(user.equippedTitleId))
+      ) {
         await prisma.user.update({
           where: { id: userId },
           data: { equippedTitleId: cosmeticId }

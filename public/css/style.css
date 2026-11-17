@@ -163,10 +163,10 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   box-shadow:0 0 10px rgba(255,140,0,.28)
 }
 .nv-pill.title{border-color:rgba(167,180,255,.55)}
-.nv-pill.title.title-weekly-1,.nv-pill.title.title-monthly-1{border-color:#fbbf24;color:#fde68a}
-.nv-pill.title.title-weekly-2,.nv-pill.title.title-monthly-2{border-color:#cbd5e1;color:#e2e8f0}
-.nv-pill.title.title-weekly-3,.nv-pill.title.title-monthly-3{border-color:#cd7f32;color:#fdba74}
-.nv-pill.title.title-rookie{border-color:rgba(148,163,184,.55);color:#cbd5e1}
+.nv-pill.title.title-weekly-1,.nv-pill.title.title-monthly-1{border-color:#fbbf24;color:#fde68a;box-shadow:0 0 10px rgba(251,191,36,.28)}
+.nv-pill.title.title-weekly-2,.nv-pill.title.title-monthly-2{border-color:#cbd5e1;color:#e2e8f0;box-shadow:0 0 10px rgba(203,213,225,.22)}
+.nv-pill.title.title-weekly-3,.nv-pill.title.title-monthly-3{border-color:#cd7f32;color:#fdba74;box-shadow:0 0 10px rgba(205,127,50,.28)}
+.nv-pill.title.title-rookie,.nv-pill.title.title-level-1{border-color:rgba(148,163,184,.55);color:#cbd5e1}
 .nv-pill.admin{
   border-color:rgba(239,68,68,.65);color:#fecaca;
   box-shadow:0 0 8px rgba(239,68,68,.25)
