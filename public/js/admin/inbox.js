@@ -12,6 +12,40 @@ function isSafeImageData(src) {
   return typeof src === "string" && /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(src);
 }
 
+function ensureImageLightbox() {
+  let el = document.getElementById("imgLightbox");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "imgLightbox";
+  el.className = "img-lightbox hidden";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.innerHTML = `
+    <div class="img-lightbox-inner">
+      <button type="button" class="btn ghost sm img-lightbox-close" id="imgLightboxClose">ปิด</button>
+      <img id="imgLightboxImg" alt="รูปขนาดใหญ่">
+    </div>
+  `;
+  document.body.appendChild(el);
+  const close = () => el.classList.add("hidden");
+  el.addEventListener("click", (e) => {
+    if (e.target === el) close();
+  });
+  el.querySelector("#imgLightboxClose").onclick = close;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el.classList.contains("hidden")) close();
+  });
+  return el;
+}
+
+function openImageLightbox(src) {
+  if (!isSafeImageData(src)) return;
+  const el = ensureImageLightbox();
+  const img = el.querySelector("#imgLightboxImg");
+  if (img) img.src = src;
+  el.classList.remove("hidden");
+}
+
 export async function renderInbox(root, opts = {}) {
   const onOpenCount = typeof opts.onOpenCount === "function" ? opts.onOpenCount : null;
 
@@ -21,12 +55,16 @@ export async function renderInbox(root, opts = {}) {
         <h2 style="margin:0">ข้อความติดต่อแอดมิน</h2>
         <p class="muted tiny" id="inboxOpenHint" style="margin:6px 0 0">กำลังโหลด…</p>
       </div>
-      <select class="input" id="inboxStatus" style="max-width:160px">
-        <option value="">ทั้งหมด</option>
-        <option value="open">ใหม่</option>
-        <option value="read">อ่านแล้ว</option>
-        <option value="closed">ปิดแล้ว</option>
-      </select>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select class="input" id="inboxStatus" style="max-width:160px">
+          <option value="">ทั้งหมด</option>
+          <option value="open">ใหม่</option>
+          <option value="read">อ่านแล้ว</option>
+          <option value="closed">ปิดแล้ว</option>
+        </select>
+        <button type="button" class="btn ghost sm danger" id="inboxClearClosed">ลบที่ปิดแล้ว</button>
+        <button type="button" class="btn ghost sm danger" id="inboxClearAll">ลบประวัติทั้งหมด</button>
+      </div>
     </section>
     <div id="inboxList" class="loading">Loading…</div>
   `;
@@ -61,7 +99,10 @@ export async function renderInbox(root, opts = {}) {
               ? `${m.user.displayName || m.user.username} (@${m.user.username})`
               : "ผู้ใช้ถูกลบแล้ว";
             const img = isSafeImageData(m.imageData)
-              ? `<img class="inbox-attach" src="${m.imageData}" alt="แนบรูป" loading="lazy">`
+              ? `<button type="button" class="inbox-attach-btn" data-zoom-src="1" title="ดูรูปใหญ่">
+                   <img class="inbox-attach" src="${m.imageData}" alt="แนบรูป" loading="lazy">
+                   <div class="inbox-attach-hint">คลิกเพื่อดูรูปใหญ่</div>
+                 </button>`
               : "";
             return `<article class="inbox-card${m.status === "open" ? " open-msg" : ""}" data-id="${esc(m.id)}">
               <div class="room-card-top">
@@ -89,6 +130,7 @@ export async function renderInbox(root, opts = {}) {
                 ${m.status !== "read" ? `<button type="button" class="btn ghost sm" data-set="read">อ่านแล้ว</button>` : ""}
                 ${m.status !== "open" ? `<button type="button" class="btn ghost sm" data-set="open">เปิดใหม่</button>` : ""}
                 ${m.status !== "closed" ? `<button type="button" class="btn ghost sm" data-set="closed">ปิด</button>` : ""}
+                <button type="button" class="btn danger sm" data-delete>ลบ</button>
                 <span class="tiny" data-msg></span>
               </div>
             </article>`;
@@ -96,8 +138,11 @@ export async function renderInbox(root, opts = {}) {
           .join("")}
       </div>`;
 
-    box.querySelectorAll(".inbox-attach").forEach((img) => {
-      img.onclick = () => window.open(img.src, "_blank", "noopener");
+    box.querySelectorAll("[data-zoom-src]").forEach((btn) => {
+      btn.onclick = () => {
+        const img = btn.querySelector("img");
+        if (img && img.src) openImageLightbox(img.src);
+      };
     });
 
     box.querySelectorAll("[data-set]").forEach((btn) => {
@@ -110,6 +155,27 @@ export async function renderInbox(root, opts = {}) {
           method: "PATCH",
           body: JSON.stringify({ status: btn.getAttribute("data-set") })
         });
+        await load();
+      };
+    });
+
+    box.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.onclick = async () => {
+        const card = btn.closest("[data-id]");
+        const id = card && card.getAttribute("data-id");
+        if (!id) return;
+        if (!confirm("ลบข้อความติดต่อนี้?")) return;
+        btn.disabled = true;
+        const r = await api(`/api/v1/admin/inbox/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          body: "{}"
+        });
+        if (!r.res.ok) {
+          btn.disabled = false;
+          const msg = card.querySelector("[data-msg]");
+          if (msg) msg.textContent = "ลบไม่สำเร็จ";
+          return;
+        }
         await load();
       };
     });
@@ -144,5 +210,32 @@ export async function renderInbox(root, opts = {}) {
   }
 
   root.querySelector("#inboxStatus").onchange = load;
+
+  root.querySelector("#inboxClearClosed").onclick = async () => {
+    if (!confirm("ลบข้อความสถานะ “ปิดแล้ว” ทั้งหมด?")) return;
+    const r = await api("/api/v1/admin/inbox/clear", {
+      method: "POST",
+      body: JSON.stringify({ scope: "closed" })
+    });
+    if (!r.res.ok) {
+      alert("ลบไม่สำเร็จ");
+      return;
+    }
+    await load();
+  };
+
+  root.querySelector("#inboxClearAll").onclick = async () => {
+    if (!confirm("ลบประวัติติดต่อทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้")) return;
+    const r = await api("/api/v1/admin/inbox/clear", {
+      method: "POST",
+      body: JSON.stringify({ scope: "all" })
+    });
+    if (!r.res.ok) {
+      alert("ลบไม่สำเร็จ");
+      return;
+    }
+    await load();
+  };
+
   await load();
 }

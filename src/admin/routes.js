@@ -1105,11 +1105,55 @@ async function handleAdminApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/admin/inbox/clear") {
+    const auth = await requirePermission(req, res, "users.view");
+    if (!auth) return true;
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const body = await readJsonBody(req).catch(() => null);
+    const scope = String((body && body.scope) || "closed");
+    const where =
+      scope === "all"
+        ? {}
+        : scope === "read"
+          ? { status: { in: ["read", "closed"] } }
+          : { status: "closed" };
+    const result = await prisma.contactMessage.deleteMany({ where });
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "inbox.clear",
+      targetId: null,
+      metadata: { scope, deleted: result.count },
+      ipAddress: ip
+    });
+    sendJson(res, 200, { ok: true, deleted: result.count });
+    return true;
+  }
+
   const inboxMatch = pathname.match(/^\/api\/v1\/admin\/inbox\/([^/]+)$/);
   if (inboxMatch) {
     const auth = await requirePermission(req, res, "users.view");
     if (!auth) return true;
     const id = inboxMatch[1];
+    if (method(req) === "DELETE") {
+      const existing = await prisma.contactMessage.findUnique({ where: { id } });
+      if (!existing) {
+        sendJson(res, 404, { error: "not_found" });
+        return true;
+      }
+      await prisma.contactMessage.delete({ where: { id } });
+      await writeAdminLog(prisma, {
+        adminId: auth.user.id,
+        action: "inbox.delete",
+        targetId: id,
+        metadata: { userId: existing.userId || null, subject: existing.subject || null },
+        ipAddress: ip
+      });
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
     if (method(req) === "PATCH") {
       const body = await readJsonBody(req).catch(() => null);
       if (!body) {
