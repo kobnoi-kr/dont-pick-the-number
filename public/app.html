@@ -69,21 +69,25 @@
 
 <div id="notifPanel" class="card notif-panel hidden">
   <div class="notif-head">
-    <h3 style="margin:0">การแจ้งเตือน</h3>
+    <div>
+      <h3 class="notif-title">การแจ้งเตือน</h3>
+      <p class="notif-sub" id="notifSub">ทั้งหมด 0 รายการ</p>
+    </div>
     <div class="notif-head-actions">
       <button type="button" class="btn ghost sm" id="notifMarkAll">อ่านทั้งหมด</button>
       <button type="button" class="btn ghost sm danger-text" id="notifDeleteAll">ลบทั้งหมด</button>
     </div>
   </div>
-  <div class="notif-toolbar">
+  <div class="notif-cats" id="notifCats" role="tablist" aria-label="หมวดหมู่การแจ้งเตือน"></div>
+  <div class="notif-toolbar hidden" id="notifToolbar">
     <label class="notif-select-all">
       <input type="checkbox" id="notifSelectAll" aria-label="เลือกทั้งหมด">
       <span>เลือกทั้งหมด</span>
     </label>
     <button type="button" class="btn sm hidden" id="notifDeleteSelected" disabled>ลบที่เลือก</button>
   </div>
-  <ul class="list" id="notifList"></ul>
-  <p class="empty tiny" id="notifEmpty">ยังไม่มีการแจ้งเตือน</p>
+  <ul class="list notif-list" id="notifList"></ul>
+  <p class="empty tiny notif-empty" id="notifEmpty">ยังไม่มีการแจ้งเตือน</p>
 </div>
 
 <div id="createModal" class="modal hidden" role="dialog" aria-modal="true">

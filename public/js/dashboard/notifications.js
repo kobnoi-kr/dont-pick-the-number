@@ -1,32 +1,64 @@
 import { api } from "./api.js";
 
+const CATS = [
+  { id: "all", label: "ทั้งหมด" },
+  { id: "announce", label: "ประกาศ" },
+  { id: "invite", label: "เชิญห้อง" },
+  { id: "game", label: "เกม" },
+  { id: "friend", label: "เพื่อน" },
+  { id: "other", label: "อื่นๆ" }
+];
+
+let cacheItems = [];
+let activeCat = "all";
+
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
 }
+
 function when(iso) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString();
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    if (diff < 60_000) return "เมื่อสักครู่";
+    if (diff < 3_600_000) return Math.floor(diff / 60_000) + " นาทีที่แล้ว";
+    if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + " ชม.ที่แล้ว";
+    return d.toLocaleString();
   } catch {
     return iso;
   }
+}
+
+function catOf(n) {
+  const type = String(n.type || "");
+  if (type === "announcement") return "announce";
+  if (type === "room_invitation") return "invite";
+  if (type === "game_finished") return "game";
+  if (type === "friend_request" || type === "friend") return "friend";
+  return "other";
 }
 
 function notifMeta(n) {
   const type = String(n.type || "");
   const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
   if (type === "announcement") {
-    if (kind === "warning") return { label: "เตือน", cls: "notif-warning" };
-    if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger" };
-    if (kind === "alert") return { label: "เตือนถึงคุณ", cls: "notif-alert" };
-    return { label: "ประกาศ", cls: "notif-info" };
+    if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!" };
+    if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!" };
+    if (kind === "alert") return { label: "เตือนถึงคุณ", cls: "notif-alert", icon: "!!" };
+    return { label: "ประกาศ", cls: "notif-info", icon: "📢" };
   }
-  if (type === "room_invitation") return { label: "เชิญห้อง", cls: "notif-invite" };
-  if (type === "game_finished") return { label: "จบเกม", cls: "notif-game" };
-  if (type === "friend_request" || type === "friend") return { label: "เพื่อน", cls: "notif-friend" };
-  return { label: "แจ้งเตือน", cls: "notif-default" };
+  if (type === "room_invitation") return { label: "เชิญห้อง", cls: "notif-invite", icon: "🎮" };
+  if (type === "game_finished") return { label: "จบเกม", cls: "notif-game", icon: "🏁" };
+  if (type === "friend_request" || type === "friend") return { label: "เพื่อน", cls: "notif-friend", icon: "👥" };
+  return { label: "แจ้งเตือน", cls: "notif-default", icon: "🔔" };
+}
+
+function filteredItems() {
+  if (activeCat === "all") return cacheItems;
+  return cacheItems.filter((n) => catOf(n) === activeCat);
 }
 
 function selectedIds() {
@@ -51,59 +83,77 @@ function syncSelectionUi() {
   }
 }
 
-export async function refreshNotifications() {
-  const { res, data } = await api("/api/v1/notifications", { method: "GET" });
+function paintCats() {
+  const wrap = document.getElementById("notifCats");
+  if (!wrap) return;
+  const counts = Object.fromEntries(CATS.map((c) => [c.id, 0]));
+  counts.all = cacheItems.length;
+  for (const n of cacheItems) counts[catOf(n)] = (counts[catOf(n)] || 0) + 1;
+
+  wrap.innerHTML = CATS.map((c) => {
+    const count = counts[c.id] || 0;
+    const on = activeCat === c.id;
+    return `<button type="button" class="notif-cat${on ? " on" : ""}" data-cat="${c.id}" role="tab" aria-selected="${on ? "true" : "false"}">
+      <span>${esc(c.label)}</span>
+      <em>${count}</em>
+    </button>`;
+  }).join("");
+
+  wrap.querySelectorAll("[data-cat]").forEach((btn) => {
+    btn.onclick = () => {
+      activeCat = btn.getAttribute("data-cat") || "all";
+      paintCats();
+      renderList();
+    };
+  });
+}
+
+function renderList() {
   const list = document.getElementById("notifList");
   const empty = document.getElementById("notifEmpty");
-  const dot = document.getElementById("notifDot");
-  const toolbar = document.querySelector(".notif-toolbar");
-  if (!list) return [];
-  if (!res.ok) {
-    list.innerHTML = "";
-    if (empty) {
-      empty.classList.remove("hidden");
-      empty.textContent = "โหลดการแจ้งเตือนไม่สำเร็จ";
-    }
-    if (dot) dot.classList.add("hidden");
-    if (toolbar) toolbar.classList.add("hidden");
-    syncSelectionUi();
-    return [];
+  const toolbar = document.getElementById("notifToolbar");
+  const sub = document.getElementById("notifSub");
+  if (!list) return;
+
+  const items = filteredItems();
+  if (sub) {
+    const catLabel = (CATS.find((c) => c.id === activeCat) || CATS[0]).label;
+    sub.textContent = `${catLabel} · ${items.length} รายการ`;
   }
-  const items = (data && data.items) || [];
-  const unread = items.filter((n) => !n.readAt).length;
-  if (dot) dot.classList.toggle("hidden", unread === 0);
   if (toolbar) toolbar.classList.toggle("hidden", !items.length);
+
   if (!items.length) {
     list.innerHTML = "";
     if (empty) {
       empty.classList.remove("hidden");
-      empty.textContent = "ยังไม่มีการแจ้งเตือน";
-    }
-    const selectAll = document.getElementById("notifSelectAll");
-    if (selectAll) {
-      selectAll.checked = false;
-      selectAll.indeterminate = false;
+      empty.textContent =
+        cacheItems.length && activeCat !== "all"
+          ? "ไม่มีรายการในหมวดนี้"
+          : "ยังไม่มีการแจ้งเตือน";
     }
     syncSelectionUi();
-    return items;
+    return;
   }
   if (empty) empty.classList.add("hidden");
+
   list.innerHTML = items
     .map((n) => {
       const meta = notifMeta(n);
       return `
-    <li class="notif-item ${n.readAt ? "" : "unread"} ${meta.cls}" data-id="${esc(n.id)}">
-      <label class="notif-check" onclick="event.stopPropagation()">
+    <li class="notif-item ${n.readAt ? "is-read" : "unread"} ${meta.cls}" data-id="${esc(n.id)}" data-cat="${catOf(n)}">
+      <label class="notif-check">
         <input type="checkbox" data-pick="${esc(n.id)}" aria-label="เลือกข้อความ">
       </label>
-      <div class="notif-accent" aria-hidden="true"></div>
+      <div class="notif-icon" aria-hidden="true">${meta.icon}</div>
       <div class="grow">
-        <div class="tiny notif-kicker">${esc(meta.label)}</div>
-        <b>${esc(n.title)}</b>
-        <div class="tiny">${esc(n.body || "")}</div>
-        <div class="tiny">${when(n.createdAt)}</div>
+        <div class="notif-top">
+          <span class="notif-pill">${esc(meta.label)}</span>
+          <span class="notif-time">${esc(when(n.createdAt))}</span>
+        </div>
+        <b class="notif-item-title">${esc(n.title)}</b>
+        <div class="notif-body">${esc(n.body || "")}</div>
       </div>
-      <button type="button" class="btn ghost sm" data-del="${esc(n.id)}" aria-label="ลบ">✕</button>
+      <button type="button" class="notif-x" data-del="${esc(n.id)}" aria-label="ลบ">×</button>
     </li>`;
     })
     .join("");
@@ -127,10 +177,41 @@ export async function refreshNotifications() {
     };
   });
   list.querySelectorAll("input[data-pick]").forEach((box) => {
+    box.onclick = (e) => e.stopPropagation();
     box.onchange = () => syncSelectionUi();
   });
+  list.querySelectorAll(".notif-check").forEach((lab) => {
+    lab.onclick = (e) => e.stopPropagation();
+  });
   syncSelectionUi();
-  return items;
+}
+
+export async function refreshNotifications() {
+  const { res, data } = await api("/api/v1/notifications", { method: "GET" });
+  const list = document.getElementById("notifList");
+  const empty = document.getElementById("notifEmpty");
+  const dot = document.getElementById("notifDot");
+  if (!list) return [];
+
+  if (!res.ok) {
+    cacheItems = [];
+    list.innerHTML = "";
+    paintCats();
+    if (empty) {
+      empty.classList.remove("hidden");
+      empty.textContent = "โหลดการแจ้งเตือนไม่สำเร็จ";
+    }
+    if (dot) dot.classList.add("hidden");
+    syncSelectionUi();
+    return [];
+  }
+
+  cacheItems = (data && data.items) || [];
+  const unread = cacheItems.filter((n) => !n.readAt).length;
+  if (dot) dot.classList.toggle("hidden", unread === 0);
+  paintCats();
+  renderList();
+  return cacheItems;
 }
 
 export function wireNotifications() {
@@ -141,6 +222,8 @@ export function wireNotifications() {
   const deleteSelected = document.getElementById("notifDeleteSelected");
   const selectAll = document.getElementById("notifSelectAll");
   if (!btn || !panel) return;
+
+  paintCats();
 
   btn.onclick = async () => {
     panel.classList.toggle("hidden");
@@ -163,6 +246,7 @@ export function wireNotifications() {
     deleteAll.onclick = async () => {
       if (!confirm("ลบการแจ้งเตือนทั้งหมด?")) return;
       await api("/api/v1/notifications/delete-all", { method: "POST", body: "{}" });
+      activeCat = "all";
       refreshNotifications();
     };
   }
