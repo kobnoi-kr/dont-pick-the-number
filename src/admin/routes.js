@@ -13,6 +13,7 @@ const { revokeAllUserSessions } = require("../auth/sessions");
 const { getGameApi } = require("../dashboard/bridge");
 const { writeAdminLog } = require("./audit");
 const { publishAnnouncement, isDueNow } = require("./publish-announcement");
+const { invalidatePublicSettingsCache } = require("../system/public-settings");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -803,12 +804,24 @@ async function handleAdminApi(req, res, pathname) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
-      const allowed = ["maintenance_message", "max_rooms_display", "game_catalog"];
+      const allowed = [
+        "maintenance_enabled",
+        "maintenance_message",
+        "max_rooms_display",
+        "game_catalog"
+      ];
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(body.settings, key)) {
-          await setSetting(prisma, key, body.settings[key]);
+          let value = body.settings[key];
+          if (key === "maintenance_enabled") value = !!value;
+          if (key === "maintenance_message") value = String(value || "").slice(0, 2000);
+          if (key === "max_rooms_display") {
+            value = Math.min(200, Math.max(1, Number(value) || 50));
+          }
+          await setSetting(prisma, key, value);
         }
       }
+      invalidatePublicSettingsCache();
       await writeAdminLog(prisma, {
         adminId: auth.user.id,
         action: "settings.update",

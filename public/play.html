@@ -342,6 +342,14 @@
   <span id="volLabel" class="vollabel">100%</span>
   <button type="button" id="volUp" class="volbtn" aria-label="เพิ่มเสียง">+</button>
 </div>
-<script src="/js/game.js"></script>
+<script type="module">
+  import { enforceMaintenanceGate } from "/js/maintenance-gate.js";
+  const gate = await enforceMaintenanceGate({ hardBlock: true });
+  if (!gate.blocked) {
+    const s = document.createElement("script");
+    s.src = "/js/game.js";
+    document.body.appendChild(s);
+  }
+</script>
 </body>
 </html>

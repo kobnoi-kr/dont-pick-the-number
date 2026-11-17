@@ -3,6 +3,11 @@
 const { authEnabled, getPrisma } = require("../db");
 const { sendJson, readJsonBody, clientIp } = require("../auth/http");
 const { requireAuth, requireAdmin, resolveAuth, isAdminUser } = require("../auth/middleware");
+const {
+  loadPublicSettings,
+  getMaintenanceState,
+  userBypassesMaintenance
+} = require("../system/public-settings");
 
 /** Opt-in only — user dashboard APIs are public to signed-in/guest sessions by default. */
 const DASHBOARD_ADMIN_ONLY = process.env.DASHBOARD_ADMIN_ONLY === "1";
@@ -100,6 +105,30 @@ async function handleDashboardApi(req, res, pathname) {
     pathname.startsWith("/api/v1/notifications") ||
     pathname.startsWith("/api/v1/announcements") ||
     pathname.match(/^\/api\/v1\/users\/[^/]+\/public$/);
+
+  if (pathname === "/api/v1/system/status") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const settings = await loadPublicSettings();
+    const maint = await getMaintenanceState();
+    let bypass = false;
+    if (maint.enabled) {
+      const user = await optionalUser(req);
+      if (user && isAdminUser(user)) bypass = true;
+      else if (user && (await userBypassesMaintenance(user.id))) bypass = true;
+    }
+    sendJson(res, 200, {
+      maintenance: {
+        enabled: maint.enabled,
+        message: maint.message,
+        bypass
+      },
+      maxRoomsDisplay: settings.maxRoomsDisplay
+    });
+    return true;
+  }
 
   if (DASHBOARD_ADMIN_ONLY && isDashPath) {
     const admin = await requireAdmin(req, res);
@@ -321,6 +350,17 @@ async function handleDashboardApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
+    {
+      const maint = await getMaintenanceState();
+      if (maint.enabled) {
+        const user = await optionalUser(req);
+        const bypass = user && (isAdminUser(user) || (await userBypassesMaintenance(user.id)));
+        if (!bypass) {
+          sendJson(res, 503, { error: "maintenance", message: maint.message });
+          return true;
+        }
+      }
+    }
     const rl = rateLimit("qp:" + clientIp(req), 30, 60_000);
     if (!rl.ok) {
       tooMany(res, rl.retryAfterSec);
@@ -357,6 +397,16 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     const user = await optionalUser(req);
+    {
+      const maint = await getMaintenanceState();
+      if (maint.enabled) {
+        const bypass = user && (isAdminUser(user) || (await userBypassesMaintenance(user.id)));
+        if (!bypass) {
+          sendJson(res, 503, { error: "maintenance", message: maint.message });
+          return true;
+        }
+      }
+    }
     const token = (user && user.id) || String(body.token || "");
     const name = String(body.displayName || body.name || (user && user.displayName) || "").trim().slice(0, 24);
     const created = game.createRoomHttp({
@@ -386,6 +436,17 @@ async function handleDashboardApi(req, res, pathname) {
     } catch {
       sendJson(res, 400, { error: "invalid_json" });
       return true;
+    }
+    {
+      const maint = await getMaintenanceState();
+      if (maint.enabled) {
+        const user = await optionalUser(req);
+        const bypass = user && (isAdminUser(user) || (await userBypassesMaintenance(user.id)));
+        if (!bypass) {
+          sendJson(res, 503, { error: "maintenance", message: maint.message });
+          return true;
+        }
+      }
     }
     const code = String(body.code || "").replace(/\D/g, "").slice(0, 6);
     if (!game) {

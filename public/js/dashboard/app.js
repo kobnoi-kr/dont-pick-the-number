@@ -8,6 +8,7 @@ import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
+import { enforceMaintenanceGate } from "/js/maintenance-gate.js";
 
 const state = {
   user: null,
@@ -176,6 +177,10 @@ onDashboardMessage((msg) => {
   } catch (err) {
     paintUser(null);
   }
+
+  const gate = await enforceMaintenanceGate({ hardBlock: true });
+  if (gate.blocked) return;
+
   wireNotifications();
   connectDashboardWs();
   loadAnnouncementToasts().catch(() => {});

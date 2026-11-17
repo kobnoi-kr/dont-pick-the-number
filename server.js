@@ -22,6 +22,11 @@ const { handleAdminApi } = require("./src/admin/routes");
 const { attachGameApi } = require("./src/dashboard/bridge");
 const { persistFinishedGame } = require("./src/dashboard/persist");
 const { publishDueAnnouncements } = require("./src/admin/publish-announcement");
+const {
+  getMaxRoomsDisplay,
+  getMaintenanceState,
+  userBypassesMaintenance
+} = require("./src/system/public-settings");
 
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
@@ -545,8 +550,17 @@ function lobbyMsg() {
     if (ap !== bp) return bp - ap;
     return (b.created || 0) - (a.created || 0);
   });
-  return { t: "lobby", rooms: list.slice(0, 50) };
+  const maxShow = Number(lobbyMsg._maxRooms) || 50;
+  return { t: "lobby", rooms: list.slice(0, maxShow) };
 }
+lobbyMsg._maxRooms = 50;
+setInterval(() => {
+  getMaxRoomsDisplay()
+    .then((n) => {
+      lobbyMsg._maxRooms = n;
+    })
+    .catch(() => {});
+}, 5000);
 function broadcastLobby() {
   const msg = lobbyMsg();
   for (const ws of watchers) send(ws, msg);
@@ -1364,7 +1378,20 @@ function identity(ws, msg) {
   trackPresence(ws, token);
   return { name, token, avatarUrl };
 }
-function onCreate(ws, msg) {
+async function assertNotMaintenance(ws, msg) {
+  try {
+    const maint = await getMaintenanceState();
+    if (!maint.enabled) return true;
+    const token = validToken(msg && msg.token) ? msg.token : validToken(ws.token) ? ws.token : "";
+    if (token && (await userBypassesMaintenance(token))) return true;
+    fail(ws, maint.message || "ระบบปิดปรับปรุงชั่วคราว");
+    return false;
+  } catch {
+    return true;
+  }
+}
+async function onCreate(ws, msg) {
+  if (!(await assertNotMaintenance(ws, msg))) return;
   const { name, token, avatarUrl } = identity(ws, msg);
   if (!name) return fail(ws, "ใส่ชื่อก่อน");
   if (rooms.size >= MAX_ROOMS) return fail(ws, "เซิร์ฟเวอร์เต็ม ลองใหม่ภายหลัง");
@@ -1412,7 +1439,7 @@ function onUnwatch(ws) {
   send(ws, { t: "left" });
   send(ws, lobbyMsg());
 }
-function onJoin(ws, msg) {
+async function onJoin(ws, msg) {
   const code = String(msg.code || "").trim();
   if (!/^\d{6}$/.test(code)) return fail(ws, "รหัสต้องเป็นตัวเลข 6 หลัก");
   const room = rooms.get(code);
@@ -1425,6 +1452,7 @@ function onJoin(ws, msg) {
     attach(ws, room, existing);
     return;
   }
+  if (!(await assertNotMaintenance(ws, msg))) return;
   if (!name) return fail(ws, "ใส่ชื่อก่อน");
   if (room.phase !== "lobby") return fail(ws, "ห้องนี้เริ่มเกมแล้ว");
   if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
@@ -1794,7 +1822,8 @@ attachGameApi({
       list.push(lobbyRoomRow(room));
     }
     list.sort((a, b) => (b.created || 0) - (a.created || 0));
-    return list.slice(0, 50);
+    const maxShow = Number(lobbyMsg._maxRooms) || 50;
+    return list.slice(0, maxShow);
   },
   listLiveGames() {
     const list = [];
@@ -1804,7 +1833,8 @@ attachGameApi({
       if (!room.players.some((item) => item.connected)) continue;
       list.push(lobbyRoomRow(room));
     }
-    return list.slice(0, 50);
+    const maxShow = Number(lobbyMsg._maxRooms) || 50;
+    return list.slice(0, maxShow);
   },
   listAllRooms() {
     const list = [];

@@ -1,3 +1,5 @@
+import { enforceMaintenanceGate } from "/js/maintenance-gate.js";
+
 async function api(path, opts = {}) {
   const res = await fetch(path, Object.assign({
     credentials: "same-origin",
@@ -26,7 +28,11 @@ function setAvatar(el, user) {
   try {
     let me = await api("/api/v1/auth/me", { method: "GET" });
     if (!me.res.ok) {
-      me = await api("/api/v1/auth/guest", { method: "POST", body: "{}", headers: { "Content-Type": "application/json", Accept: "application/json" } });
+      me = await api("/api/v1/auth/guest", {
+        method: "POST",
+        body: "{}",
+        headers: { "Content-Type": "application/json", Accept: "application/json" }
+      });
     }
     const user = me.data && me.data.user;
     if (user) {
@@ -43,5 +49,16 @@ function setAvatar(el, user) {
     label.textContent = "เข้าสู่ระบบ";
     name.textContent = "Guest";
     link.href = "/login.html";
+  }
+
+  const gate = await enforceMaintenanceGate({ hardBlock: true });
+  if (gate.blocked) {
+    const start = document.getElementById("startBtn");
+    if (start) {
+      start.setAttribute("aria-disabled", "true");
+      start.addEventListener("click", (e) => e.preventDefault());
+      start.style.pointerEvents = "none";
+      start.style.opacity = "0.5";
+    }
   }
 })();

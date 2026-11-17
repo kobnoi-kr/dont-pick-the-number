@@ -106,6 +106,7 @@ async function main() {
   }
 
   const defaults = {
+    maintenance_enabled: false,
     maintenance_message: "",
     max_rooms_display: 50,
     game_catalog: {
