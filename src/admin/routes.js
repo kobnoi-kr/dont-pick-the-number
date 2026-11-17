@@ -340,8 +340,17 @@ async function handleAdminApi(req, res, pathname) {
 
       // —— Reset EXP / Level ——
       if (wantsResetExp && !wantsStatus && !wantsUsername && !wantsDisplayName) {
-        const auth = await requirePermission(req, res, "users.ban");
-        if (!auth) return true;
+        const authAdmin = await requireAdmin(req, res);
+        if (!authAdmin) return true;
+        const { userHasPermission } = require("../auth/middleware");
+        if (
+          !userHasPermission(authAdmin.user, "users.reset_exp") &&
+          !userHasPermission(authAdmin.user, "users.ban")
+        ) {
+          sendJson(res, 403, { error: "permission_denied", permission: "users.reset_exp" });
+          return true;
+        }
+        const auth = authAdmin;
         const target = await prisma.user.findUnique({
           where: { id: userId },
           include: { userRoles: { include: { role: true } } }
@@ -838,6 +847,8 @@ async function handleAdminApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
+    const { ensurePermissionsCatalog, enrichPermission, GROUP_LABELS } = require("./permissions-catalog");
+    await ensurePermissionsCatalog(prisma);
     const roles = await prisma.role.findMany({
       include: {
         rolePermissions: { include: { permission: true } },
@@ -854,7 +865,8 @@ async function handleAdminApi(req, res, pathname) {
         userCount: r._count.userRoles,
         permissions: r.rolePermissions.map((rp) => rp.permission.name)
       })),
-      permissions: permissions.map((p) => ({ id: p.id, name: p.name, description: p.description }))
+      permissions: permissions.map(enrichPermission),
+      groups: GROUP_LABELS
     });
     return true;
   }

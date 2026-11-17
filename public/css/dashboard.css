@@ -2791,3 +2791,19 @@ body.nav-open .sidebar .nav {
 }
 .dec-item.shop-item { cursor: default; opacity: 0.92; }
 .shop-soon h3 { margin-bottom: 4px; }
+
+.perm-matrix .perm-group-row td {
+  background: rgba(255, 255, 255, 0.04);
+  padding-top: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--nv-border);
+}
+.perm-matrix .perm-name {
+  font-weight: 750;
+  margin-bottom: 2px;
+}
+.perm-matrix code.tiny {
+  display: inline-block;
+  margin-bottom: 2px;
+  opacity: 0.85;
+}

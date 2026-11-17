@@ -244,21 +244,35 @@ async function handleLevelsApi(req, res, pathname) {
 
 async function handleAdminLevelsApi(req, res, pathname) {
   if (!pathname.startsWith("/api/v1/admin/levels")) return false;
-  const { requirePermission } = require("../auth/middleware");
+  const { requireAdmin, userHasPermission } = require("../auth/middleware");
   const { writeAdminLog } = require("../admin/audit");
   const prisma = await getPrisma();
 
   if (pathname === "/api/v1/admin/levels" && method(req) === "GET") {
-    const auth = await requirePermission(req, res, "settings.view");
+    const auth = await requireAdmin(req, res);
     if (!auth) return true;
+    if (
+      !userHasPermission(auth.user, "levels.view") &&
+      !userHasPermission(auth.user, "settings.view")
+    ) {
+      sendJson(res, 403, { error: "permission_denied", permission: "levels.view" });
+      return true;
+    }
     const config = await ensureLevelConfig(prisma);
     sendJson(res, 200, { config });
     return true;
   }
 
   if (pathname === "/api/v1/admin/levels" && method(req) === "PUT") {
-    const auth = await requirePermission(req, res, "settings.manage");
+    const auth = await requireAdmin(req, res);
     if (!auth) return true;
+    if (
+      !userHasPermission(auth.user, "levels.manage") &&
+      !userHasPermission(auth.user, "settings.manage")
+    ) {
+      sendJson(res, 403, { error: "permission_denied", permission: "levels.manage" });
+      return true;
+    }
     const body = await readJsonBody(req).catch(() => null);
     if (!body || !body.config || typeof body.config !== "object") {
       sendJson(res, 400, { error: "invalid_body" });

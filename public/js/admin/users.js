@@ -99,7 +99,7 @@ export async function renderUsers(root, { user }) {
         <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
       </div>
       ${
-        canBan
+        hasPerm(user, "users.reset_exp") || canBan
           ? `<div style="margin-top:16px">
         <h3 style="margin:0 0 8px">Level / EXP</h3>
         <p class="tiny muted" style="margin:0 0 10px">ลบ EXP แล้วเลเวลจะกลับไป 1</p>

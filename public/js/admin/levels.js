@@ -6,7 +6,7 @@ function blankRow(level, exp) {
 }
 
 export async function renderLevels(root, { user }) {
-  const canManage = hasPerm(user, "settings.manage");
+  const canManage = hasPerm(user, "levels.manage") || hasPerm(user, "settings.manage");
   root.innerHTML = `<div class="loading">Loading…</div>`;
   const { res, data } = await api("/api/v1/admin/levels", { method: "GET" });
   if (!res.ok) {

@@ -19,10 +19,15 @@ export function statusPill(status) {
 }
 
 export function hasPerm(user, perm) {
-  if (!user) return false;
+  if (!user || !perm) return false;
   const roles = user.roles || [];
   if (roles.includes("super_admin")) return true;
-  return (user.permissions || []).includes(perm);
+  const list = String(perm)
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const owned = user.permissions || [];
+  return list.some((p) => owned.includes(p));
 }
 
 export function modeLabel(mode) {
