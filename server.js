@@ -22,13 +22,20 @@ const { persistFinishedGame } = require("./src/dashboard/persist");
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
 const HOST = process.env.HOST || "0.0.0.0";
-/** Admin dashboard — default localhost-only so public users cannot reach it */
-const ADMIN_PORT = Number(process.env.ADMIN_PORT || 9100);
+/** Admin dashboard — default localhost-only; on Render default off (single public port). */
+const ADMIN_PORT = Number(
+  process.env.ADMIN_PORT !== undefined && process.env.ADMIN_PORT !== ""
+    ? process.env.ADMIN_PORT
+    : process.env.RENDER
+      ? 0
+      : 9100
+);
 const ADMIN_HOST = process.env.ADMIN_HOST || "127.0.0.1";
 /** When admin port is off (e.g. Render), serve dashboard on the public port (APIs still role-gated). */
 const PUBLIC_DASHBOARD =
   process.env.PUBLIC_DASHBOARD === "1" ||
-  (process.env.PUBLIC_DASHBOARD !== "0" && !(ADMIN_PORT > 0));
+  (process.env.PUBLIC_DASHBOARD !== "0" &&
+    (!(ADMIN_PORT > 0) || !!process.env.RENDER));
 const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 const SEAT_MS = 45000;
