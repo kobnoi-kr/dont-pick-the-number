@@ -81,8 +81,8 @@ async function loadCleanupSettings(prisma) {
 }
 
 /** Drop finished room/game history older than retention (cascades players + rounds). */
-async function cleanupOldGames(prisma, retentionDays = 7) {
-  const days = Math.min(365, Math.max(1, Number(retentionDays) || 7));
+async function cleanupOldGames(prisma, retentionDays = 30) {
+  const days = Math.min(365, Math.max(1, Number(retentionDays) || 30));
   const cutoff = new Date(Date.now() - days * DAY_MS);
   const result = await prisma.game.deleteMany({
     where: {
