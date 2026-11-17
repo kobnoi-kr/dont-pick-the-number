@@ -153,11 +153,14 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
   ].join(";");
   const message =
     msg.message || "ระบบจะปิดปรับปรุงชั่วคราว กรุณาเตรียมออกจากห้อง";
+  const isDeploy =
+    /อัปเดต|อัพเดต|deploy|update/i.test(String(message)) || msg.kind === "deploy";
 
   // Stash for resync from server pulses.
   el._nvEndsAt = endsAt;
   el._nvMessage = message;
   el._nvBypass = !!bypass;
+  el._nvDeploy = isDeploy;
 
   let lastSec = -1;
   const paint = () => {
@@ -166,6 +169,11 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
     const sec = Math.max(0, Math.ceil(leftMs / 1000));
     if (sec !== lastSec) {
       lastSec = sec;
+      const badge = el._nvDeploy ? "SYSTEM UPDATE" : "MAINTENANCE";
+      const title = el._nvDeploy ? "กำลังอัปเดตระบบใน" : "Maintenance in";
+      const sub = el._nvDeploy
+        ? `กรุณาหยุดการกระทำ — ปิดปรับปรุงใน ${sec} วินาที`
+        : `ปิดเซิร์ฟใน ${sec} วินาที`;
       el.innerHTML = `
         <div style="
           width:min(420px,100%);text-align:center;color:#fee2e2;
@@ -177,10 +185,10 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
             display:inline-block;margin-bottom:10px;padding:4px 12px;border-radius:999px;
             background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.4);
             font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">
-            MAINTENANCE
+            ${badge}
           </div>
           <div style="font-size:1.05rem;font-weight:800;margin-bottom:6px;color:#fecaca">
-            Maintenance in
+            ${title}
           </div>
           <div style="
             font-size:4.2rem;line-height:1;font-weight:900;
@@ -189,7 +197,7 @@ export function applyMaintenanceCountdown(msg, { bypass = false } = {}) {
             ${sec}
           </div>
           <div style="font-size:.95rem;font-weight:700;color:#fca5a5;margin-bottom:12px">
-            ปิดเซิร์ฟใน ${sec} วินาที
+            ${sub}
           </div>
           <p style="margin:0;color:#f5c2c2;line-height:1.45;white-space:pre-wrap">${esc(el._nvMessage || message)}</p>
           ${

@@ -1031,15 +1031,19 @@ async function handleAdminApi(req, res, pathname) {
         /* ignore */
       }
       const gameApi = getGameApi();
-      // Turning maintenance ON → 15s countdown warning, then kick
+      // Turning maintenance ON → countdown warning, then kick
       if (!beforeOn && afterOn) {
         const msg =
           body.settings.maintenance_message != null
             ? String(body.settings.maintenance_message || "").trim()
             : "";
+        const countdownSec = Math.max(
+          5,
+          Math.min(180, Number(body.settings.maintenance_countdown_sec) || 15)
+        );
         if (gameApi && typeof gameApi.scheduleForceMaintenance === "function") {
           try {
-            gameApi.scheduleForceMaintenance(msg, 15);
+            gameApi.scheduleForceMaintenance(msg, countdownSec);
           } catch {
             /* ignore */
           }

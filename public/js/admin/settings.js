@@ -24,6 +24,9 @@ export async function renderSettings(root, { user }) {
     const msg = String(s.maintenance_message || "");
     const enabled = isMaintOn(s);
 
+    const defaultDeployMsg =
+      "มีการอัปเดตระบบ กรุณาหยุดการเล่น/ออกจากห้องชั่วคราว — ระบบจะปิดปรับปรุงในไม่ช้า";
+
     root.innerHTML = `
       <div class="card">
         <h2>สถานะเซิร์ฟเวอร์</h2>
@@ -52,9 +55,39 @@ export async function renderSettings(root, { user }) {
       </div>
 
       <div class="card" style="margin-top:16px">
+        <h2>แจ้งเตือนก่อน Deploy</h2>
+        <p class="muted" style="margin-top:0">
+          กดปุ่มนี้ก่อนกด Deploy บน Render — ผู้เล่นทุกคนจะเห็น popup นับถอยหลัง
+          ให้หยุดการกระทำ / ออกจากห้อง แล้วระบบจะปิดปรับปรุงอัตโนมัติ
+        </p>
+        <ol class="tiny" style="margin:8px 0 12px;padding-left:18px;color:var(--nv-text-2);line-height:1.55">
+          <li>กด “แจ้งเตือน Deploy”</li>
+          <li>รอจนนับถอยหลังจบ (ผู้เล่นถูกเตะออก)</li>
+          <li>ค่อยกด Deploy บน Render</li>
+          <li>หลังขึ้นแล้วกลับมาหน้านี้ กด “เปิดเซิร์ฟ”</li>
+        </ol>
+        <label class="tiny" style="display:block;margin-bottom:8px">เวลานับถอยหลัง (วินาที)
+          <select class="input" id="sDeploySec" ${canManage && !enabled ? "" : "disabled"} style="margin-top:6px;max-width:160px">
+            <option value="15">15 วินาที</option>
+            <option value="30" selected>30 วินาที</option>
+            <option value="60">60 วินาที</option>
+            <option value="90">90 วินาที</option>
+          </select>
+        </label>
+        ${
+          canManage && !enabled
+            ? `<button type="button" class="btn sm" id="sDeployWarn" style="background:#dc2626;border-color:#dc2626">แจ้งเตือน Deploy + ปิดเซิร์ฟ</button>`
+            : canManage && enabled
+              ? `<p class="tiny" style="color:#fcd34d;margin:0">เซิร์ฟปิดอยู่แล้ว — Deploy ได้เลย แล้วค่อยกดเปิดเซิร์ฟหลังเสร็จ</p>`
+              : ""
+        }
+        <p class="tiny" id="sDeployMsg" style="margin-top:10px"></p>
+      </div>
+
+      <div class="card" style="margin-top:16px">
         <h2>ข้อความปิดปรับปรุง</h2>
-        <p class="muted" style="margin-top:0">ข้อความนี้จะโชว์ให้ผู้เล่นตอนเซิร์ฟปิด</p>
-        <textarea class="input" id="sMaint" rows="3" ${canManage ? "" : "disabled"} placeholder="เช่น ระบบปิดปรับปรุงถึง 18:00">${esc(msg)}</textarea>
+        <p class="muted" style="margin-top:0">ข้อความนี้จะโชว์ให้ผู้เล่นตอนเซิร์ฟปิด / ตอนแจ้งเตือน Deploy</p>
+        <textarea class="input" id="sMaint" rows="3" ${canManage ? "" : "disabled"} placeholder="${esc(defaultDeployMsg)}">${esc(msg)}</textarea>
         ${canManage ? `<button type="button" class="btn ghost sm" id="sSaveMsg" style="margin-top:10px">บันทึกข้อความ</button>` : ""}
         <p class="tiny" id="sMsgMsg"></p>
       </div>
@@ -160,7 +193,7 @@ export async function renderSettings(root, { user }) {
         const message = root.querySelector("#sMaint").value.trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
         closeBtn.disabled = true;
         const r = await patchSettings(
-          { maintenance_enabled: true, maintenance_message: message },
+          { maintenance_enabled: true, maintenance_message: message, maintenance_countdown_sec: 15 },
           root.querySelector("#sToggleMsg")
         );
         if (!r.res.ok) {
@@ -170,6 +203,39 @@ export async function renderSettings(root, { user }) {
         }
         root.querySelector("#sToggleMsg").textContent =
           "ปิดเซิร์ฟแล้ว — แจ้งเตือนนับถอยหลัง 15 วิ แล้วเตะทุกคนออกจากห้อง";
+        await load();
+      };
+    }
+
+    const deployBtn = root.querySelector("#sDeployWarn");
+    if (deployBtn) {
+      deployBtn.onclick = async () => {
+        const sec = Number(root.querySelector("#sDeploySec")?.value) || 30;
+        const message =
+          root.querySelector("#sMaint").value.trim() || defaultDeployMsg;
+        if (
+          !confirm(
+            `แจ้งเตือนผู้เล่นทุกคน และปิดเซิร์ฟใน ${sec} วินาที?\n\nหลังนับจบ ค่อยกด Deploy บน Render`
+          )
+        ) {
+          return;
+        }
+        deployBtn.disabled = true;
+        const r = await patchSettings(
+          {
+            maintenance_enabled: true,
+            maintenance_message: message,
+            maintenance_countdown_sec: sec
+          },
+          root.querySelector("#sDeployMsg")
+        );
+        if (!r.res.ok) {
+          root.querySelector("#sDeployMsg").textContent = "แจ้งเตือนไม่สำเร็จ";
+          deployBtn.disabled = false;
+          return;
+        }
+        root.querySelector("#sDeployMsg").textContent =
+          `แจ้งแล้ว — นับถอยหลัง ${sec} วิ แล้วเตะทุกคนออก จากนั้นค่อย Deploy`;
         await load();
       };
     }
