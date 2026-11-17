@@ -7,6 +7,7 @@
 <meta name="application-name" content="NUMVERSE">
 <link rel="icon" href="/images/n-logo.png" type="image/png">
 <link rel="apple-touch-icon" href="/images/n-logo.png">
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
@@ -20,13 +21,13 @@
     </div>
     <nav class="nav" id="sideNav">
       <div class="nav-section">MAIN MENU</div>
-      <button type="button" data-view="overview" class="active"><span class="ico">◈</span> Overview</button>
-      <button type="button" data-view="library"><span class="ico">▣</span> Game Library</button>
-      <button type="button" data-view="rooms"><span class="ico">⌂</span> My Rooms</button>
-      <button type="button" data-view="friends"><span class="ico">☺</span> Friends</button>
+      <button type="button" data-view="overview" class="active"><i class="fi fi-rr-apps ico" aria-hidden="true"></i> Overview</button>
+      <button type="button" data-view="library"><i class="fi fi-rr-gamepad ico" aria-hidden="true"></i> Game Library</button>
+      <button type="button" data-view="rooms"><i class="fi fi-rr-door-open ico" aria-hidden="true"></i> My Rooms</button>
+      <button type="button" data-view="friends"><i class="fi fi-rr-users ico" aria-hidden="true"></i> Friends</button>
       <div class="nav-section">ACCOUNT</div>
-      <button type="button" data-view="profile"><span class="ico">⚙</span> Profile &amp; Settings</button>
-      <a class="admin-nav hidden" id="adminNavBtn" href="/admin"><span class="ico">🛡</span> Admin Dashboard</a>
+      <button type="button" data-view="profile"><i class="fi fi-rr-settings ico" aria-hidden="true"></i> Profile &amp; Settings</button>
+      <a class="admin-nav hidden" id="adminNavBtn" href="/admin"><i class="fi fi-rr-shield-check ico" aria-hidden="true"></i> Admin Dashboard</a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-user">
@@ -40,15 +41,16 @@
         </button>
       </div>
       <p class="sidebar-legal"><a href="/terms">ข้อกำหนด</a> · <a href="/faq">FAQ</a></p>
+      <p class="sidebar-legal tiny">Icons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer">Flaticon</a></p>
     </div>
   </aside>
 
   <header class="topbar">
-    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu"><i class="fi fi-rr-menu-burger" aria-hidden="true"></i></button>
     <h1 id="pageTitle">Overview</h1>
     <a class="btn ghost sm home-link" href="/">หน้าแรก</a>
-    <button type="button" class="icon-btn" id="notifBtn" aria-label="Notifications">🔔<span class="badge-dot hidden" id="notifDot"></span></button>
-    <button type="button" class="icon-btn" id="userMenuBtn" aria-label="Account">👤</button>
+    <button type="button" class="icon-btn" id="notifBtn" aria-label="Notifications"><i class="fi fi-rr-bell" aria-hidden="true"></i><span class="badge-dot hidden" id="notifDot"></span></button>
+    <button type="button" class="icon-btn" id="userMenuBtn" aria-label="Account"><i class="fi fi-rr-circle-user" aria-hidden="true"></i></button>
   </header>
 
   <main class="main">
@@ -62,11 +64,11 @@
 </div>
 
 <nav class="bottom-nav" id="bottomNav" aria-label="Mobile navigation">
-  <button type="button" data-view="overview" class="active">Overview</button>
-  <button type="button" data-view="library">Games</button>
-  <button type="button" data-view="rooms">Rooms</button>
-  <button type="button" data-view="friends">Friends</button>
-  <button type="button" data-view="profile">Me</button>
+  <button type="button" data-view="overview" class="active"><i class="fi fi-rr-apps" aria-hidden="true"></i><span>Overview</span></button>
+  <button type="button" data-view="library"><i class="fi fi-rr-gamepad" aria-hidden="true"></i><span>Games</span></button>
+  <button type="button" data-view="rooms"><i class="fi fi-rr-door-open" aria-hidden="true"></i><span>Rooms</span></button>
+  <button type="button" data-view="friends"><i class="fi fi-rr-users" aria-hidden="true"></i><span>Friends</span></button>
+  <button type="button" data-view="profile"><i class="fi fi-rr-circle-user" aria-hidden="true"></i><span>Me</span></button>
 </nav>
 
 <div id="backdrop" class="backdrop hidden"></div>

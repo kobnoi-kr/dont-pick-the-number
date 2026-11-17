@@ -169,7 +169,32 @@ textarea:focus {
   color: var(--nv-text);
   box-shadow: inset 0 0 0 1px rgba(86, 119, 252, 0.28);
 }
-.nav .ico { width: 18px; opacity: 0.9; }
+.nav .ico {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.92;
+}
+.nav .ico::before {
+  line-height: 1;
+}
+.icon-btn .fi {
+  font-size: 1.05rem;
+  line-height: 1;
+  display: inline-flex;
+}
+.bottom-nav button .fi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.bottom-nav button span {
+  line-height: 1.1;
+}
 .sidebar-foot {
   margin-top: auto;
   border-top: 1px solid var(--nv-border);

@@ -6,6 +6,7 @@
 <title>Admin — NUMVERSE</title>
 <meta name="application-name" content="NUMVERSE">
 <link rel="icon" href="/images/n-logo.png" type="image/png">
+<link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
@@ -19,21 +20,21 @@
     </div>
     <nav class="nav" id="sideNav">
       <div class="nav-section">DASHBOARD</div>
-      <button type="button" data-view="overview" data-perm="dashboard.view" class="active"><span class="ico">◈</span> Overview</button>
-      <button type="button" data-view="analytics" data-perm="analytics.view"><span class="ico">◔</span> Analytics</button>
-      <button type="button" data-view="live" data-perm="rooms.view"><span class="ico">⌁</span> Live Monitor</button>
+      <button type="button" data-view="overview" data-perm="dashboard.view" class="active"><i class="fi fi-rr-dashboard ico" aria-hidden="true"></i> Overview</button>
+      <button type="button" data-view="analytics" data-perm="analytics.view"><i class="fi fi-rr-chart-histogram ico" aria-hidden="true"></i> Analytics</button>
+      <button type="button" data-view="live" data-perm="rooms.view"><i class="fi fi-rr-live ico" aria-hidden="true"></i> Live Monitor</button>
       <div class="nav-section">MANAGEMENT</div>
-      <button type="button" data-view="users" data-perm="users.view"><span class="ico">☺</span> User Management</button>
-      <button type="button" data-view="games" data-perm="games.view"><span class="ico">▣</span> Game Management</button>
-      <button type="button" data-view="rooms" data-perm="rooms.view"><span class="ico">⌂</span> Room Management</button>
-      <button type="button" data-view="announcements" data-perm="announcements.manage"><span class="ico">◎</span> Announcements</button>
+      <button type="button" data-view="users" data-perm="users.view"><i class="fi fi-rr-users ico" aria-hidden="true"></i> User Management</button>
+      <button type="button" data-view="games" data-perm="games.view"><i class="fi fi-rr-gamepad ico" aria-hidden="true"></i> Game Management</button>
+      <button type="button" data-view="rooms" data-perm="rooms.view"><i class="fi fi-rr-door-open ico" aria-hidden="true"></i> Room Management</button>
+      <button type="button" data-view="announcements" data-perm="announcements.manage"><i class="fi fi-rr-megaphone ico" aria-hidden="true"></i> Announcements</button>
       <div class="nav-section">SYSTEM</div>
-      <button type="button" data-view="permissions" data-perm="admins.view"><span class="ico">🛡</span> Admin &amp; Permissions</button>
-      <button type="button" data-view="system" data-perm="settings.view"><span class="ico">▤</span> System Management</button>
-      <button type="button" data-view="logs" data-perm="logs.view"><span class="ico">☰</span> User / Admin Logs</button>
-      <button type="button" data-view="settings" data-perm="settings.view"><span class="ico">⚙</span> Settings</button>
+      <button type="button" data-view="permissions" data-perm="admins.view"><i class="fi fi-rr-shield-check ico" aria-hidden="true"></i> Admin &amp; Permissions</button>
+      <button type="button" data-view="system" data-perm="settings.view"><i class="fi fi-rr-computer ico" aria-hidden="true"></i> System Management</button>
+      <button type="button" data-view="logs" data-perm="logs.view"><i class="fi fi-rr-list ico" aria-hidden="true"></i> User / Admin Logs</button>
+      <button type="button" data-view="settings" data-perm="settings.view"><i class="fi fi-rr-settings ico" aria-hidden="true"></i> Settings</button>
       <div class="nav-section">ACCOUNT</div>
-      <a class="admin-nav" href="/app"><span class="ico">←</span> User Dashboard</a>
+      <a class="admin-nav" href="/app"><i class="fi fi-rr-arrow-left ico" aria-hidden="true"></i> User Dashboard</a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-user">
@@ -47,11 +48,12 @@
         </button>
       </div>
       <p class="sidebar-legal"><a href="/terms">ข้อกำหนด</a> · <a href="/faq">FAQ</a></p>
+      <p class="sidebar-legal tiny">Icons by <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener noreferrer">Flaticon</a></p>
     </div>
   </aside>
 
   <header class="topbar">
-    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu"><i class="fi fi-rr-menu-burger" aria-hidden="true"></i></button>
     <h1 id="pageTitle">Overview</h1>
     <a class="btn ghost sm home-link" href="/">หน้าแรก</a>
   </header>
