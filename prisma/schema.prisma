@@ -316,21 +316,24 @@ model Notification {
 }
 
 model Announcement {
-  id         String    @id @default(uuid()) @db.Uuid
-  title      String    @db.VarChar(160)
-  body       String    @db.Text
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(160)
+  body        String    @db.Text
   /// info=green general | warning=yellow | danger=red personal | alert=yellow-red personal
-  kind       String    @default("info") @db.VarChar(32)
+  kind        String    @default("info") @db.VarChar(32)
   /// Targets for personal kinds: user id / username / friend code
-  targetIds  Json?     @map("target_ids")
-  active     Boolean   @default(false)
-  startsAt   DateTime? @map("starts_at")
-  endsAt     DateTime? @map("ends_at")
-  createdBy  String?   @map("created_by") @db.Uuid
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  targetIds   Json?     @map("target_ids")
+  active      Boolean   @default(false)
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  /// Set once when toast + inbox fan-out runs (immediate or when schedule fires)
+  publishedAt DateTime? @map("published_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([active, startsAt, endsAt])
+  @@index([publishedAt])
   @@index([createdAt])
   @@index([kind])
   @@map("announcements")

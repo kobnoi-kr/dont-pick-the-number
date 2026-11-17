@@ -56,10 +56,38 @@ function filterOnline(ids) {
   return (ids || []).filter(isUserOnline);
 }
 
+function listOnlineUserIds() {
+  return [...presence.keys()];
+}
+
+/** Send to every connected socket (all online users). */
+function broadcastAll(obj, sendFn) {
+  let n = 0;
+  for (const set of presence.values()) {
+    for (const sock of set) {
+      sendFn(sock, obj);
+      n += 1;
+    }
+  }
+  return n;
+}
+
+/** Send to specific user ids only. */
+function broadcastToUsers(userIds, obj, sendFn) {
+  let n = 0;
+  for (const id of userIds || []) {
+    n += sendToUser(id, obj, sendFn);
+  }
+  return n;
+}
+
 module.exports = {
   trackPresence,
   untrackPresence,
   isUserOnline,
   sendToUser,
-  filterOnline
+  filterOnline,
+  listOnlineUserIds,
+  broadcastAll,
+  broadcastToUsers
 };

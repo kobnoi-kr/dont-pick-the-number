@@ -7,7 +7,7 @@ import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
-import { loadAnnouncementToasts } from "./toasts.js";
+import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
 
 const state = {
   user: null,
@@ -147,6 +147,10 @@ window.addEventListener("hashchange", () => {
 onDashboardMessage((msg) => {
   if (msg.t === "lobby" && state.view === "rooms") navigate("rooms");
   if (msg.t === "notification:new") refreshNotifications();
+  if (msg.t === "announcement:new") {
+    onLiveAnnouncement(msg.announcement);
+    refreshNotifications();
+  }
   if (msg.t === "dashboard:update" && state.view === "overview") navigate("overview");
   if ((msg.t === "friend:update" || msg.t === "presence") && state.view === "friends") {
     navigate("friends");
@@ -175,6 +179,7 @@ onDashboardMessage((msg) => {
   wireNotifications();
   connectDashboardWs();
   loadAnnouncementToasts().catch(() => {});
+  startAnnouncementPoll(25000);
   const q = new URLSearchParams(location.search);
   if (q.get("create") === "1" || q.get("cat")) {
     openCreateModal({ cat: q.get("cat") || "secret", lockCat: !!q.get("cat") });

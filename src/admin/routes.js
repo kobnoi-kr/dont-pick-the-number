@@ -12,6 +12,7 @@ const { publicUser } = require("../auth/users");
 const { revokeAllUserSessions } = require("../auth/sessions");
 const { getGameApi } = require("../dashboard/bridge");
 const { writeAdminLog } = require("./audit");
+const { publishAnnouncement, isDueNow } = require("./publish-announcement");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -540,22 +541,47 @@ async function handleAdminApi(req, res, pathname) {
           return true;
         }
       }
-      const item = await prisma.announcement.create({
+      const mode = body.mode === "schedule" ? "schedule" : body.mode === "draft" ? "draft" : "now";
+      let startsAt = body.startsAt ? new Date(body.startsAt) : null;
+      let endsAt = body.endsAt ? new Date(body.endsAt) : null;
+      if (startsAt && Number.isNaN(startsAt.getTime())) startsAt = null;
+      if (endsAt && Number.isNaN(endsAt.getTime())) endsAt = null;
+
+      let active = !!body.active;
+      if (mode === "now") {
+        active = true;
+        startsAt = new Date();
+      } else if (mode === "schedule") {
+        if (!startsAt || startsAt <= new Date()) {
+          sendJson(res, 400, { error: "starts_at_required" });
+          return true;
+        }
+        active = true;
+      } else {
+        active = false;
+      }
+
+      let item = await prisma.announcement.create({
         data: {
           title: String(body.title).slice(0, 160),
           body: String(body.body).slice(0, 8000),
           kind,
           targetIds: personal ? targetIds : [],
-          active: !!body.active,
-          startsAt: body.startsAt ? new Date(body.startsAt) : null,
-          endsAt: body.endsAt ? new Date(body.endsAt) : null,
+          active,
+          startsAt,
+          endsAt,
           createdBy: auth.user.id
         }
       });
+      if (active && isDueNow(item)) {
+        const published = await publishAnnouncement(prisma, item.id);
+        if (published) item = published;
+      }
       await writeAdminLog(prisma, {
         adminId: auth.user.id,
         action: "announcement.create",
         targetId: item.id,
+        metadata: { mode, kind, active },
         ipAddress: ip
       });
       sendJson(res, 201, { announcement: item });
@@ -580,8 +606,14 @@ async function handleAdminApi(req, res, pathname) {
       if (body.title != null) data.title = String(body.title).slice(0, 160);
       if (body.body != null) data.body = String(body.body).slice(0, 8000);
       if (body.active != null) data.active = !!body.active;
-      if (body.startsAt !== undefined) data.startsAt = body.startsAt ? new Date(body.startsAt) : null;
-      if (body.endsAt !== undefined) data.endsAt = body.endsAt ? new Date(body.endsAt) : null;
+      if (body.startsAt !== undefined) {
+        const d = body.startsAt ? new Date(body.startsAt) : null;
+        data.startsAt = d && !Number.isNaN(d.getTime()) ? d : null;
+      }
+      if (body.endsAt !== undefined) {
+        const d = body.endsAt ? new Date(body.endsAt) : null;
+        data.endsAt = d && !Number.isNaN(d.getTime()) ? d : null;
+      }
       if (body.kind != null && ["info", "warning", "danger", "alert"].includes(body.kind)) {
         data.kind = body.kind;
       }
@@ -594,7 +626,11 @@ async function handleAdminApi(req, res, pathname) {
               .filter(Boolean);
         data.targetIds = [...new Set(raw.map(String))].slice(0, 50);
       }
-      const item = await prisma.announcement.update({ where: { id }, data });
+      let item = await prisma.announcement.update({ where: { id }, data });
+      if (item.active && !item.publishedAt && isDueNow(item)) {
+        const published = await publishAnnouncement(prisma, item.id);
+        if (published) item = published;
+      }
       await writeAdminLog(prisma, {
         adminId: auth.user.id,
         action: "announcement.update",

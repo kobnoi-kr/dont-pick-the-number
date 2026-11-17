@@ -85,4 +85,21 @@ export async function loadAnnouncementToasts() {
     if (seen.has(a.id)) continue;
     showAnnouncementToast(a);
   }
+  return items;
+}
+
+/** Live push from WS — show even if previously unseen only once per id in session host. */
+export function onLiveAnnouncement(ann) {
+  if (!ann || !ann.id) return;
+  const seen = new Set(readSeen());
+  if (seen.has(ann.id)) return;
+  showAnnouncementToast(ann);
+}
+
+let pollTimer = null;
+export function startAnnouncementPoll(intervalMs = 25000) {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => {
+    loadAnnouncementToasts().catch(() => {});
+  }, intervalMs);
 }

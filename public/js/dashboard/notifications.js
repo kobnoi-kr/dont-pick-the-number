@@ -31,15 +31,29 @@ export async function refreshNotifications() {
     return items;
   }
   empty.classList.add("hidden");
-  list.innerHTML = items.map((n) => `
-    <li class="notif-item ${n.readAt ? "" : "unread"}" data-id="${esc(n.id)}">
+  list.innerHTML = items.map((n) => {
+    const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
+    const isAnn = n.type === "announcement";
+    const kicker = isAnn
+      ? kind === "warning"
+        ? "เตือน"
+        : kind === "danger"
+          ? "ถึงคุณ"
+          : kind === "alert"
+            ? "เตือนถึงคุณ"
+            : "ประกาศ"
+      : "";
+    return `
+    <li class="notif-item ${n.readAt ? "" : "unread"}${isAnn ? " notif-ann" : ""}" data-id="${esc(n.id)}">
       <div class="grow">
+        ${kicker ? `<div class="tiny notif-kicker">${esc(kicker)}</div>` : ""}
         <b>${esc(n.title)}</b>
         <div class="tiny">${esc(n.body || "")}</div>
         <div class="tiny">${when(n.createdAt)}</div>
       </div>
       <button type="button" class="btn ghost sm" data-del="${esc(n.id)}">✕</button>
-    </li>`).join("");
+    </li>`;
+  }).join("");
 
   list.querySelectorAll(".notif-item").forEach((li) => {
     li.onclick = async (e) => {

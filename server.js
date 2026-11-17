@@ -13,12 +13,15 @@ const {
   untrackPresence: untrackPresenceCore,
   isUserOnline,
   sendToUser: sendToUserCore,
-  filterOnline
+  filterOnline,
+  broadcastAll: broadcastAllCore,
+  broadcastToUsers: broadcastToUsersCore
 } = require("./src/presence");
 const { handleDashboardApi } = require("./src/dashboard/routes");
 const { handleAdminApi } = require("./src/admin/routes");
 const { attachGameApi } = require("./src/dashboard/bridge");
 const { persistFinishedGame } = require("./src/dashboard/persist");
+const { publishDueAnnouncements } = require("./src/admin/publish-announcement");
 
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
@@ -1907,6 +1910,18 @@ attachGameApi({
     rooms.set(code, room);
     scheduleDelete(room);
     return { code, token: id, title: roomLabel(room) };
+  },
+  /** Live toast + inbox ping. recipientIds=null → everyone online. */
+  pushAnnouncement(announcement, recipientIds) {
+    const toastMsg = { t: "announcement:new", announcement };
+    const notifMsg = { t: "notification:new" };
+    if (Array.isArray(recipientIds)) {
+      broadcastToUsersCore(recipientIds, toastMsg, send);
+      broadcastToUsersCore(recipientIds, notifMsg, send);
+    } else {
+      broadcastAllCore(toastMsg, send);
+      broadcastAllCore(notifMsg, send);
+    }
   }
 });
 
@@ -1934,6 +1949,14 @@ setInterval(() => {
     if (inv.expires < now) purgeInvite(id);
   }
 }, 5000);
+
+/** Fire scheduled announcements → toast + notification inbox. */
+setInterval(() => {
+  if (!authEnabled()) return;
+  getPrisma()
+    .then((prisma) => publishDueAnnouncements(prisma))
+    .catch(() => {});
+}, 15000);
 server.listen(PORT, HOST, () => {
   console.log("Public game: http://localhost:" + PORT + " (play.html)");
   console.log("Bind public: " + HOST + ":" + PORT + (HOST === "0.0.0.0" ? " (เครือข่าย)" : " (local)"));
