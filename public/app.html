@@ -79,35 +79,21 @@
 <div id="createModal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-card">
     <h3>สร้างห้อง</h3>
-    <p class="muted">ตั้งค่าห้อง แล้วเข้าล็อบบี้ทันที</p>
+    <p class="muted">ใส่ชื่อห้อง แล้วเข้าล็อบบี้ตั้งค่าเกมต่อ</p>
     <div class="form-grid">
       <label>ชื่อห้อง<input id="crName" maxlength="32" placeholder="ห้องของฉัน"></label>
       <label>การมองเห็น
-        <select id="crVis">
-          <option value="public">Public</option>
-          <option value="private">Private</option>
-        </select>
+        <div class="vis-toggle" id="crVisToggle" role="group" aria-label="การมองเห็น">
+          <button type="button" class="vis-opt on" data-vis="public">Public</button>
+          <button type="button" class="vis-opt" data-vis="private">Private</button>
+        </div>
+        <input type="hidden" id="crVis" value="public">
       </label>
-      <label>เกม
-        <select id="crCat">
-          <option value="secret">หาเลข</option>
-          <option value="wheel">วงล้อ</option>
-        </select>
-      </label>
-      <label>ช่วงตัวเลข
-        <select id="crRange">
-          <option value="99">1–99</option>
-          <option value="999">1–999</option>
-          <option value="9999">1–9999</option>
-        </select>
-      </label>
-      <label>แต้มชนะ<input id="crWin" type="number" min="1" max="99" value="3"></label>
-      <label>เวลาต่อเทิร์น (วินาที, 0=ปิด)<input id="crTurn" type="number" min="0" max="120" value="0"></label>
     </div>
     <p class="msg" id="crMsg"></p>
     <div class="modal-actions">
       <button type="button" class="btn ghost" id="crCancel">ยกเลิก</button>
-      <button type="button" class="btn" id="crSubmit">สร้างห้อง</button>
+      <button type="button" class="btn" id="crSubmit">เข้าล็อบบี้</button>
     </div>
   </div>
 </div>

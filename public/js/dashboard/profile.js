@@ -105,17 +105,29 @@ export async function renderProfile(root, { user, onSaved }) {
         </div>
         <div class="card">
           <h3>ความเป็นส่วนตัว</h3>
-          <form id="privForm" class="form-grid">
-            <label><input id="privStats" type="checkbox" ${pref.publicStats !== false ? "checked" : ""}> เปิดสถิติสาธารณะ</label>
-            <label><input id="privHistory" type="checkbox" ${pref.publicHistory ? "checked" : ""}> เปิดประวัติการเล่นสาธารณะ</label>
-            <label><input id="privInvites" type="checkbox" ${pref.allowInvites !== false ? "checked" : ""}> รับคำเชิญเข้าห้อง</label>
+          <form id="privForm" class="switch-stack">
+            <label class="switch-row">
+              <span>เปิดสถิติสาธารณะ</span>
+              <input id="privStats" type="checkbox" class="switch-input" ${pref.publicStats !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>เปิดประวัติการเล่นสาธารณะ</span>
+              <input id="privHistory" type="checkbox" class="switch-input" ${pref.publicHistory ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>รับคำเชิญเข้าห้อง</span>
+              <input id="privInvites" type="checkbox" class="switch-input" ${pref.allowInvites !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
             <button class="btn ghost" type="submit">บันทึกความเป็นส่วนตัว</button>
           </form>
           <p class="msg" id="privMsg"></p>
         </div>
         <div class="card">
           <h3>Sessions</h3>
-          <ul class="list" id="pfSessions"></ul>
+          <ul class="list session-list" id="pfSessions"></ul>
           <button type="button" class="btn ghost block" id="pfLogout" style="margin-top:10px">Logout</button>
           <button type="button" class="btn ghost block" id="pfLogoutAll" style="margin-top:8px">Logout ทุกอุปกรณ์</button>
           <button type="button" class="btn ghost block danger-outline" id="pfDelete" style="margin-top:8px">ลบบัญชี</button>
@@ -143,10 +155,15 @@ export async function renderProfile(root, { user, onSaved }) {
   const provBox = root.querySelector("#pfProviders");
   providers.forEach((p) => {
     const li = document.createElement("li");
-    li.innerHTML = `<span>${esc(p.provider)}${p.providerEmail ? " · " + esc(p.providerEmail) : ""}</span>`;
+    li.className = "provider-row";
+    li.innerHTML = `
+      <div class="provider-meta grow">
+        <div class="provider-name">${esc(p.provider)}</div>
+        ${p.providerEmail ? `<div class="tiny provider-email">${esc(p.providerEmail)}</div>` : ""}
+      </div>`;
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "btn ghost sm";
+    btn.className = "btn ghost sm provider-unlink";
     btn.textContent = "ยกเลิกเชื่อม";
     btn.onclick = async () => {
       const r = await api("/api/v1/account/unlink/" + p.provider, { method: "DELETE" });
@@ -178,21 +195,42 @@ export async function renderProfile(root, { user, onSaved }) {
   }
 
   const sessBox = root.querySelector("#pfSessions");
+  function deviceLabel(ua) {
+    const s = String(ua || "");
+    if (/Edg\//i.test(s)) return "Microsoft Edge";
+    if (/Chrome\//i.test(s) && !/Edg\//i.test(s)) return "Chrome";
+    if (/Firefox\//i.test(s)) return "Firefox";
+    if (/Safari\//i.test(s) && !/Chrome\//i.test(s)) return "Safari";
+    return "เบราว์เซอร์";
+  }
+  function osLabel(ua) {
+    const s = String(ua || "");
+    if (/Windows/i.test(s)) return "Windows";
+    if (/Android/i.test(s)) return "Android";
+    if (/iPhone|iPad|iOS/i.test(s)) return "iOS";
+    if (/Mac OS/i.test(s)) return "macOS";
+    if (/Linux/i.test(s)) return "Linux";
+    return "อุปกรณ์";
+  }
   sessions.forEach((sItem) => {
     const li = document.createElement("li");
-    li.innerHTML = `<div><div>${esc((sItem.userAgent || "device").slice(0, 48))}</div><div class="tiny">${esc(sItem.ipAddress || "")} · ${esc(
-      new Date(sItem.lastSeenAt).toLocaleString()
-    )}</div></div>`;
-    if (sItem.current) {
-      const b = document.createElement("span");
-      b.className = "pill ok";
-      b.textContent = "เครื่องนี้";
-      li.appendChild(b);
-    } else {
+    li.className = "session-row" + (sItem.current ? " current" : "");
+    const title = deviceLabel(sItem.userAgent) + " · " + osLabel(sItem.userAgent);
+    li.innerHTML = `
+      <div class="session-main grow">
+        <div class="session-title-row">
+          <span class="session-title">${esc(title)}</span>
+          ${sItem.current ? `<span class="session-badge">เครื่องนี้</span>` : ""}
+        </div>
+        <div class="tiny session-sub">${esc(sItem.ipAddress || "—")} · ${esc(
+          new Date(sItem.lastSeenAt).toLocaleString()
+        )}</div>
+      </div>`;
+    if (!sItem.current) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn ghost sm";
-      btn.textContent = "revoke";
+      btn.textContent = "ยกเลิก";
       btn.onclick = async () => {
         await api("/api/v1/account/sessions/" + sItem.id, { method: "DELETE" });
         renderProfile(root, { user, onSaved });

@@ -63,11 +63,24 @@
     </form>
     <form id="setup">
       <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องและเริ่มเกมได้</p>
-      <p class="label">หมวดเกม</p>
-      <div class="modes cats" id="cats">
-        <button type="button" class="mode on" data-cat="secret" aria-pressed="true">ห้ามโดนเลขลับ</button>
-        <button type="button" class="mode" data-cat="wheel" aria-pressed="false">วงล้อสุ่มเลข</button>
+      <p class="label">เลือกเกม</p>
+      <div class="game-pick" id="cats">
+        <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true">
+          <span class="game-pick-ico" aria-hidden="true">🔢</span>
+          <span class="game-pick-body">
+            <b>หาเลข</b>
+            <small>ห้ามโดนเลขลับ</small>
+          </span>
+        </button>
+        <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false">
+          <span class="game-pick-ico" aria-hidden="true">🎡</span>
+          <span class="game-pick-body">
+            <b>วงล้อ</b>
+            <small>วงล้อสุ่มเลข</small>
+          </span>
+        </button>
       </div>
+      <p class="label">ตั้งค่าเกมที่เลือก</p>
       <p class="label">เลือกช่วงตัวเลข</p>
       <div class="modes" id="modes">
         <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>

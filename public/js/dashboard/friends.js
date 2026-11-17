@@ -49,9 +49,11 @@ export async function renderFriends(root, { user } = {}) {
                 </label>
                 <button class="btn" type="submit">ส่งคำขอ</button>
               </form>
-              <label style="margin-top:8px">ค้นหาจากชื่อ
-                <input id="searchInput" type="text" maxlength="64" placeholder="พิมพ์อย่างน้อย 2 ตัวอักษร" autocomplete="off">
-              </label>
+              <div class="form-grid" style="margin-top:4px">
+                <label>ค้นหาจากชื่อ
+                  <input id="searchInput" type="text" maxlength="64" placeholder="พิมพ์อย่างน้อย 2 ตัวอักษร" autocomplete="off">
+                </label>
+              </div>
               <ul class="list" id="searchResults"></ul>
             </div>
             <div class="panel-right">

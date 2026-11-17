@@ -17,13 +17,23 @@ const state = {
 function openCreateModal(opts = {}) {
   document.getElementById("createModal").classList.remove("hidden");
   document.getElementById("crMsg").textContent = "";
-  if (opts.cat) {
-    const sel = document.getElementById("crCat");
-    if (sel) sel.value = opts.cat === "wheel" ? "wheel" : "secret";
-  }
+  if (opts.cat) state.pendingCat = opts.cat === "wheel" ? "wheel" : "secret";
+  else state.pendingCat = localStorage.getItem("nv-last-game") || "secret";
 }
 function closeCreateModal() {
   document.getElementById("createModal").classList.add("hidden");
+}
+
+function wireVisToggle() {
+  const wrap = document.getElementById("crVisToggle");
+  const hidden = document.getElementById("crVis");
+  if (!wrap || !hidden) return;
+  wrap.querySelectorAll("[data-vis]").forEach((btn) => {
+    btn.onclick = () => {
+      wrap.querySelectorAll("[data-vis]").forEach((b) => b.classList.toggle("on", b === btn));
+      hidden.value = btn.getAttribute("data-vis");
+    };
+  });
 }
 
 async function createRoomFromModal() {
@@ -32,18 +42,13 @@ async function createRoomFromModal() {
     (document.getElementById("crName").value || "").trim() ||
     (state.user && (state.user.displayName || state.user.username)) ||
     "Player";
-  const cat = document.getElementById("crCat").value;
+  const cat = state.pendingCat === "wheel" ? "wheel" : "secret";
   localStorage.setItem("nv-last-game", cat);
   const body = {
-    visibility: document.getElementById("crVis").value,
+    visibility: document.getElementById("crVis").value || "public",
     title: document.getElementById("crName").value.trim(),
     displayName: name,
-    setup: {
-      cat,
-      rangeMode: document.getElementById("crRange").value,
-      winTarget: Number(document.getElementById("crWin").value) || 3,
-      turnSec: Number(document.getElementById("crTurn").value) || 0
-    }
+    setup: { cat }
   };
   msg.textContent = "กำลังสร้าง…";
   const { res, data } = await api("/api/v1/rooms", { method: "POST", body: JSON.stringify(body) });
@@ -93,6 +98,7 @@ const shell = wireShell({
   onLogout: logout
 });
 
+wireVisToggle();
 document.getElementById("crCancel").onclick = closeCreateModal;
 document.getElementById("crSubmit").onclick = createRoomFromModal;
 document.getElementById("createModal").addEventListener("click", (e) => {

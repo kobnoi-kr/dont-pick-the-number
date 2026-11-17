@@ -1397,18 +1397,30 @@ function spinNumber(){
 }
 function applyCat(next){
   const cat=next==="wheel"?"wheel":"secret";
-  if(cat===gameCat) return;
-  saveScores();
-  gameCat=cat;
+  const changed=cat!==gameCat;
+  if(changed){
+    saveScores();
+    gameCat=cat;
+  }
   const wheel=cat==="wheel";
   $("secretOnly").classList.toggle("hidden", wheel);
   $("wheelOnly").classList.toggle("hidden", !wheel);
+  const cats=$("cats");
+  if(cats){
+    for(const x of cats.querySelectorAll("[data-cat]")){
+      const on=x.dataset.cat===cat;
+      x.classList.toggle("on",on);
+      x.setAttribute("aria-pressed",on?"true":"false");
+    }
+  }
   $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
   $("sideHint").textContent=wheel
     ?"แต่ละคนเลือกได้หลายเลข · วงล้อสุ่มแล้วตัดเลขที่ออกออกไปเรื่อยๆ · โดนเลขตัวไหนคนนั้นออก · คนสุดท้ายได้ 1 แต้ม"
     :"โดนเลขลับแล้วหลุดจากเทิร์น · เหลือหลายคนเลือกได้ว่าให้ทุกคนยกเว้นคนที่โดน หรือให้คนสุดท้ายที่เหลือ";
-  loadScores();
-  renderPlayers();
+  if(changed){
+    loadScores();
+    renderPlayers();
+  }
 }
 
 function onUserGesture(){
@@ -1888,7 +1900,7 @@ function choosePick(n){
   send({t:"pickNum",n:n});
 }
 function syncSetup(s){
-  if(s.cat!==gameCat) applyCat(s.cat);
+  applyCat(s.cat||"secret");
   const custom=s.rangeMode==="custom";
   for(const x of $("modes").children){
     const on=custom?x.dataset.custom==="1":x.dataset.max===String(s.max)&&!x.dataset.custom;
