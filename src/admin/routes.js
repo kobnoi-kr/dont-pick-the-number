@@ -1112,7 +1112,65 @@ async function handleAdminApi(req, res, pathname) {
     const id = inboxMatch[1];
     if (method(req) === "PATCH") {
       const body = await readJsonBody(req).catch(() => null);
-      const next = body && body.status;
+      if (!body) {
+        sendJson(res, 400, { error: "invalid_body" });
+        return true;
+      }
+
+      // Admin reply → notify user (popup-readable)
+      if (Object.prototype.hasOwnProperty.call(body, "reply")) {
+        const reply = String(body.reply || "").trim().slice(0, 2000);
+        if (reply.length < 2) {
+          sendJson(res, 400, { error: "invalid_reply" });
+          return true;
+        }
+        const existing = await prisma.contactMessage.findUnique({ where: { id } });
+        if (!existing) {
+          sendJson(res, 404, { error: "not_found" });
+          return true;
+        }
+        const row = await prisma.contactMessage.update({
+          where: { id },
+          data: {
+            adminReply: reply,
+            repliedAt: new Date(),
+            repliedById: auth.user.id,
+            status: "read",
+            readAt: existing.readAt || new Date()
+          },
+          include: {
+            user: { select: { id: true, displayName: true, username: true, accountType: true } }
+          }
+        });
+        if (existing.userId) {
+          const preview = reply.length > 140 ? reply.slice(0, 140) + "…" : reply;
+          await prisma.notification.create({
+            data: {
+              userId: existing.userId,
+              type: "admin_reply",
+              title: "แอดมินตอบกลับ",
+              body: preview,
+              payload: {
+                contactId: existing.id,
+                subject: existing.subject || "ติดต่อแอดมิน",
+                fullBody: reply,
+                originalMessage: existing.message
+              }
+            }
+          });
+        }
+        await writeAdminLog(prisma, {
+          adminId: auth.user.id,
+          action: "inbox.reply",
+          targetId: id,
+          metadata: { userId: existing.userId || null },
+          ipAddress: ip
+        });
+        sendJson(res, 200, { message: row });
+        return true;
+      }
+
+      const next = body.status;
       if (!["open", "read", "closed"].includes(next)) {
         sendJson(res, 400, { error: "invalid_status" });
         return true;

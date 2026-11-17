@@ -368,14 +368,17 @@ model UserActivityLog {
 
 /// Messages from users via "ติดต่อแอดมิน" → Admin Inbox.
 model ContactMessage {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @map("user_id") @db.Uuid
-  subject   String   @default("") @db.VarChar(128)
-  message   String   @db.Text
-  status    String   @default("open") @db.VarChar(16)
-  ipAddress String?  @map("ip_address") @db.VarChar(64)
-  createdAt DateTime @default(now()) @map("created_at")
-  readAt    DateTime? @map("read_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  subject     String    @default("") @db.VarChar(128)
+  message     String    @db.Text
+  status      String    @default("open") @db.VarChar(16)
+  ipAddress   String?   @map("ip_address") @db.VarChar(64)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  readAt      DateTime? @map("read_at")
+  adminReply  String?   @map("admin_reply") @db.Text
+  repliedAt   DateTime? @map("replied_at")
+  repliedById String?   @map("replied_by") @db.Uuid
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 

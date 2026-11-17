@@ -14,7 +14,7 @@ export async function renderInbox(root) {
       <div class="row-between" style="margin-bottom:12px">
         <div>
           <h2 style="margin:0">ข้อความติดต่อแอดมิน</h2>
-          <p class="muted tiny" style="margin:6px 0 0">ข้อความจากผู้ใช้ผ่านปุ่ม “ติดต่อแอดมิน”</p>
+          <p class="muted tiny" style="margin:6px 0 0">ตอบกลับแล้วผู้ใช้จะได้รับการแจ้งเตือน และคลิกอ่านแบบ popup ได้</p>
         </div>
         <select class="input" id="inboxStatus" style="max-width:160px">
           <option value="">ทั้งหมด</option>
@@ -59,10 +59,23 @@ export async function renderInbox(root) {
                 ${statusLabel(m.status)}
               </div>
               <p style="margin:10px 0 0;white-space:pre-wrap;line-height:1.5;color:var(--nv-text-2);font-size:0.92rem">${esc(m.message)}</p>
+              ${
+                m.adminReply
+                  ? `<div style="margin-top:10px;padding:10px;border-radius:12px;border:1px solid rgba(86,119,252,.3);background:rgba(86,119,252,.08)">
+                      <div class="tiny" style="color:#93c5fd;margin-bottom:4px">ตอบแล้ว · ${esc(fmtDate(m.repliedAt))}</div>
+                      <div style="white-space:pre-wrap;line-height:1.45">${esc(m.adminReply)}</div>
+                    </div>`
+                  : ""
+              }
+              <label class="tiny" style="display:block;margin-top:12px">ตอบกลับผู้ใช้
+                <textarea class="input" data-reply rows="3" maxlength="2000" placeholder="พิมพ์คำตอบ…"></textarea>
+              </label>
               <div class="room-card-actions">
+                <button type="button" class="btn sm" data-send-reply>ส่งคำตอบ</button>
                 ${m.status !== "read" ? `<button type="button" class="btn ghost sm" data-set="read">อ่านแล้ว</button>` : ""}
                 ${m.status !== "open" ? `<button type="button" class="btn ghost sm" data-set="open">เปิดใหม่</button>` : ""}
-                ${m.status !== "closed" ? `<button type="button" class="btn sm" data-set="closed">ปิด</button>` : ""}
+                ${m.status !== "closed" ? `<button type="button" class="btn ghost sm" data-set="closed">ปิด</button>` : ""}
+                <span class="tiny" data-msg></span>
               </div>
             </article>`;
                 })
@@ -81,6 +94,34 @@ export async function renderInbox(root) {
           method: "PATCH",
           body: JSON.stringify({ status: btn.getAttribute("data-set") })
         });
+        await load();
+      };
+    });
+
+    box.querySelectorAll("[data-send-reply]").forEach((btn) => {
+      btn.onclick = async () => {
+        const card = btn.closest("[data-id]");
+        const id = card && card.getAttribute("data-id");
+        const ta = card && card.querySelector("[data-reply]");
+        const msg = card && card.querySelector("[data-msg]");
+        if (!id || !ta) return;
+        const reply = (ta.value || "").trim();
+        if (reply.length < 2) {
+          if (msg) msg.textContent = "พิมพ์คำตอบก่อน";
+          return;
+        }
+        btn.disabled = true;
+        if (msg) msg.textContent = "กำลังส่ง…";
+        const r = await api(`/api/v1/admin/inbox/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ reply })
+        });
+        btn.disabled = false;
+        if (!r.res.ok) {
+          if (msg) msg.textContent = "ส่งไม่สำเร็จ";
+          return;
+        }
+        if (msg) msg.textContent = "ส่งแล้ว — ผู้ใช้จะเห็นในการแจ้งเตือน";
         await load();
       };
     });

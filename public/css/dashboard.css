@@ -850,41 +850,84 @@ td.row-actions > a.btn:last-child {
   background: rgba(239,68,68,.12);
 }
 
-.notif-item.notif-info .notif-icon { background: rgba(34,197,94,.14); color: #86efac; border-color: rgba(34,197,94,.25); }
-.notif-item.notif-info .notif-pill { background: rgba(34,197,94,.16); color: #86efac; }
-.notif-item.notif-info.unread { box-shadow: inset 3px 0 0 #22c55e; }
-
-.notif-item.notif-warning .notif-icon { background: rgba(245,158,11,.14); color: #fcd34d; border-color: rgba(245,158,11,.25); }
-.notif-item.notif-warning .notif-pill { background: rgba(245,158,11,.16); color: #fcd34d; }
-.notif-item.notif-warning.unread { box-shadow: inset 3px 0 0 #f59e0b; }
-
-.notif-item.notif-danger .notif-icon { background: rgba(239,68,68,.14); color: #fca5a5; border-color: rgba(239,68,68,.25); }
-.notif-item.notif-danger .notif-pill { background: rgba(239,68,68,.16); color: #fca5a5; }
-.notif-item.notif-danger.unread { box-shadow: inset 3px 0 0 #ef4444; }
-
-.notif-item.notif-alert .notif-icon {
-  background: linear-gradient(135deg, rgba(245,158,11,.2), rgba(239,68,68,.2));
-  color: #fdba74;
-  border-color: rgba(249,115,22,.3);
+.notif-item.notif-info {
+  background: rgba(34,197,94,.08) !important;
+  border-color: rgba(34,197,94,.28) !important;
 }
-.notif-item.notif-alert .notif-pill { background: rgba(249,115,22,.16); color: #fdba74; }
-.notif-item.notif-alert.unread { box-shadow: inset 3px 0 0 #f97316; }
+.notif-item.notif-info .notif-icon { background: rgba(34,197,94,.22) !important; color: #86efac !important; border-color: rgba(34,197,94,.4) !important; }
+.notif-item.notif-info .notif-pill { background: rgba(34,197,94,.22) !important; color: #86efac !important; }
+.notif-item.notif-info.unread { box-shadow: inset 4px 0 0 #22c55e !important; }
 
-.notif-item.notif-invite .notif-icon { background: rgba(56,189,248,.14); color: #7dd3fc; border-color: rgba(56,189,248,.25); }
-.notif-item.notif-invite .notif-pill { background: rgba(56,189,248,.16); color: #7dd3fc; }
-.notif-item.notif-invite.unread { box-shadow: inset 3px 0 0 #38bdf8; }
+.notif-item.notif-warning {
+  background: rgba(245,158,11,.08) !important;
+  border-color: rgba(245,158,11,.28) !important;
+}
+.notif-item.notif-warning .notif-icon { background: rgba(245,158,11,.22) !important; color: #fcd34d !important; border-color: rgba(245,158,11,.4) !important; }
+.notif-item.notif-warning .notif-pill { background: rgba(245,158,11,.22) !important; color: #fcd34d !important; }
+.notif-item.notif-warning.unread { box-shadow: inset 4px 0 0 #f59e0b !important; }
 
-.notif-item.notif-game .notif-icon { background: rgba(167,139,250,.14); color: #c4b5fd; border-color: rgba(167,139,250,.25); }
-.notif-item.notif-game .notif-pill { background: rgba(167,139,250,.16); color: #c4b5fd; }
-.notif-item.notif-game.unread { box-shadow: inset 3px 0 0 #a78bfa; }
+.notif-item.notif-danger {
+  background: rgba(239,68,68,.09) !important;
+  border-color: rgba(239,68,68,.3) !important;
+}
+.notif-item.notif-danger .notif-icon { background: rgba(239,68,68,.22) !important; color: #fca5a5 !important; border-color: rgba(239,68,68,.4) !important; }
+.notif-item.notif-danger .notif-pill { background: rgba(239,68,68,.22) !important; color: #fca5a5 !important; }
+.notif-item.notif-danger.unread { box-shadow: inset 4px 0 0 #ef4444 !important; }
 
-.notif-item.notif-friend .notif-icon { background: rgba(52,211,153,.14); color: #6ee7b7; border-color: rgba(52,211,153,.25); }
-.notif-item.notif-friend .notif-pill { background: rgba(52,211,153,.16); color: #6ee7b7; }
-.notif-item.notif-friend.unread { box-shadow: inset 3px 0 0 #34d399; }
+.notif-item.notif-alert {
+  background: linear-gradient(90deg, rgba(245,158,11,.1), rgba(239,68,68,.08)) !important;
+  border-color: rgba(249,115,22,.32) !important;
+}
+.notif-item.notif-alert .notif-icon {
+  background: linear-gradient(135deg, rgba(245,158,11,.28), rgba(239,68,68,.28)) !important;
+  color: #fdba74 !important;
+  border-color: rgba(249,115,22,.4) !important;
+}
+.notif-item.notif-alert .notif-pill { background: rgba(249,115,22,.22) !important; color: #fdba74 !important; }
+.notif-item.notif-alert.unread { box-shadow: inset 4px 0 0 #f97316 !important; }
 
-.notif-item.notif-default .notif-icon { color: #94a3b8; }
-.notif-item.notif-default .notif-pill { color: #94a3b8; }
-.notif-item.notif-default.unread { box-shadow: inset 3px 0 0 #64748b; }
+.notif-item.notif-invite {
+  background: rgba(56,189,248,.08) !important;
+  border-color: rgba(56,189,248,.28) !important;
+}
+.notif-item.notif-invite .notif-icon { background: rgba(56,189,248,.22) !important; color: #7dd3fc !important; border-color: rgba(56,189,248,.4) !important; }
+.notif-item.notif-invite .notif-pill { background: rgba(56,189,248,.22) !important; color: #7dd3fc !important; }
+.notif-item.notif-invite.unread { box-shadow: inset 4px 0 0 #38bdf8 !important; }
+
+.notif-item.notif-game {
+  background: rgba(167,139,250,.09) !important;
+  border-color: rgba(167,139,250,.3) !important;
+}
+.notif-item.notif-game .notif-icon { background: rgba(167,139,250,.24) !important; color: #c4b5fd !important; border-color: rgba(167,139,250,.42) !important; }
+.notif-item.notif-game .notif-pill { background: rgba(167,139,250,.24) !important; color: #c4b5fd !important; }
+.notif-item.notif-game.unread { box-shadow: inset 4px 0 0 #a78bfa !important; }
+
+.notif-item.notif-friend {
+  background: rgba(52,211,153,.08) !important;
+  border-color: rgba(52,211,153,.28) !important;
+}
+.notif-item.notif-friend .notif-icon { background: rgba(52,211,153,.22) !important; color: #6ee7b7 !important; border-color: rgba(52,211,153,.4) !important; }
+.notif-item.notif-friend .notif-pill { background: rgba(52,211,153,.22) !important; color: #6ee7b7 !important; }
+.notif-item.notif-friend.unread { box-shadow: inset 4px 0 0 #34d399 !important; }
+
+.notif-item.notif-admin {
+  background: rgba(86,119,252,.1) !important;
+  border-color: rgba(86,119,252,.32) !important;
+}
+.notif-item.notif-admin .notif-icon { background: rgba(86,119,252,.24) !important; color: #93c5fd !important; border-color: rgba(86,119,252,.45) !important; }
+.notif-item.notif-admin .notif-pill { background: rgba(86,119,252,.24) !important; color: #93c5fd !important; }
+.notif-item.notif-admin.unread { box-shadow: inset 4px 0 0 #5677FC !important; }
+
+.notif-item.notif-default .notif-icon { color: #94a3b8 !important; }
+.notif-item.notif-default .notif-pill { color: #94a3b8 !important; }
+.notif-item.notif-default.unread { box-shadow: inset 4px 0 0 #64748b !important; }
+
+.notif-item.has-detail .notif-item-title::after {
+  content: " · แตะเพื่ออ่าน";
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--nv-muted);
+}
 
 .bottom-nav {
   display: none;

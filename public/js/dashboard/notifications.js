@@ -6,7 +6,7 @@ const CATS = [
   { id: "invite", label: "เชิญห้อง" },
   { id: "game", label: "เกม" },
   { id: "friend", label: "เพื่อน" },
-  { id: "other", label: "อื่นๆ" }
+  { id: "other", label: "แอดมิน/อื่นๆ" }
 ];
 
 let cacheItems = [];
@@ -38,22 +38,70 @@ function catOf(n) {
   if (type === "room_invitation") return "invite";
   if (type === "game_finished") return "game";
   if (type === "friend_request" || type === "friend") return "friend";
+  if (type === "admin_reply") return "other";
   return "other";
 }
 
 function notifMeta(n) {
   const type = String(n.type || "");
   const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
+  if (type === "admin_reply") return { label: "แอดมินตอบ", cls: "notif-admin", icon: "A", detail: true };
   if (type === "announcement") {
-    if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!" };
-    if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!" };
-    if (kind === "alert") return { label: "เตือนถึงคุณ", cls: "notif-alert", icon: "!!" };
-    return { label: "ประกาศ", cls: "notif-info", icon: "📢" };
+    if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!", detail: true };
+    if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!", detail: true };
+    if (kind === "alert") return { label: "เตือนถึงคุณ", cls: "notif-alert", icon: "!!", detail: true };
+    return { label: "ประกาศ", cls: "notif-info", icon: "i", detail: true };
   }
-  if (type === "room_invitation") return { label: "เชิญห้อง", cls: "notif-invite", icon: "🎮" };
-  if (type === "game_finished") return { label: "จบเกม", cls: "notif-game", icon: "🏁" };
-  if (type === "friend_request" || type === "friend") return { label: "เพื่อน", cls: "notif-friend", icon: "👥" };
-  return { label: "แจ้งเตือน", cls: "notif-default", icon: "🔔" };
+  if (type === "room_invitation") return { label: "เชิญห้อง", cls: "notif-invite", icon: "R" };
+  if (type === "game_finished") return { label: "จบเกม", cls: "notif-game", icon: "G" };
+  if (type === "friend_request" || type === "friend") return { label: "เพื่อน", cls: "notif-friend", icon: "F" };
+  return { label: "แจ้งเตือน", cls: "notif-default", icon: "N" };
+}
+
+function ensureNotifDetailModal() {
+  let modal = document.getElementById("notifDetailModal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "notifDetailModal";
+  modal.className = "modal hidden";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="row-between" style="align-items:flex-start;gap:10px">
+        <div>
+          <p class="tiny" id="notifDetailPill" style="margin:0 0 6px"></p>
+          <h3 id="notifDetailTitle" style="margin:0">รายละเอียด</h3>
+        </div>
+        <button type="button" class="btn ghost sm" id="notifDetailClose">ปิด</button>
+      </div>
+      <p class="tiny muted" id="notifDetailWhen" style="margin:8px 0 12px"></p>
+      <div id="notifDetailBody" style="white-space:pre-wrap;line-height:1.55;color:var(--nv-text-2)"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+  modal.querySelector("#notifDetailClose").onclick = () => modal.classList.add("hidden");
+  return modal;
+}
+
+function openNotifDetail(n, meta) {
+  const modal = ensureNotifDetailModal();
+  const pill = modal.querySelector("#notifDetailPill");
+  const title = modal.querySelector("#notifDetailTitle");
+  const whenEl = modal.querySelector("#notifDetailWhen");
+  const body = modal.querySelector("#notifDetailBody");
+  if (pill) pill.innerHTML = `<span class="notif-pill">${esc(meta.label)}</span>`;
+  if (title) title.textContent = n.title || "รายละเอียด";
+  if (whenEl) whenEl.textContent = when(n.createdAt);
+  const full =
+    (n.payload && (n.payload.fullBody || n.payload.reply || n.payload.message)) ||
+    n.body ||
+    "";
+  if (body) body.textContent = String(full || "ไม่มีรายละเอียด");
+  modal.classList.remove("hidden");
 }
 
 function filteredItems() {
@@ -143,12 +191,13 @@ function renderList() {
   list.innerHTML = items
     .map((n) => {
       const meta = notifMeta(n);
+      const detailCls = meta.detail ? " has-detail" : "";
       return `
-    <li class="notif-item ${n.readAt ? "is-read" : "unread"} ${meta.cls}" data-id="${esc(n.id)}" data-cat="${catOf(n)}">
+    <li class="notif-item ${n.readAt ? "is-read" : "unread"} ${meta.cls}${detailCls}" data-id="${esc(n.id)}" data-cat="${catOf(n)}" data-detail="${meta.detail ? "1" : "0"}">
       <label class="notif-check">
         <input type="checkbox" data-pick="${esc(n.id)}" aria-label="เลือกข้อความ">
       </label>
-      <div class="notif-icon" aria-hidden="true">${meta.icon}</div>
+      <div class="notif-icon" aria-hidden="true">${esc(meta.icon)}</div>
       <div class="grow">
         <div class="notif-top">
           <span class="notif-pill">${esc(meta.label)}</span>
@@ -167,12 +216,15 @@ function renderList() {
       e.stopPropagation();
       if (e.target.closest("[data-del]") || e.target.closest(".notif-check")) return;
       const id = li.getAttribute("data-id");
+      const row = cacheItems.find((n) => n.id === id);
+      const meta = row ? notifMeta(row) : null;
+      if (row && meta && (meta.detail || String(row.type) === "admin_reply")) {
+        openNotifDetail(row, meta);
+      }
       await api("/api/v1/notifications/" + id, {
         method: "PATCH",
         body: JSON.stringify({ read: true })
       });
-      // Soft update: keep panel open and preserve category/scroll.
-      const row = cacheItems.find((n) => n.id === id);
       if (row) row.readAt = new Date().toISOString();
       paintCats();
       renderList();
