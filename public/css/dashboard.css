@@ -160,6 +160,43 @@ textarea:focus {
   cursor: pointer;
   text-align: left;
   transition: background .15s, color .15s, box-shadow .15s;
+  position: relative;
+}
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(15, 18, 28, 0.85);
+}
+.nav-badge.hidden { display: none !important; }
+.contact-image-preview {
+  margin-top: 8px;
+  max-width: 100%;
+  max-height: 180px;
+  border-radius: 12px;
+  border: 1px solid var(--nv-border);
+  object-fit: contain;
+  background: rgba(0,0,0,.25);
+  display: none;
+}
+.contact-image-preview.on { display: block; }
+.inbox-attach {
+  margin-top: 10px;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 12px;
+  border: 1px solid var(--nv-border);
+  object-fit: contain;
+  background: rgba(0,0,0,.2);
+  cursor: zoom-in;
 }
 .nav button:hover, .nav a:hover,
 .nav button.active, .nav a.active {
@@ -618,14 +655,27 @@ td.row-actions > a.btn:last-child {
 }
 .modal-card {
   width: min(480px, 100%);
+  max-width: 100%;
   background: var(--nv-card);
   border: 1px solid var(--nv-border);
   border-radius: 16px;
   padding: 18px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .modal-card.wide { width: min(640px, 100%); }
-.modal-card h3 { margin: 0 0 8px; }
+.modal-card h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.notif-detail-card { width: min(520px, 100%); }
+.notif-detail-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.55;
+  color: var(--nv-text-2);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
 .form-grid { display: grid; gap: 10px; margin: 12px 0; }
 .form-grid label { display: grid; gap: 6px; color: var(--nv-text-2); font-size: 0.86rem; }
 .form-grid input, .form-grid select {

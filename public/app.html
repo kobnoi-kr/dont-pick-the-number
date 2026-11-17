@@ -143,8 +143,12 @@
         <input class="input" id="contactSubject" maxlength="128" placeholder="เช่น ปัญหาห้อง / ถูกแบนผิด">
       </label>
       <label>ข้อความ
-        <textarea class="input" id="contactMessage" rows="5" maxlength="2000" placeholder="อธิบายรายละเอียด…" required></textarea>
+        <textarea class="input" id="contactMessage" rows="5" maxlength="2000" placeholder="อธิบายรายละเอียด…"></textarea>
       </label>
+      <label>แนบรูป (ถ้ามี)
+        <input class="input" id="contactImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <img id="contactImagePreview" class="contact-image-preview" alt="ตัวอย่างรูป">
       <p class="msg" id="contactMsg"></p>
       <div class="modal-actions">
         <button type="button" class="btn ghost" id="contactCancel">ยกเลิก</button>

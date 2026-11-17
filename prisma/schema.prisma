@@ -372,6 +372,7 @@ model ContactMessage {
   userId      String?   @map("user_id") @db.Uuid
   subject     String    @default("") @db.VarChar(128)
   message     String    @db.Text
+  imageData   String?   @map("image_data") @db.Text
   status      String    @default("open") @db.VarChar(16)
   ipAddress   String?   @map("ip_address") @db.VarChar(64)
   createdAt   DateTime  @default(now()) @map("created_at")

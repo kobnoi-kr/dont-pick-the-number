@@ -67,16 +67,16 @@ function ensureNotifDetailModal() {
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.innerHTML = `
-    <div class="modal-card">
+    <div class="modal-card notif-detail-card">
       <div class="row-between" style="align-items:flex-start;gap:10px">
-        <div>
+        <div style="min-width:0;flex:1">
           <p class="tiny" id="notifDetailPill" style="margin:0 0 6px"></p>
-          <h3 id="notifDetailTitle" style="margin:0">รายละเอียด</h3>
+          <h3 id="notifDetailTitle" style="margin:0;overflow-wrap:anywhere">รายละเอียด</h3>
         </div>
         <button type="button" class="btn ghost sm" id="notifDetailClose">ปิด</button>
       </div>
       <p class="tiny muted" id="notifDetailWhen" style="margin:8px 0 12px"></p>
-      <div id="notifDetailBody" style="white-space:pre-wrap;line-height:1.55;color:var(--nv-text-2)"></div>
+      <div id="notifDetailBody" class="notif-detail-body"></div>
     </div>
   `;
   document.body.appendChild(modal);

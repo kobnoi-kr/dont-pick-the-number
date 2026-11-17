@@ -1,52 +1,8 @@
 import { api } from "./api.js";
+import { wireContactForm } from "./contact-form.js";
 
 function wireContactAdmin() {
-  const btn = document.getElementById("contactAdminBtn");
-  const modal = document.getElementById("contactModal");
-  if (!btn || !modal) return;
-  const form = document.getElementById("contactForm");
-  const cancel = document.getElementById("contactCancel");
-  const msg = document.getElementById("contactMsg");
-  const open = () => {
-    if (msg) msg.textContent = "";
-    modal.classList.remove("hidden");
-    const ta = document.getElementById("contactMessage");
-    if (ta) requestAnimationFrame(() => ta.focus());
-  };
-  const close = () => modal.classList.add("hidden");
-  btn.onclick = open;
-  if (cancel) cancel.onclick = close;
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) close();
-  });
-  if (form) {
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const subject = (document.getElementById("contactSubject")?.value || "").trim();
-      const message = (document.getElementById("contactMessage")?.value || "").trim();
-      if (message.length < 5) {
-        if (msg) msg.textContent = "พิมพ์ข้อความอย่างน้อย 5 ตัวอักษร";
-        return;
-      }
-      if (msg) msg.textContent = "กำลังส่ง…";
-      const r = await api("/api/v1/contact", {
-        method: "POST",
-        body: JSON.stringify({ subject, message })
-      });
-      if (!r.res.ok) {
-        if (msg) {
-          msg.textContent =
-            r.res.status === 429
-              ? "ส่งบ่อยเกินไป ลองใหม่ภายหลัง"
-              : (r.data && r.data.error) || "ส่งไม่สำเร็จ";
-        }
-        return;
-      }
-      if (msg) msg.textContent = "ส่งแล้ว — แอดมินจะเห็นใน Inbox";
-      form.reset();
-      setTimeout(close, 900);
-    };
-  }
+  wireContactForm();
 }
 
 const TITLES = {

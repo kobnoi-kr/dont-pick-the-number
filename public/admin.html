@@ -28,7 +28,7 @@
       <button type="button" data-view="games" data-perm="games.view"><i class="fi fi-rr-gamepad ico" aria-hidden="true"></i> Game Management</button>
       <button type="button" data-view="rooms" data-perm="rooms.view"><i class="fi fi-rr-door-open ico" aria-hidden="true"></i> Room Management</button>
       <button type="button" data-view="announcements" data-perm="announcements.manage"><i class="fi fi-rr-megaphone ico" aria-hidden="true"></i> Announcements</button>
-      <button type="button" data-view="inbox" data-perm="users.view"><i class="fi fi-rr-envelope ico" aria-hidden="true"></i> ข้อความติดต่อ</button>
+      <button type="button" data-view="inbox" data-perm="users.view"><i class="fi fi-rr-envelope ico" aria-hidden="true"></i> ข้อความติดต่อ<span class="nav-badge hidden" id="inboxNavBadge" aria-label="ข้อความใหม่">0</span></button>
       <div class="nav-section">SYSTEM</div>
       <button type="button" data-view="permissions" data-perm="admins.view"><i class="fi fi-rr-shield-check ico" aria-hidden="true"></i> Admin &amp; Permissions</button>
       <button type="button" data-view="system" data-perm="settings.view"><i class="fi fi-rr-computer ico" aria-hidden="true"></i> System Management</button>
@@ -78,8 +78,12 @@
         <input class="input" id="contactSubject" maxlength="128" placeholder="เช่น ปัญหาห้อง / ข้อเสนอ">
       </label>
       <label>ข้อความ
-        <textarea class="input" id="contactMessage" rows="5" maxlength="2000" placeholder="อธิบายรายละเอียด…" required></textarea>
+        <textarea class="input" id="contactMessage" rows="5" maxlength="2000" placeholder="อธิบายรายละเอียด…"></textarea>
       </label>
+      <label>แนบรูป (ถ้ามี)
+        <input class="input" id="contactImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+      <img id="contactImagePreview" class="contact-image-preview" alt="ตัวอย่างรูป">
       <p class="msg" id="contactMsg"></p>
       <div class="modal-actions">
         <button type="button" class="btn ghost" id="contactCancel">ยกเลิก</button>

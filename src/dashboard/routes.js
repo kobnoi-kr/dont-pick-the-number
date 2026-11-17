@@ -837,19 +837,45 @@ async function handleDashboardApi(req, res, pathname) {
       tooMany(res, limited.retryAfterSec || 3600);
       return true;
     }
-    const body = await readJsonBody(req).catch(() => null);
-    const message = String((body && body.message) || "").trim().slice(0, 2000);
-    const subject = String((body && body.subject) || "").trim().slice(0, 128);
-    if (message.length < 5) {
+    // Allow image data URL (~350KB) in body
+    const body = await readJsonBody(req, 512 * 1024).catch((err) => {
+      if (err && err.code === "body_too_large") return { __tooLarge: true };
+      return null;
+    });
+    if (body && body.__tooLarge) {
+      sendJson(res, 413, { error: "body_too_large" });
+      return true;
+    }
+    if (!body) {
+      sendJson(res, 400, { error: "invalid_body" });
+      return true;
+    }
+    let message = String(body.message || "").trim().slice(0, 2000);
+    const subject = String(body.subject || "").trim().slice(0, 128);
+    let imageData = null;
+    if (Object.prototype.hasOwnProperty.call(body, "imageData") && body.imageData != null && body.imageData !== "") {
+      const raw = String(body.imageData).trim().replace(/\s+/g, "");
+      if (
+        !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(raw) ||
+        raw.length > 350000
+      ) {
+        sendJson(res, 400, { error: "invalid_image" });
+        return true;
+      }
+      imageData = raw;
+    }
+    if (message.length < 5 && !imageData) {
       sendJson(res, 400, { error: "invalid_message" });
       return true;
     }
+    if (!message && imageData) message = "(ส่งรูปภาพ)";
     const prisma = await getPrisma();
     const row = await prisma.contactMessage.create({
       data: {
         userId: auth.user.id,
         subject: subject || "ติดต่อแอดมิน",
         message,
+        imageData,
         status: "open",
         ipAddress: ip ? String(ip).slice(0, 64) : null
       }

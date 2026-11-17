@@ -1,4 +1,5 @@
 import { api } from "/js/dashboard/api.js";
+import { wireContactForm } from "/js/dashboard/contact-form.js";
 import { hasPerm } from "./util.js";
 import { renderOverview } from "./overview.js";
 import { renderAnalytics } from "./analytics.js";
@@ -122,11 +123,34 @@ async function showView(view) {
   else if (next === "games") await renderGames(root, ctx);
   else if (next === "rooms") await renderRooms(root, ctx);
   else if (next === "announcements") await renderAnnouncements(root);
-  else if (next === "inbox") await renderInbox(root);
+  else if (next === "inbox") await renderInbox(root, { onOpenCount: setInboxBadge });
   else if (next === "permissions") await renderPermissions(root, ctx);
   else if (next === "system") await renderSystem(root, ctx);
   else if (next === "logs") await renderLogs(root);
   else if (next === "settings") await renderSettings(root, ctx);
+}
+
+function setInboxBadge(count) {
+  const badge = document.getElementById("inboxNavBadge");
+  if (!badge) return;
+  const n = Math.max(0, Number(count) || 0);
+  if (n <= 0) {
+    badge.classList.add("hidden");
+    badge.textContent = "0";
+    return;
+  }
+  badge.classList.remove("hidden");
+  badge.textContent = n > 99 ? "99+" : String(n);
+}
+
+async function refreshInboxBadge() {
+  if (!hasPerm(state.user, "users.view")) {
+    setInboxBadge(0);
+    return;
+  }
+  const { res, data } = await api("/api/v1/admin/inbox?limit=1", { method: "GET" });
+  if (!res.ok) return;
+  setInboxBadge(data && data.openCount != null ? data.openCount : 0);
 }
 
 function wireShell() {
@@ -171,46 +195,7 @@ function wireShell() {
     };
   }
 
-  const contactBtn = document.getElementById("contactAdminBtn");
-  const contactModal = document.getElementById("contactModal");
-  if (contactBtn && contactModal) {
-    const form = document.getElementById("contactForm");
-    const cancel = document.getElementById("contactCancel");
-    const msg = document.getElementById("contactMsg");
-    const open = () => {
-      if (msg) msg.textContent = "";
-      contactModal.classList.remove("hidden");
-    };
-    const close = () => contactModal.classList.add("hidden");
-    contactBtn.onclick = open;
-    if (cancel) cancel.onclick = close;
-    contactModal.addEventListener("click", (e) => {
-      if (e.target === contactModal) close();
-    });
-    if (form) {
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const subject = (document.getElementById("contactSubject")?.value || "").trim();
-        const message = (document.getElementById("contactMessage")?.value || "").trim();
-        if (message.length < 5) {
-          if (msg) msg.textContent = "พิมพ์ข้อความอย่างน้อย 5 ตัวอักษร";
-          return;
-        }
-        if (msg) msg.textContent = "กำลังส่ง…";
-        const r = await api("/api/v1/contact", {
-          method: "POST",
-          body: JSON.stringify({ subject, message })
-        });
-        if (!r.res.ok) {
-          if (msg) msg.textContent = r.res.status === 429 ? "ส่งบ่อยเกินไป" : "ส่งไม่สำเร็จ";
-          return;
-        }
-        if (msg) msg.textContent = "ส่งแล้ว";
-        form.reset();
-        setTimeout(close, 800);
-      };
-    }
-  }
+  wireContactForm();
 }
 
 async function boot() {
@@ -236,6 +221,10 @@ async function boot() {
   paintUser(state.user);
   wireShell();
   await showView(location.hash.replace(/^#/, "") || "overview");
+  await refreshInboxBadge();
+  setInterval(() => {
+    refreshInboxBadge().catch(() => {});
+  }, 30000);
 }
 
 boot().catch(() => {

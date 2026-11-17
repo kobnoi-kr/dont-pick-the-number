@@ -8,13 +8,18 @@ function statusLabel(s) {
   return `<span class="pill">${esc(s)}</span>`;
 }
 
-export async function renderInbox(root) {
+function isSafeImageData(src) {
+  return typeof src === "string" && /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(src);
+}
+
+export async function renderInbox(root, opts = {}) {
+  const onOpenCount = typeof opts.onOpenCount === "function" ? opts.onOpenCount : null;
+
   root.innerHTML = `
     <div class="card">
       <div class="row-between" style="margin-bottom:12px">
         <div>
           <h2 style="margin:0">ข้อความติดต่อแอดมิน</h2>
-          <p class="muted tiny" style="margin:6px 0 0">ตอบกลับแล้วผู้ใช้จะได้รับการแจ้งเตือน และคลิกอ่านแบบ popup ได้</p>
         </div>
         <select class="input" id="inboxStatus" style="max-width:160px">
           <option value="">ทั้งหมด</option>
@@ -40,6 +45,7 @@ export async function renderInbox(root) {
     }
     const messages = data.messages || [];
     const openCount = data.openCount != null ? data.openCount : 0;
+    if (onOpenCount) onOpenCount(openCount);
     box.innerHTML = `
       <p class="tiny" style="margin:0 0 10px;color:var(--nv-muted)">ข้อความใหม่รออ่าน: ${openCount}</p>
       <div class="room-card-list">
@@ -50,6 +56,10 @@ export async function renderInbox(root) {
                   const who = m.user
                     ? `${m.user.displayName || m.user.username} (@${m.user.username})`
                     : "ผู้ใช้ถูกลบแล้ว";
+                  const img =
+                    isSafeImageData(m.imageData)
+                      ? `<img class="inbox-attach" src="${m.imageData}" alt="แนบรูป" loading="lazy">`
+                      : "";
                   return `<article class="room-card" data-id="${esc(m.id)}">
               <div class="room-card-top">
                 <div class="room-card-title">
@@ -58,12 +68,13 @@ export async function renderInbox(root) {
                 </div>
                 ${statusLabel(m.status)}
               </div>
-              <p style="margin:10px 0 0;white-space:pre-wrap;line-height:1.5;color:var(--nv-text-2);font-size:0.92rem">${esc(m.message)}</p>
+              <p style="margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;line-height:1.5;color:var(--nv-text-2);font-size:0.92rem">${esc(m.message)}</p>
+              ${img}
               ${
                 m.adminReply
                   ? `<div style="margin-top:10px;padding:10px;border-radius:12px;border:1px solid rgba(86,119,252,.3);background:rgba(86,119,252,.08)">
                       <div class="tiny" style="color:#93c5fd;margin-bottom:4px">ตอบแล้ว · ${esc(fmtDate(m.repliedAt))}</div>
-                      <div style="white-space:pre-wrap;line-height:1.45">${esc(m.adminReply)}</div>
+                      <div style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;line-height:1.45">${esc(m.adminReply)}</div>
                     </div>`
                   : ""
               }
@@ -83,6 +94,10 @@ export async function renderInbox(root) {
             : `<div class="empty">ยังไม่มีข้อความ</div>`
         }
       </div>`;
+
+    box.querySelectorAll(".inbox-attach").forEach((img) => {
+      img.onclick = () => window.open(img.src, "_blank", "noopener");
+    });
 
     box.querySelectorAll("[data-set]").forEach((btn) => {
       btn.onclick = async () => {
@@ -121,7 +136,7 @@ export async function renderInbox(root) {
           if (msg) msg.textContent = "ส่งไม่สำเร็จ";
           return;
         }
-        if (msg) msg.textContent = "ส่งแล้ว — ผู้ใช้จะเห็นในการแจ้งเตือน";
+        if (msg) msg.textContent = "ส่งแล้ว";
         await load();
       };
     });
