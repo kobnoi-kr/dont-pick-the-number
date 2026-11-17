@@ -384,10 +384,34 @@ async function handleAccountProfile(req, res) {
         }
         data.avatarUrl = av;
       }
+      if (Object.prototype.hasOwnProperty.call(body, "gender")) {
+        const g = body.gender == null || body.gender === "" ? null : String(body.gender);
+        if (g != null && !["male", "female", "lgbtq"].includes(g)) {
+          sendJson(res, 400, { error: "invalid_gender" });
+          return true;
+        }
+        data.gender = g;
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "age")) {
+        if (body.age == null || body.age === "") data.age = null;
+        else {
+          const age = Number(body.age);
+          if (!Number.isInteger(age) || age < 1 || age > 120) {
+            sendJson(res, 400, { error: "invalid_age" });
+            return true;
+          }
+          data.age = age;
+        }
+      }
       const user = await auth.prisma.user.update({
         where: { id: auth.user.id },
         data,
-        include: { userRoles: { include: { role: true } } }
+        include: {
+          userRoles: { include: { role: true } },
+          equippedTitle: true,
+          equippedFrame: true,
+          equippedEffect: true
+        }
       });
       sendJson(res, 200, { user: publicUser(user) });
     } catch (err) {

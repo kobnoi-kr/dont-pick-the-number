@@ -131,6 +131,13 @@ async function main() {
     });
   }
 
+  try {
+    const { ensureCosmeticsCatalog } = require("../src/dashboard/cosmetics");
+    await ensureCosmeticsCatalog(prisma);
+  } catch (err) {
+    console.warn("Cosmetics seed skipped:", err && err.message ? err.message : err);
+  }
+
   console.log("Seeded roles, permissions, and system settings");
 }
 

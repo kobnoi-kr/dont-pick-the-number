@@ -15,6 +15,7 @@ const { rateLimit } = require("../auth/rate-limit");
 const { getGameApi } = require("./bridge");
 const { listAcceptedFriendIds, friendshipRelation } = require("../auth/friends");
 const { rankingWindow } = require("./ranking-period");
+const { handleCosmeticsApi, publicCosmetic } = require("./cosmetics");
 
 const GAME_CATALOG = [
   {
@@ -95,6 +96,9 @@ async function statsForUser(userId) {
 
 async function handleDashboardApi(req, res, pathname) {
   const game = getGameApi();
+  if (pathname.startsWith("/api/v1/cosmetics") || pathname.startsWith("/api/v1/shop/")) {
+    return handleCosmeticsApi(req, res, pathname);
+  }
   const isDashPath =
     pathname.startsWith("/api/v1/dashboard") ||
     pathname.startsWith("/api/v1/rooms") ||
@@ -424,7 +428,7 @@ async function handleDashboardApi(req, res, pathname) {
     }
     const token = (user && user.id) || String(body.token || "");
     const name = String(body.displayName || body.name || (user && user.displayName) || "").trim().slice(0, 24);
-    const created = game.createRoomHttp({
+    const created = await game.createRoomHttp({
       visibility: body.visibility === "private" ? "private" : "public",
       title: body.title || "",
       token: token || undefined,
@@ -923,7 +927,12 @@ async function handleDashboardApi(req, res, pathname) {
     const prisma = await getPrisma();
     const u = await prisma.user.findUnique({
       where: { id: pubUser[1] },
-      include: { settings: true }
+      include: {
+        settings: true,
+        equippedTitle: true,
+        equippedFrame: true,
+        equippedEffect: true
+      }
     });
     if (!u || u.status === "deleted") {
       sendJson(res, 404, { error: "not_found" });
@@ -945,7 +954,14 @@ async function handleDashboardApi(req, res, pathname) {
         username: u.username,
         avatarUrl: u.avatarUrl,
         accountType: u.accountType,
-        createdAt: u.createdAt
+        createdAt: u.createdAt,
+        gender: u.gender || null,
+        age: u.age == null ? null : u.age,
+        equipped: {
+          title: publicCosmetic(u.equippedTitle),
+          frame: publicCosmetic(u.equippedFrame),
+          effect: publicCosmetic(u.equippedEffect)
+        }
       },
       stats,
       relation

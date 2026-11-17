@@ -78,6 +78,18 @@ export async function renderProfile(root, { user, onSaved }) {
         <form id="profileForm" class="form-grid">
           <label>Display Name<input id="pfName" maxlength="64" value="${esc(u.displayName || "")}" required></label>
           <label>Username<input value="${esc(u.username || "")}" disabled></label>
+          <label>เพศ
+            <select id="pfGender">
+              <option value="" ${!u.gender ? "selected" : ""}>—</option>
+              <option value="male" ${u.gender === "male" ? "selected" : ""}>ชาย</option>
+              <option value="female" ${u.gender === "female" ? "selected" : ""}>หญิง</option>
+              <option value="lgbtq" ${u.gender === "lgbtq" ? "selected" : ""}>LGBTQ+</option>
+            </select>
+          </label>
+          <label>อายุ
+            <input id="pfAge" type="number" min="1" max="120" inputmode="numeric" placeholder="—" value="${u.age != null ? esc(String(u.age)) : ""}">
+          </label>
+          <p class="tiny muted" style="margin:0">เพศและอายุไม่บังคับ — แสดงในล็อบบี้และโปรไฟล์การ์ด</p>
           <button class="btn" type="submit">บันทึกโปรไฟล์</button>
         </form>
         <p class="msg" id="pfMsg"></p>
@@ -267,13 +279,25 @@ export async function renderProfile(root, { user, onSaved }) {
   root.querySelector("#profileForm").onsubmit = async (e) => {
     e.preventDefault();
     const msg = root.querySelector("#pfMsg");
-    const body = { displayName: root.querySelector("#pfName").value.trim() };
+    const genderRaw = root.querySelector("#pfGender").value;
+    const ageRaw = root.querySelector("#pfAge").value.trim();
+    const body = {
+      displayName: root.querySelector("#pfName").value.trim(),
+      gender: genderRaw || null,
+      age: ageRaw === "" ? null : Number(ageRaw)
+    };
     if (pendingAvatar !== undefined) body.avatarUrl = pendingAvatar;
     const { res, data } = await api("/api/v1/account/profile", {
       method: "PATCH",
       body: JSON.stringify(body)
     });
-    msg.textContent = res.ok ? "บันทึกแล้ว" : (data && data.error) || "บันทึกไม่สำเร็จ";
+    const errMap = {
+      invalid_gender: "เพศไม่ถูกต้อง",
+      invalid_age: "อายุต้องเป็นตัวเลข 1–120"
+    };
+    msg.textContent = res.ok
+      ? "บันทึกแล้ว"
+      : errMap[data && data.error] || (data && data.error) || "บันทึกไม่สำเร็จ";
     msg.classList.toggle("ok", res.ok);
     if (res.ok && onSaved && data && data.user) onSaved(data.user);
   };

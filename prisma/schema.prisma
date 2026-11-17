@@ -31,18 +31,35 @@ enum FriendshipStatus {
   declined
 }
 
+enum Gender {
+  male
+  female
+  lgbtq
+}
+
+enum CosmeticKind {
+  title
+  frame
+  effect
+}
+
 model User {
-  id              String       @id @default(uuid()) @db.Uuid
-  username        String       @db.VarChar(64)
-  displayName     String       @map("display_name") @db.VarChar(64)
-  avatarUrl       String?      @map("avatar_url") @db.Text
-  friendCode      String?      @unique @map("friend_code") @db.VarChar(16)
-  accountType     AccountType  @default(guest) @map("account_type")
-  status          UserStatus   @default(active)
-  emailVerifiedAt DateTime?    @map("email_verified_at")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  lastLoginAt     DateTime?    @map("last_login_at")
+  id               String       @id @default(uuid()) @db.Uuid
+  username         String       @db.VarChar(64)
+  displayName      String       @map("display_name") @db.VarChar(64)
+  avatarUrl        String?      @map("avatar_url") @db.Text
+  friendCode       String?      @unique @map("friend_code") @db.VarChar(16)
+  gender           Gender?
+  age              Int?
+  equippedTitleId  String?      @map("equipped_title_id") @db.VarChar(64)
+  equippedFrameId  String?      @map("equipped_frame_id") @db.VarChar(64)
+  equippedEffectId String?      @map("equipped_effect_id") @db.VarChar(64)
+  accountType      AccountType  @default(guest) @map("account_type")
+  status           UserStatus   @default(active)
+  emailVerifiedAt  DateTime?    @map("email_verified_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  lastLoginAt      DateTime?    @map("last_login_at")
 
   authAccounts       AuthAccount[]
   sessions           Session[]
@@ -63,8 +80,60 @@ model User {
   contactMessages     ContactMessage[]
   dmSent              DirectMessage[]    @relation("DmSender")
   dmReceived          DirectMessage[]    @relation("DmRecipient")
+  cosmetics           UserCosmetic[]
+  equippedTitle       Cosmetic?          @relation("EquippedTitle", fields: [equippedTitleId], references: [id], onDelete: SetNull)
+  equippedFrame       Cosmetic?          @relation("EquippedFrame", fields: [equippedFrameId], references: [id], onDelete: SetNull)
+  equippedEffect      Cosmetic?          @relation("EquippedEffect", fields: [equippedEffectId], references: [id], onDelete: SetNull)
 
   @@map("users")
+}
+
+model Cosmetic {
+  id          String       @id @db.VarChar(64)
+  kind        CosmeticKind
+  name        String       @db.VarChar(64)
+  description String?      @db.VarChar(255)
+  shopPrice   Int?         @map("shop_price")
+  cssClass    String?      @map("css_class") @db.VarChar(64)
+  meta        Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  owners           UserCosmetic[]
+  equippedAsTitle  User[]         @relation("EquippedTitle")
+  equippedAsFrame  User[]         @relation("EquippedFrame")
+  equippedAsEffect User[]         @relation("EquippedEffect")
+
+  @@index([kind])
+  @@map("cosmetics")
+}
+
+model UserCosmetic {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  cosmeticId String   @map("cosmetic_id") @db.VarChar(64)
+  source     String   @db.VarChar(32)
+  acquiredAt DateTime @default(now()) @map("acquired_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic Cosmetic @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cosmeticId])
+  @@index([cosmeticId])
+  @@map("user_cosmetics")
+}
+
+model RankingRewardGrant {
+  id         String   @id @default(uuid()) @db.Uuid
+  period     String   @db.VarChar(16)
+  label      String   @db.VarChar(32)
+  rank       Int
+  userId     String   @map("user_id") @db.Uuid
+  cosmeticId String   @map("cosmetic_id") @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([period, label, rank])
+  @@index([userId])
+  @@map("ranking_reward_grants")
 }
 
 model UserBlock {

@@ -55,6 +55,17 @@ function permissionsOf(user) {
   return [...set];
 }
 
+function publicCosmeticLite(c) {
+  if (!c) return null;
+  return {
+    id: c.id,
+    kind: c.kind,
+    name: c.name,
+    cssClass: c.cssClass || null,
+    meta: c.meta || null
+  };
+}
+
 function publicUser(user) {
   if (!user) return null;
   const roles = (user.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
@@ -64,13 +75,20 @@ function publicUser(user) {
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     friendCode: user.friendCode || null,
+    gender: user.gender || null,
+    age: user.age == null ? null : user.age,
     accountType: user.accountType,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt,
     roles,
     permissions: permissionsOf(user),
     createdAt: user.createdAt,
-    lastLoginAt: user.lastLoginAt
+    lastLoginAt: user.lastLoginAt,
+    equipped: {
+      title: publicCosmeticLite(user.equippedTitle),
+      frame: publicCosmeticLite(user.equippedFrame),
+      effect: publicCosmeticLite(user.equippedEffect)
+    }
   };
 }
 
@@ -84,7 +102,10 @@ async function getUserWithRoles(prisma, userId) {
             include: { rolePermissions: { include: { permission: true } } }
           }
         }
-      }
+      },
+      equippedTitle: true,
+      equippedFrame: true,
+      equippedEffect: true
     }
   });
 }

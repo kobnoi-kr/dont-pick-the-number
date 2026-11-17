@@ -39,7 +39,10 @@ async function findValidSession(prisma, rawToken) {
                 include: { rolePermissions: { include: { permission: true } } }
               }
             }
-          }
+          },
+          equippedTitle: true,
+          equippedFrame: true,
+          equippedEffect: true
         }
       }
     }

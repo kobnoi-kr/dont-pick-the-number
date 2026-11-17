@@ -11,6 +11,8 @@ const TITLES = {
   rooms: "My Rooms",
   ranking: "Ranking",
   friends: "Friends",
+  decorate: "ตกแต่งโปรไฟล์",
+  shop: "Shop",
   profile: "Profile & Settings"
 };
 

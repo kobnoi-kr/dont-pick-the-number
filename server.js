@@ -567,6 +567,12 @@ function snap(room, player, opts) {
       id: item.id,
       name: item.name,
       avatarUrl: item.avatarUrl || "",
+      gender: item.gender || null,
+      age: item.age == null ? null : item.age,
+      title: item.title || null,
+      titleClass: item.titleClass || null,
+      frameClass: item.frameClass || null,
+      effectClass: item.effectClass || null,
       score: scoreOf(room, item),
       connected: item.connected,
       host: item.id === room.hostId,
@@ -1512,6 +1518,34 @@ function identity(ws, msg) {
   trackPresence(ws, token);
   return { name, token, avatarUrl };
 }
+async function hydratePlayerProfile(player) {
+  if (!player || player.bot || !authEnabled()) return player;
+  const id = validToken(player.id) ? player.id : "";
+  if (!id) return player;
+  try {
+    const prisma = await getPrisma();
+    const u = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        gender: true,
+        age: true,
+        equippedTitle: { select: { name: true, cssClass: true } },
+        equippedFrame: { select: { cssClass: true } },
+        equippedEffect: { select: { cssClass: true } }
+      }
+    });
+    if (!u) return player;
+    player.gender = u.gender || null;
+    player.age = u.age == null ? null : u.age;
+    player.title = (u.equippedTitle && u.equippedTitle.name) || null;
+    player.titleClass = (u.equippedTitle && u.equippedTitle.cssClass) || null;
+    player.frameClass = (u.equippedFrame && u.equippedFrame.cssClass) || null;
+    player.effectClass = (u.equippedEffect && u.equippedEffect.cssClass) || null;
+  } catch (_) {
+    /* ignore */
+  }
+  return player;
+}
 async function assertNotMaintenance(ws, msg) {
   try {
     const maint = await getMaintenanceState();
@@ -1534,6 +1568,7 @@ async function onCreate(ws, msg) {
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
   const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  await hydratePlayerProfile(player);
   const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
   if (msg.title) room.title = cleanRoomTitle(msg.title) || room.title;
   applyRoomSetup(room, msg.setup);
@@ -1604,6 +1639,7 @@ async function onJoin(ws, msg) {
   if (existing) {
     if (avatarUrl) existing.avatarUrl = avatarUrl;
     if (name) existing.name = name;
+    await hydratePlayerProfile(existing);
     attach(ws, room, existing);
     return;
   }
@@ -1615,6 +1651,7 @@ async function onJoin(ws, msg) {
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
   const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
+  await hydratePlayerProfile(player);
   room.players.push(player);
   if (room.phase === "lobby") {
     cancelSpin(room);
@@ -2238,7 +2275,7 @@ attachGameApi({
       joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS
     };
   },
-  createRoomHttp({ visibility, title, token, name, avatarUrl, setup }) {
+  async createRoomHttp({ visibility, title, token, name, avatarUrl, setup }) {
     if (rooms.size >= MAX_ROOMS) return null;
     const code = makeCode();
     if (!code) return null;
@@ -2255,6 +2292,7 @@ attachGameApi({
       scoreWheel: 0,
       lastSeen: Date.now()
     };
+    await hydratePlayerProfile(player);
     const room = blankRoom(code, visibility === "private" ? "private" : "public", player);
     if (title) room.title = cleanRoomTitle(title) || "";
     applyRoomSetup(room, setup);
@@ -2478,6 +2516,13 @@ setInterval(() => {
 
 /** Guest + expired session cleanup (interval from admin settings). */
 startCleanupScheduler();
+
+try {
+  const { startRankingRewardsScheduler } = require("./src/dashboard/ranking-rewards");
+  startRankingRewardsScheduler();
+} catch (err) {
+  console.warn("[ranking-rewards] scheduler not started:", err && err.message ? err.message : err);
+}
 
 server.listen(PORT, HOST, () => {
   console.log("Public game: http://localhost:" + PORT + " (/play)");

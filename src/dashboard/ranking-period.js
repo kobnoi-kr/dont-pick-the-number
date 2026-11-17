@@ -76,4 +76,9 @@ function rankingWindow(period, now = new Date()) {
   };
 }
 
-module.exports = { rankingWindow, bangkokParts, bangkokWallToUtc };
+function previousRankingWindow(period, now = new Date()) {
+  const cur = rankingWindow(period, now);
+  return rankingWindow(period, new Date(cur.since.getTime() - 1));
+}
+
+module.exports = { rankingWindow, previousRankingWindow, bangkokParts, bangkokWallToUtc };
