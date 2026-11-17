@@ -228,6 +228,18 @@ onDashboardMessage((msg) => {
   const gate = await enforceMaintenanceGate({ hardBlock: true });
   if (gate.blocked) return;
 
+  // If still seated in a live game, bounce straight back in (scores kept server-side).
+  try {
+    const active = await api("/api/v1/rooms/active", { method: "GET" });
+    const seat = active.data && active.data.active;
+    if (seat && seat.code && seat.phase !== "over") {
+      location.replace(playUrl({ code: seat.code, name: localStorage.getItem("dpn-name") || "" }));
+      return;
+    }
+  } catch {
+    /* ignore */
+  }
+
   wireNotifications();
   connectDashboardWs();
   loadAnnouncementToasts().catch(() => {});

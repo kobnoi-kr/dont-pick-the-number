@@ -209,23 +209,36 @@ let turnSec=0, turnEndsAt=0, lastCooldownSec=-1;
 let animId="", animGen=0, pendingSnap=null, sock=null, connTimer=0, wantRoom=false;
 let liveSpin=null, liveSpinUntil=0, orderAnim=0;
 let spectating=false, pendingAction=null, pendingSetup=null, enterIntent=false;
+function rememberActiveRoom(code){
+  try{
+    if(/^\d{6}$/.test(String(code||""))) localStorage.setItem("nv-active-room", String(code));
+    else localStorage.removeItem("nv-active-room");
+  }catch(e){}
+}
+function clearActiveRoom(){
+  try{ localStorage.removeItem("nv-active-room"); }catch(e){}
+}
 function readPlayParams(){
   const q=new URLSearchParams(location.search);
   const code=String(q.get("code")||"").replace(/\D/g,"").slice(0,6);
   const create=q.get("create");
   const watch=q.get("watch")==="1"||q.get("spectate");
+  const resume=q.get("resume")==="1";
   const name=q.get("name");
   if(name) try{ localStorage.setItem("dpn-name", name); }catch(e){}
   let setup=null;
   try{ if(q.get("setup")) setup=JSON.parse(q.get("setup")); }catch(e){}
   pendingSetup=setup;
   const inviteId=String(q.get("invite")||"").trim();
+  let saved="";
+  try{ saved=String(localStorage.getItem("nv-active-room")||"").replace(/\D/g,"").slice(0,6); }catch(e){}
   if(watch&&(/^\d{6}$/.test(code)||q.get("spectate"))){
     spectating=true;
     pendingAction={type:"watch",code:code||String(q.get("spectate")||"").replace(/\D/g,"").slice(0,6)};
   }else if(inviteId) pendingAction={type:"acceptInvite",inviteId};
   else if(/^\d{6}$/.test(code)) pendingAction={type:"join",code};
   else if(create==="public"||create==="private") pendingAction={type:"create",visibility:create};
+  else if(resume||/^\d{6}$/.test(saved)) pendingAction={type:"resume",code:code||saved||""};
 }
 function runPendingAction(){
   if(!pendingAction||!sock||sock.readyState!==1) return;
@@ -240,11 +253,22 @@ function runPendingAction(){
     send({t:"watch",code:action.code,token:myToken(),name,avatarUrl:myAvatar()});
   }else if(action.type==="acceptInvite"){
     send({t:"acceptInvite",inviteId:action.inviteId,name,token:myToken(),avatarUrl:myAvatar()});
+  }else if(action.type==="resume"){
+    // hello may already reattach; if not and we know the code, rejoin.
+    if(/^\d{6}$/.test(String(action.code||""))&&!wantRoom){
+      send({t:"join",code:action.code,name,token:myToken(),avatarUrl:myAvatar()});
+    }
+    setTimeout(()=>{
+      if(!wantRoom&&!spectating&&!pendingAction){
+        clearActiveRoom();
+        location.replace("/app.html#rooms");
+      }
+    }, 1200);
   }
   pendingAction=null;
   try{
     const u=new URL(location.href);
-    ["code","create","watch","spectate","setup","name","invite"].forEach(k=>u.searchParams.delete(k));
+    ["code","create","watch","spectate","setup","name","invite","resume"].forEach(k=>u.searchParams.delete(k));
     history.replaceState({}, "", u.pathname+(u.search||""));
   }catch(e){}
 }
@@ -1904,7 +1928,10 @@ async function ensureAuth(){
       authUser=data&&data.user?data.user:null;
       paintAuthBar(authUser);
       if(authUser&&authUser.id){
-        sessionStorage.setItem("dpn-token", authUser.id);
+        try{
+          localStorage.setItem("dpn-token", authUser.id);
+          sessionStorage.setItem("dpn-token", authUser.id);
+        }catch(e){}
         if(window.NVBan&&window.NVBan.clearBanNotice) window.NVBan.clearBanNotice();
         if(authUser.displayName&&!localStorage.getItem("dpn-name")){
           localStorage.setItem("dpn-name", authUser.displayName);
@@ -1920,11 +1947,15 @@ async function ensureAuth(){
   return authBoot;
 }
 function myToken(){
-  let token=sessionStorage.getItem("dpn-token");
-  if(!token){
+  // Keep one identity across dashboard + play so reconnect finds the same seat/scores.
+  let token=localStorage.getItem("dpn-token")||sessionStorage.getItem("dpn-token")||"";
+  if(!token||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){
     token=crypto.randomUUID();
-    sessionStorage.setItem("dpn-token", token);
   }
+  try{
+    localStorage.setItem("dpn-token", token);
+    sessionStorage.setItem("dpn-token", token);
+  }catch(e){}
   return token;
 }
 function typedName(){
@@ -2064,6 +2095,7 @@ function showGate(){
 }
 function leaveCurrentRoom(){
   if(spectating){
+    clearActiveRoom();
     send({t:"unwatch"});
     location.replace("/app.html#rooms");
     return;
@@ -2072,6 +2104,7 @@ function leaveCurrentRoom(){
     showErr("โฮสต์ออกห้องไม่ได้ — ใช้ปุ่มลบห้อง หรือโอนโฮสต์ก่อน");
     return;
   }
+  clearActiveRoom();
   enterIntent=false;
   wantRoom=false;
   send({t:"leave"});
@@ -2216,8 +2249,11 @@ function applySnap(s){
   hostId=s.hostId||"";
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
-  // Already seated (hello reattach) — drop matching pending join/watch.
+  if(s.phase==="over") clearActiveRoom();
+  else rememberActiveRoom(s.code);
+  // Already seated (hello reattach) — drop matching pending join/watch/resume.
   if(pendingAction&&s.code&&(
+    pendingAction.type==="resume"||
     (pendingAction.type==="join"&&pendingAction.code===s.code)||
     (pendingAction.type==="watch"&&pendingAction.code===s.code)
   )) pendingAction=null;
@@ -2632,6 +2668,7 @@ function connect(){
     }else if(msg.t==="left"||msg.t==="roomClosed"){
       // Ignore stale left while we are actively entering a room.
       if(enterIntent||pendingAction) return;
+      clearActiveRoom();
       // Maintenance kick also sends roomClosed — prefer maintenance redirect.
       if(msg.message&&/ปิดปรับปรุง|maintenance/i.test(String(msg.message))){
         try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
@@ -2678,11 +2715,12 @@ function connect(){
 }
 async function bootOnline(){
   readPlayParams();
-  if(!pendingAction){
-    location.replace("/app.html#rooms");
-    return;
-  }
   await ensureAuth();
+  if(!pendingAction){
+    // No URL action — still try resume via hello seat reattach.
+    pendingAction={type:"resume",code:""};
+    enterIntent=true;
+  }
   const saved=localStorage.getItem("dpn-name");
   if(saved&&$("myName")) $("myName").value=saved;
   if($("myName")) $("myName").addEventListener("change",typedName);

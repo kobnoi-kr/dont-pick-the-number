@@ -50,6 +50,8 @@ const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
+/** Keep mid-game rooms longer so players can refresh and rejoin with scores. */
+const ACTIVE_ROOM_MS = 5 * 60 * 1000;
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 const PUBLIC_PAGE = fs.existsSync(path.join(PUBLIC, "landing.html"))
@@ -605,6 +607,10 @@ function scheduleDelete(room) {
     }, Math.max(1000, room.holdUntil - Date.now()));
     return;
   }
+  const delay =
+    room.phase && room.phase !== "lobby" && room.phase !== "over"
+      ? ACTIVE_ROOM_MS
+      : ROOM_MS;
   room.emptyTimer = setTimeout(() => {
     room.emptyTimer = null;
     if (room.players.some((player) => player.connected)) return;
@@ -612,7 +618,7 @@ function scheduleDelete(room) {
     cancelSpin(room);
     rooms.delete(room.code);
     broadcastLobby();
-  }, ROOM_MS);
+  }, delay);
 }
 function attach(ws, room, player) {
   watchers.delete(ws);
@@ -1843,6 +1849,22 @@ function adminRoomRow(room) {
 }
 
 attachGameApi({
+  findActiveSeat(userId) {
+    const id = validToken(userId) ? userId : "";
+    if (!id) return null;
+    const found = findSeat(id);
+    if (!found) return null;
+    const { room, player } = found;
+    return {
+      code: room.code,
+      phase: room.phase,
+      title: roomLabel(room),
+      visibility: room.visibility === "private" ? "private" : "public",
+      cat: room.cat,
+      connected: !!player.connected,
+      score: scoreOf(room, player)
+    };
+  },
   listLobbyRooms(opts = {}) {
     const revealPrivate = !!opts.revealPrivate;
     const list = [];

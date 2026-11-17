@@ -306,6 +306,19 @@ async function handleDashboardApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/rooms/active") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const user = await optionalUser(req);
+    const seat = user && game && typeof game.findActiveSeat === "function"
+      ? game.findActiveSeat(user.id)
+      : null;
+    sendJson(res, 200, { active: seat || null });
+    return true;
+  }
+
   if (pathname === "/api/v1/rooms/mine") {
     if (method(req) !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
