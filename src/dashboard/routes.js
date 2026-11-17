@@ -929,6 +929,7 @@ async function handleDashboardApi(req, res, pathname) {
       where: { id: pubUser[1] },
       include: {
         settings: true,
+        userRoles: { include: { role: true } },
         equippedTitle: true,
         equippedFrame: true,
         equippedEffect: true
@@ -947,6 +948,7 @@ async function handleDashboardApi(req, res, pathname) {
     } else if (viewer && viewer.id === u.id) {
       relation = { status: "self" };
     }
+    const roles = (u.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
     sendJson(res, 200, {
       user: {
         id: u.id,
@@ -957,6 +959,7 @@ async function handleDashboardApi(req, res, pathname) {
         createdAt: u.createdAt,
         gender: u.gender || null,
         age: u.age == null ? null : u.age,
+        roles,
         equipped: {
           title: publicCosmetic(u.equippedTitle),
           frame: publicCosmetic(u.equippedFrame),

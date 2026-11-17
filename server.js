@@ -569,6 +569,7 @@ function snap(room, player, opts) {
       avatarUrl: item.avatarUrl || "",
       gender: item.gender || null,
       age: item.age == null ? null : item.age,
+      roles: Array.isArray(item.roles) ? item.roles : [],
       title: item.title || null,
       titleClass: item.titleClass || null,
       frameClass: item.frameClass || null,
@@ -1529,6 +1530,7 @@ async function hydratePlayerProfile(player) {
       select: {
         gender: true,
         age: true,
+        userRoles: { select: { role: { select: { name: true } } } },
         equippedTitle: { select: { name: true, cssClass: true } },
         equippedFrame: { select: { cssClass: true } },
         equippedEffect: { select: { cssClass: true } }
@@ -1537,6 +1539,7 @@ async function hydratePlayerProfile(player) {
     if (!u) return player;
     player.gender = u.gender || null;
     player.age = u.age == null ? null : u.age;
+    player.roles = (u.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
     player.title = (u.equippedTitle && u.equippedTitle.name) || null;
     player.titleClass = (u.equippedTitle && u.equippedTitle.cssClass) || null;
     player.frameClass = (u.equippedFrame && u.equippedFrame.cssClass) || null;

@@ -915,10 +915,9 @@ function renderLobbyGrid(){
     const ready=ranked||(meta&&meta.connected);
     const champ=isChampion(name);
     const gender=meta&&meta.gender?String(meta.gender):"";
-    const genderClass=gender==="male"?" gender-male":gender==="female"?" gender-female":gender==="lgbtq"?" gender-lgbtq":"";
-    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline")+(champ?" champion":"")+genderClass;
+    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline")+(champ?" champion":"");
     const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
-    av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph")+genderClass;
+    av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
     if(meta&&meta.avatarUrl){
       av.src=meta.avatarUrl;
       av.alt="";
@@ -938,14 +937,27 @@ function renderLobbyGrid(){
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
     nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
-    const titleLine=document.createElement("div");
-    titleLine.className="lobby-slot-title"+(meta&&meta.titleClass?" "+meta.titleClass:"");
-    titleLine.textContent=(meta&&meta.title)||"—";
-    const metaLine=document.createElement("div");
-    metaLine.className="lobby-slot-meta";
+    const pills=document.createElement("div");
+    pills.className="nv-pills lobby-slot-pills";
     const genderLabel=gender==="male"?"ชาย":gender==="female"?"หญิง":gender==="lgbtq"?"LGBTQ+":"—";
     const ageLabel=meta&&meta.age!=null&&meta.age!==""?String(meta.age):"—";
-    metaLine.textContent=genderLabel+" · "+ageLabel;
+    const genderPill=document.createElement("span");
+    genderPill.className="nv-pill gender"+(gender?" gender-"+gender:"");
+    genderPill.textContent=genderLabel;
+    const agePill=document.createElement("span");
+    agePill.className="nv-pill age";
+    agePill.textContent=ageLabel;
+    const titlePill=document.createElement("span");
+    titlePill.className="nv-pill title"+(meta&&meta.titleClass?" "+meta.titleClass:"");
+    titlePill.textContent=(meta&&meta.title)||"—";
+    pills.append(genderPill,agePill,titlePill);
+    const adminLabel=adminRoleLabel(meta&&meta.roles);
+    if(adminLabel){
+      const adminPill=document.createElement("span");
+      adminPill.className="nv-pill admin";
+      adminPill.textContent=adminLabel;
+      pills.appendChild(adminPill);
+    }
     const acts=document.createElement("div");
     acts.className="lobby-slot-acts";
     const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
@@ -977,7 +989,7 @@ function renderLobbyGrid(){
     const avWrap=document.createElement("div");
     const frameClass=meta&&meta.frameClass?(" "+meta.frameClass):"";
     const effectClass=meta&&meta.effectClass?(" "+meta.effectClass):"";
-    avWrap.className="lobby-av-wrap"+(champ?" champion":"")+genderClass+frameClass+effectClass;
+    avWrap.className="lobby-av-wrap"+(champ?" champion":"")+frameClass+effectClass;
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
     if(champ){
@@ -1012,7 +1024,7 @@ function renderLobbyGrid(){
       nm.addEventListener("click", openCard);
       avWrap.title="ดูโปรไฟล์";
     }
-    slot.append(avWrap,nm,titleLine,metaLine,status,acts);
+    slot.append(avWrap,nm,pills,status,acts);
     grid.appendChild(slot);
   }
 }
@@ -2040,6 +2052,25 @@ function formatAccountTenure(iso){
   const rem=months%12;
   return rem?years+" ปี "+rem+" เดือน":years+" ปี";
 }
+function adminRoleLabel(roles){
+  const list=Array.isArray(roles)?roles:[];
+  if(list.includes("super_admin")) return "Super Admin";
+  if(list.includes("admin")) return "Admin";
+  if(list.includes("moderator")) return "Moderator";
+  return "";
+}
+function genderLabelOf(g){
+  if(g==="male") return "ชาย";
+  if(g==="female") return "หญิง";
+  if(g==="lgbtq") return "LGBTQ+";
+  return "—";
+}
+function makeNvPill(text, extraClass){
+  const el=document.createElement("span");
+  el.className="nv-pill"+(extraClass?" "+extraClass:"");
+  el.textContent=text||"—";
+  return el;
+}
 function canOpenPlayerProfile(meta){
   return !!(onlineMode&&netPhase==="lobby"&&!spinning&&meta&&meta.id&&!meta.bot);
 }
@@ -2053,10 +2084,7 @@ async function openPlayerProfileModal(userId){
   if(!modal||!userId) return;
   const title=$("playerProfileTitle");
   const userEl=$("playerProfileUser");
-  const titleBadge=$("playerProfileTitleBadge");
-  const metaEl=$("playerProfileMeta");
-  const genderEl=$("playerProfileGender");
-  const ageEl=$("playerProfileAge");
+  const pillsEl=$("playerProfilePills");
   const tenure=$("playerProfileTenure");
   const winRate=$("playerProfileWinRate");
   const wins=$("playerProfileWins");
@@ -2064,60 +2092,57 @@ async function openPlayerProfileModal(userId){
   const hint=$("playerProfileHint");
   const acts=$("playerProfileActs");
   const head=modal.querySelector(".player-profile-head");
-  function genderClassOf(g){
-    if(g==="male") return " gender-male";
-    if(g==="female") return " gender-female";
-    if(g==="lgbtq") return " gender-lgbtq";
-    return "";
-  }
-  function genderLabelOf(g){
-    if(g==="male") return "ชาย";
-    if(g==="female") return "หญิง";
-    if(g==="lgbtq") return "LGBTQ+";
-    return "—";
-  }
-  function setProfileAv(src, letter, gender){
+  function setProfileAv(src, letter){
     if(!head) return;
-    const gClass=genderClassOf(gender);
     let node=$("playerProfileAv");
     if(src){
       if(!node||node.tagName!=="IMG"){
         const img=document.createElement("img");
         img.id="playerProfileAv";
-        img.className="player-profile-av"+gClass;
+        img.className="player-profile-av";
         img.alt="";
         img.referrerPolicy="no-referrer";
         if(node) node.replaceWith(img); else head.prepend(img);
         node=img;
       }
-      node.className="player-profile-av"+gClass;
+      node.className="player-profile-av";
       node.src=src;
     }else{
       if(!node||node.tagName==="IMG"){
         const div=document.createElement("div");
         div.id="playerProfileAv";
-        div.className="player-profile-av ph"+gClass;
+        div.className="player-profile-av ph";
         div.setAttribute("aria-hidden","true");
         if(node) node.replaceWith(div); else head.prepend(div);
         node=div;
       }
-      node.className="player-profile-av ph"+gClass;
+      node.className="player-profile-av ph";
       node.textContent=letter||"?";
     }
   }
+  function paintPills(u){
+    if(!pillsEl) return;
+    pillsEl.innerHTML="";
+    const eq=(u&&u.equipped)||{};
+    const gender=u&&u.gender?String(u.gender):"";
+    pillsEl.appendChild(makeNvPill(genderLabelOf(gender), "gender"+(gender?" gender-"+gender:"")));
+    pillsEl.appendChild(makeNvPill(u&&u.age!=null&&u.age!==""?String(u.age):"—", "age"));
+    const titleName=(eq.title&&eq.title.name)||"—";
+    const titleClass=(eq.title&&eq.title.cssClass)||"";
+    pillsEl.appendChild(makeNvPill(titleName, "title"+(titleClass?" "+titleClass:"")));
+    const adminLabel=adminRoleLabel(u&&u.roles);
+    if(adminLabel) pillsEl.appendChild(makeNvPill(adminLabel, "admin"));
+  }
   if(title) title.textContent="กำลังโหลด…";
   if(userEl) userEl.textContent="@—";
-  if(titleBadge){ titleBadge.textContent="—"; titleBadge.className="player-profile-title"; }
-  if(metaEl) metaEl.textContent="— · —";
-  if(genderEl) genderEl.textContent="—";
-  if(ageEl) ageEl.textContent="—";
+  if(pillsEl) pillsEl.innerHTML="";
   if(tenure) tenure.textContent="—";
   if(winRate) winRate.textContent="—";
   if(wins) wins.textContent="—";
   if(games) games.textContent="—";
   if(hint) hint.textContent="";
   if(acts) acts.innerHTML="";
-  setProfileAv(null,"?",null);
+  setProfileAv(null,"?");
   modal.classList.remove("hidden");
   let data=null;
   try{
@@ -2139,19 +2164,10 @@ async function openPlayerProfileModal(userId){
   const u=data.user||{};
   const st=data.stats;
   const rel=data.relation||{status:"none"};
-  const eq=u.equipped||{};
   if(title) title.textContent=u.displayName||"ผู้เล่น";
   if(userEl) userEl.textContent=u.username?("@"+u.username):"";
-  if(titleBadge){
-    titleBadge.textContent=(eq.title&&eq.title.name)||"—";
-    titleBadge.className="player-profile-title"+(eq.title&&eq.title.cssClass?(" "+eq.title.cssClass):"");
-  }
-  const gLabel=genderLabelOf(u.gender);
-  const aLabel=u.age!=null&&u.age!==""?String(u.age):"—";
-  if(metaEl) metaEl.textContent=gLabel+" · "+aLabel;
-  if(genderEl) genderEl.textContent=gLabel;
-  if(ageEl) ageEl.textContent=aLabel;
-  setProfileAv(u.avatarUrl||null, String(u.displayName||"?").slice(0,1).toUpperCase(), u.gender||null);
+  paintPills(u);
+  setProfileAv(u.avatarUrl||null, String(u.displayName||"?").slice(0,1).toUpperCase());
   if(tenure) tenure.textContent=formatAccountTenure(u.createdAt);
   if(st){
     if(winRate) winRate.textContent=(st.winRate!=null?st.winRate:0)+"%";
