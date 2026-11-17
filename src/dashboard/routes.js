@@ -574,57 +574,168 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     if (!authEnabled()) {
-      sendJson(res, 200, { rows: [], me: null });
+      sendJson(res, 200, { period: lb[1], sort: "points", rows: [], me: null });
       return true;
     }
     const prisma = await getPrisma();
     const user = await optionalUser(req);
     const period = lb[1];
-    let where = {};
+    const url = new URL(req.url || "/", "http://localhost");
+    const sortRaw = String(url.searchParams.get("sort") || "points").toLowerCase();
+    const sort = ["points", "wins", "winrate", "games"].includes(sortRaw)
+      ? sortRaw === "winrate"
+        ? "winRate"
+        : sortRaw
+      : "points";
+    const take = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50) || 50));
+
+    // Period boards: aggregate finished games in window (registered only).
     if (period === "weekly" || period === "monthly") {
-      const since = new Date();
-      since.setDate(since.getDate() - (period === "weekly" ? 7 : 30));
-      // approximate: use updatedAt on stats for period boards
-      where = { updatedAt: { gte: since } };
+      const days = period === "monthly" ? 30 : 7;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const players = await prisma.gamePlayer.findMany({
+        where: {
+          userId: { not: null },
+          user: { accountType: "registered", status: "active" },
+          game: { endedAt: { gte: since } }
+        },
+        select: {
+          userId: true,
+          points: true,
+          won: true,
+          user: { select: { id: true, displayName: true, avatarUrl: true } }
+        }
+      });
+      const byUser = new Map();
+      for (const p of players) {
+        if (!p.userId || !p.user) continue;
+        let row = byUser.get(p.userId);
+        if (!row) {
+          row = {
+            userId: p.userId,
+            displayName: p.user.displayName,
+            avatarUrl: p.user.avatarUrl,
+            totalPoints: 0,
+            gamesWon: 0,
+            totalGames: 0
+          };
+          byUser.set(p.userId, row);
+        }
+        row.totalPoints += Number(p.points) || 0;
+        row.totalGames += 1;
+        if (p.won) row.gamesWon += 1;
+      }
+      const ranked = Array.from(byUser.values()).map((r) => ({
+        ...r,
+        winRate: r.totalGames ? Math.round((r.gamesWon / r.totalGames) * 100) : 0
+      }));
+      ranked.sort((a, b) => {
+        if (sort === "wins") {
+          if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+          if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+          return b.totalGames - a.totalGames;
+        }
+        if (sort === "winRate") {
+          if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+          if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+          return b.totalGames - a.totalGames;
+        }
+        if (sort === "games") {
+          if (b.totalGames !== a.totalGames) return b.totalGames - a.totalGames;
+          if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+          return b.gamesWon - a.gamesWon;
+        }
+        // points (default)
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+        if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+        return b.totalGames - a.totalGames;
+      });
+      const rows = ranked.slice(0, take).map((r, i) => ({
+        rank: i + 1,
+        userId: r.userId,
+        displayName: r.displayName,
+        avatarUrl: r.avatarUrl,
+        totalPoints: r.totalPoints,
+        gamesWon: r.gamesWon,
+        totalGames: r.totalGames,
+        winRate: r.winRate
+      }));
+      let me = null;
+      if (user && user.accountType === "registered") {
+        const idx = ranked.findIndex((r) => r.userId === user.id);
+        if (idx >= 0) {
+          const r = ranked[idx];
+          me = {
+            rank: idx + 1,
+            userId: r.userId,
+            displayName: r.displayName,
+            avatarUrl: r.avatarUrl,
+            totalPoints: r.totalPoints,
+            gamesWon: r.gamesWon,
+            totalGames: r.totalGames,
+            winRate: r.winRate
+          };
+        } else {
+          me = {
+            rank: null,
+            userId: user.id,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl || null,
+            totalPoints: 0,
+            gamesWon: 0,
+            totalGames: 0,
+            winRate: 0
+          };
+        }
+      }
+      sendJson(res, 200, { period, sort, rows, me, since: since.toISOString() });
+      return true;
     }
-    let friendIds = null;
+
+    // Legacy lifetime boards (global / friends) — registered stats only.
+    let where = { user: { accountType: "registered", status: "active" } };
     if (period === "friends" && user) {
-      friendIds = await listAcceptedFriendIds(prisma, user.id);
+      const friendIds = await listAcceptedFriendIds(prisma, user.id);
       friendIds.push(user.id);
-      where = { userId: { in: friendIds } };
+      where = { userId: { in: friendIds }, user: { accountType: "registered", status: "active" } };
     }
     const rowsRaw = await prisma.playerStatistics.findMany({
       where,
       orderBy: [{ totalPoints: "desc" }, { gamesWon: "desc" }],
-      take: 50,
-      include: { user: true }
+      take,
+      include: { user: { select: { id: true, displayName: true, avatarUrl: true, accountType: true } } }
     });
-    const rows = rowsRaw.map((r, i) => ({
-      rank: i + 1,
-      userId: r.userId,
-      displayName: r.user.displayName,
-      avatarUrl: r.user.avatarUrl,
-      totalPoints: r.totalPoints,
-      gamesWon: r.gamesWon,
-      winRate: r.totalGames ? Math.round((r.gamesWon / r.totalGames) * 100) : 0
-    }));
+    const rows = rowsRaw
+      .filter((r) => r.user && r.user.accountType === "registered")
+      .map((r, i) => ({
+        rank: i + 1,
+        userId: r.userId,
+        displayName: r.user.displayName,
+        avatarUrl: r.user.avatarUrl,
+        totalPoints: r.totalPoints,
+        gamesWon: r.gamesWon,
+        totalGames: r.totalGames,
+        winRate: r.totalGames ? Math.round((r.gamesWon / r.totalGames) * 100) : 0
+      }));
     let me = null;
-    if (user) {
+    if (user && user.accountType === "registered") {
       const mine = rows.find((r) => r.userId === user.id);
       if (mine) me = mine;
       else {
         const st = await statsForUser(user.id);
-        me = st.totalGames
-          ? {
-              rank: null,
-              displayName: user.displayName,
-              totalPoints: st.totalPoints,
-              gamesWon: st.gamesWon
-            }
-          : null;
+        me = {
+          rank: null,
+          userId: user.id,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl || null,
+          totalPoints: st.totalPoints,
+          gamesWon: st.gamesWon,
+          totalGames: st.totalGames,
+          winRate: st.winRate
+        };
       }
     }
-    sendJson(res, 200, { rows, me });
+    sendJson(res, 200, { period, sort: "points", rows, me });
     return true;
   }
 

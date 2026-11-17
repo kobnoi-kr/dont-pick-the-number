@@ -5,6 +5,7 @@ import { renderOverview } from "./overview.js";
 import { renderLibrary } from "./library.js";
 import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
+import { renderRanking } from "./ranking.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
 import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js";
@@ -129,6 +130,7 @@ async function navigate(view) {
   if (state.view === "overview") await renderOverview(root, ctx);
   else if (state.view === "library") await renderLibrary(root, ctx);
   else if (state.view === "rooms") await renderRooms(root, ctx);
+  else if (state.view === "ranking") await renderRanking(root, ctx);
   else if (state.view === "friends") await renderFriends(root, ctx);
   else if (state.view === "profile") await renderProfile(root, ctx);
   else await renderOverview(root, ctx);

@@ -2211,3 +2211,107 @@ body.nav-open .sidebar .nav {
 }
 .chat-thread-form .btn { margin: 0; }
 #chatThreadMsg { margin: 6px 0 0; min-height: 1.1em; }
+
+/* Ranking */
+.rank-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.rank-tabs, .rank-sorts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rank-tab, .rank-chip {
+  appearance: none;
+  border: 1px solid var(--nv-border);
+  background: rgba(255,255,255,.03);
+  color: var(--nv-muted);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.rank-tab.on, .rank-chip.on {
+  color: var(--nv-text);
+  background: rgba(86, 119, 252, 0.16);
+  border-color: rgba(86, 119, 252, 0.4);
+}
+.rank-card { padding: 12px !important; }
+.rank-list { display: flex; flex-direction: column; gap: 6px; }
+.rank-list.compact .rank-av { width: 32px; height: 32px; }
+.rank-row {
+  display: grid;
+  grid-template-columns: 40px 36px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid transparent;
+}
+.rank-row.is-me {
+  background: rgba(86, 119, 252, 0.12);
+  border-color: rgba(86, 119, 252, 0.28);
+}
+.rank-pos {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-muted);
+  text-align: center;
+}
+.rank-av {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.1);
+}
+.rank-av.ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--nv-muted);
+}
+.rank-meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rank-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-you {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #93c5fd;
+}
+.rank-sub { font-size: 0.75rem; color: var(--nv-muted); }
+.rank-score {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.rank-score b { font-size: 1.05rem; }
+.rank-me {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--nv-border);
+}
+.rank-me-label {
+  font-size: 0.78rem;
+  color: var(--nv-muted);
+  margin-bottom: 6px;
+  font-weight: 650;
+}
+@media (max-width: 860px) {
+  .bottom-nav button { font-size: 0.62rem; padding: 0 2px; }
+}

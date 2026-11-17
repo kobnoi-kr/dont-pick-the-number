@@ -28,6 +28,16 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
       <div class="stat"><div class="label">ห้องที่สร้าง</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
       <div class="stat"><div class="label">แต้มรวม</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
     </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0">Top Weekly</h2>
+          <p class="muted tiny" style="margin:4px 0 0">อันดับแต้ม 7 วันล่าสุด (บัญชีที่ล็อกอิน)</p>
+        </div>
+        <a class="btn ghost sm" href="#ranking">ดูทั้งหมด</a>
+      </div>
+      <div id="ovTopRank" style="margin-top:12px"><div class="loading">Loading…</div></div>
+    </div>
     <div class="content-grid">
       <div class="card">
         <h2>เกมที่เล่นล่าสุด</h2>
@@ -79,6 +89,38 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
       </div>`;
     lastBox.querySelector("#ovPlayAgain").onclick = () =>
       openCreate && openCreate({ cat: lastGame.gameMode === "wheel" ? "wheel" : "secret" });
+  }
+
+  const topBox = root.querySelector("#ovTopRank");
+  if (topBox) {
+    if (guest) {
+      topBox.innerHTML = `<div class="empty">เข้าสู่ระบบเพื่อดู Ranking</div>`;
+    } else {
+      const lb = await api("/api/v1/leaderboard/weekly?sort=points&limit=5", { method: "GET" });
+      const rows = (lb.data && lb.data.rows) || [];
+      if (!lb.res.ok) {
+        topBox.innerHTML = `<div class="empty">โหลด Top ไม่ได้</div>`;
+      } else if (!rows.length) {
+        topBox.innerHTML = `<div class="empty">ยังไม่มีอันดับสัปดาห์นี้</div>`;
+      } else {
+        topBox.innerHTML = `<div class="rank-list compact">${rows
+          .map((r) => {
+            const av = r.avatarUrl
+              ? `<img class="rank-av" src="${esc(r.avatarUrl)}" alt="" width="32" height="32" referrerpolicy="no-referrer">`
+              : `<div class="rank-av ph">${esc((r.displayName || "?").slice(0, 1).toUpperCase())}</div>`;
+            return `<div class="rank-row">
+              <span class="rank-pos">#${r.rank}</span>
+              ${av}
+              <span class="rank-meta">
+                <span class="rank-name">${esc(r.displayName || "ผู้เล่น")}</span>
+                <span class="rank-sub">${r.gamesWon || 0} ชนะ · ${r.totalGames || 0} เกม</span>
+              </span>
+              <span class="rank-score"><b>${r.totalPoints || 0}</b><span class="tiny">แต้ม</span></span>
+            </div>`;
+          })
+          .join("")}</div>`;
+      }
+    }
   }
 
   const act = await api("/api/v1/dashboard/activity", { method: "GET" });
