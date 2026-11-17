@@ -42,8 +42,16 @@ const SEAT_MS = 45000;
 const ROOM_MS = 60000;
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
-const PUBLIC_PAGE = fs.existsSync(path.join(PUBLIC, "play.html")) ? "play.html" : "index.html";
-const ADMIN_PAGE = fs.existsSync(path.join(PUBLIC, "index.html")) ? "index.html" : PUBLIC_PAGE;
+const PUBLIC_PAGE = fs.existsSync(path.join(PUBLIC, "landing.html"))
+  ? "landing.html"
+  : fs.existsSync(path.join(PUBLIC, "play.html"))
+    ? "play.html"
+    : "index.html";
+const ADMIN_PAGE = fs.existsSync(path.join(PUBLIC, "admin.html"))
+  ? "admin.html"
+  : fs.existsSync(path.join(PUBLIC, "app.html"))
+    ? "app.html"
+    : PUBLIC_PAGE;
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -1567,8 +1575,8 @@ function onMessage(ws, raw) {
 }
 function isDashboardAsset(name) {
   const n = String(name || "").replace(/^\/+/, "").replace(/\\/g, "/");
-  if (n === "index.html" || n === "") return true;
-  if (n.startsWith("js/dashboard/") || n.startsWith("css/dashboard.css")) return true;
+  // Legacy admin-only shell; user app (app.html) is public.
+  if (n === "index.html") return true;
   return false;
 }
 
@@ -1618,38 +1626,27 @@ async function servePublic(req, res) {
   }
   const url = new URL(req.url || "/", "http://localhost");
   const pathname = decodeURIComponent(url.pathname);
-  if (PUBLIC_DASHBOARD && pathname === "/js/dashboard/runtime-config.js") {
+  if (pathname === "/js/dashboard/runtime-config.js") {
     writeDashboardRuntimeConfig(res);
     return;
   }
   if (pathname.startsWith("/api/")) {
     const handled = await handleAuthApi(req, res, pathname);
     if (handled) return;
-    if (PUBLIC_DASHBOARD) {
-      const dash = await handleDashboardApi(req, res, pathname);
-      if (dash) return;
-    } else if (
-      pathname.startsWith("/api/v1/dashboard") ||
-      pathname.startsWith("/api/v1/rooms") ||
-      pathname.startsWith("/api/v1/live-games") ||
-      pathname.startsWith("/api/v1/history") ||
-      pathname.startsWith("/api/v1/stats") ||
-      pathname.startsWith("/api/v1/leaderboard") ||
-      pathname.startsWith("/api/v1/settings") ||
-      pathname.startsWith("/api/v1/notifications")
-    ) {
-      // Dashboard APIs are admin-port only unless PUBLIC_DASHBOARD=1
-      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: "not_found" }));
-      return;
-    }
+    const dash = await handleDashboardApi(req, res, pathname);
+    if (dash) return;
     res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ error: "not_found" }));
     return;
   }
+  if (pathname === "/index.html") {
+    res.writeHead(302, { Location: PUBLIC_DASHBOARD ? "/admin.html" : "/app.html" });
+    res.end();
+    return;
+  }
   let name = pathname === "/" ? PUBLIC_PAGE : pathname.replace(/^\/+/, "");
   if (!PUBLIC_DASHBOARD && isDashboardAsset(name)) {
-    res.writeHead(302, { Location: "/play.html" });
+    res.writeHead(302, { Location: "/app.html" });
     res.end();
     return;
   }

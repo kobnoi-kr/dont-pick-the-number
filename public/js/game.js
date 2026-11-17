@@ -2367,7 +2367,7 @@ async function bootOnline(){
   if(saved&&$("myName")) $("myName").value=saved;
   const dashLink=document.createElement("p");
   dashLink.className="hint";
-  dashLink.innerHTML='<a href="/" style="color:inherit">← กลับ Dashboard</a>';
+  dashLink.innerHTML='<a href="/app.html" style="color:inherit">← กลับ Dashboard</a>';
   const gate=$("gate");
   if(gate) gate.appendChild(dashLink);
   $("myName").addEventListener("change",typedName);

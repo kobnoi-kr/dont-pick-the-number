@@ -4,79 +4,95 @@ function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-export async function renderOverview(root, { user, openCreate, openJoinFocus }) {
+function modeLabel(mode) {
+  return mode === "wheel" ? "วงล้อ" : "หาเลข";
+}
+
+export async function renderOverview(root, { user, openCreate, openRooms }) {
   const name = (user && (user.displayName || user.username)) || "Player";
   const guest = !user || user.accountType === "guest";
   root.innerHTML = `
     <section class="welcome">
       <div>
-        <p class="big">${guest ? "Welcome, Guest!" : "Welcome back, " + esc(name) + "!"}</p>
-        <p class="muted">${guest ? "Jump into a game and have fun." : "Ready to challenge your friends?"}</p>
+        <p class="big">${guest ? "ยินดีต้อนรับ!" : "สวัสดี, " + esc(name)}</p>
+        <p class="muted">${guest ? "เริ่มเล่นได้เลย หรือผูกบัญชีเพื่อเก็บสถิติ" : "พร้อมท้าเพื่อนอีกเกมไหม?"}</p>
       </div>
       <div class="actions">
-        <button type="button" class="btn" id="ovQuickPlay">Quick Play</button>
-        <a class="btn ghost" href="${playUrl()}">Open Game</a>
+        <button type="button" class="btn" id="ovStart">ไปที่ห้องของฉัน</button>
+        <button type="button" class="btn ghost" id="ovLibrary">คลังเกม</button>
       </div>
     </section>
-    <div class="quick-grid">
-      <button type="button" class="quick-card" id="ovCreate"><h3>Create Room</h3><p>ตั้งค่าห้อง แล้วชวนเพื่อนด้วยรหัส 6 หลัก</p></button>
-      <button type="button" class="quick-card" id="ovJoin"><h3>Join Room</h3><p>ใส่รหัสห้องเพื่อเข้าเล่นทันที</p></button>
-      <button type="button" class="quick-card" id="ovRooms"><h3>Public Rooms</h3><p>ดูห้องสาธารณะที่เปิดรับผู้เล่น</p></button>
-    </div>
     <div class="stats-row" id="ovStats">
-      <div class="stat"><div class="label">Total Games</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
-      <div class="stat"><div class="label">Wins</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
-      <div class="stat"><div class="label">Win Rate</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
-      <div class="stat"><div class="label">Points</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
+      <div class="stat"><div class="label">เกมที่เล่น</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
+      <div class="stat"><div class="label">ชั่วโมงเล่น</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
+      <div class="stat"><div class="label">ห้องที่สร้าง</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
+      <div class="stat"><div class="label">แต้มรวม</div><div class="value skeleton" style="height:28px;width:40%"></div></div>
     </div>
     <div class="content-grid">
       <div class="card">
-        <h2>Recent Activity</h2>
-        <div id="ovActivity"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+        <h2>เกมที่เล่นล่าสุด</h2>
+        <div id="ovLast"><div class="loading">Loading…</div></div>
       </div>
-      <div class="panel-right">
-        <div class="card">
-          <h3>Account</h3>
-          <p class="muted">${guest ? "Guest session — upgrade anytime." : "Registered player"}</p>
-          <p class="tiny">ID: ${esc(user && user.id)}</p>
-          <a class="btn ghost block" style="margin-top:10px" href="/account.html">Manage Account</a>
-        </div>
+      <div class="card">
+        <h2>ประวัติล่าสุด</h2>
+        <div id="ovActivity"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       </div>
     </div>
   `;
 
-  root.querySelector("#ovCreate").onclick = openCreate;
-  root.querySelector("#ovJoin").onclick = openJoinFocus;
-  root.querySelector("#ovRooms").onclick = () => location.hash = "#rooms";
-  root.querySelector("#ovQuickPlay").onclick = async () => {
-    const { res, data } = await api("/api/v1/rooms/quick-play", { method: "POST", body: "{}" });
-    if (res.ok && data && data.code) {
-      location.href = playUrl({ code: data.code });
-      return;
-    }
-    openCreate();
+  root.querySelector("#ovStart").onclick = () => {
+    if (openRooms) openRooms();
+    else location.hash = "#rooms";
+  };
+  root.querySelector("#ovLibrary").onclick = () => {
+    location.hash = "#library";
   };
 
   const summary = await api("/api/v1/dashboard/summary", { method: "GET" });
   const stats = (summary.data && summary.data.stats) || {};
-  const games = stats.totalGames || 0;
-  const wins = stats.gamesWon || 0;
-  const rate = games ? Math.round((wins / games) * 100) : 0;
+  const lastGame = summary.data && summary.data.lastGame;
   root.querySelector("#ovStats").innerHTML = `
-    <div class="stat"><div class="label">Total Games</div><div class="value">${games}</div></div>
-    <div class="stat"><div class="label">Wins</div><div class="value">${wins}</div></div>
-    <div class="stat"><div class="label">Win Rate</div><div class="value">${rate}%</div></div>
-    <div class="stat"><div class="label">Points</div><div class="value">${stats.totalPoints || 0}</div></div>
+    <div class="stat"><div class="label">เกมที่เล่น</div><div class="value">${stats.totalGames || 0}</div></div>
+    <div class="stat"><div class="label">ชั่วโมงเล่น</div><div class="value">${stats.playHours != null ? stats.playHours : Math.round(((stats.playTimeSec || 0) / 3600) * 10) / 10}</div></div>
+    <div class="stat"><div class="label">ห้องที่สร้าง</div><div class="value">${stats.roomsCreated || 0}</div></div>
+    <div class="stat"><div class="label">แต้มรวม</div><div class="value">${stats.totalPoints || 0}</div></div>
   `;
+
+  const lastBox = root.querySelector("#ovLast");
+  if (!lastGame) {
+    lastBox.innerHTML = `<div class="empty">ยังไม่มีเกมล่าสุด <button class="btn sm" id="ovCreateFirst" style="margin-top:10px">สร้างห้อง</button></div>`;
+    const b = lastBox.querySelector("#ovCreateFirst");
+    if (b) b.onclick = () => openCreate && openCreate();
+  } else {
+    lastBox.innerHTML = `
+      <div class="list">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+          <div>
+            <b>${esc(lastGame.roomName || "Room")}</b>
+            <div class="tiny">${esc(modeLabel(lastGame.gameMode))} · ${lastGame.won ? "ชนะ" : "เล่น"} · ${lastGame.points || 0} pts</div>
+          </div>
+          <span class="tiny">${lastGame.endedAt ? esc(new Date(lastGame.endedAt).toLocaleString()) : ""}</span>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button type="button" class="btn sm" id="ovPlayAgain">เล่นเกมนี้อีก</button>
+      </div>`;
+    lastBox.querySelector("#ovPlayAgain").onclick = () =>
+      openCreate && openCreate({ cat: lastGame.gameMode === "wheel" ? "wheel" : "secret" });
+  }
 
   const act = await api("/api/v1/dashboard/activity", { method: "GET" });
   const items = (act.data && act.data.items) || [];
   const box = root.querySelector("#ovActivity");
   if (!items.length) {
-    box.innerHTML = `<div class="empty">Play your first game to start tracking activity.</div>`;
+    box.innerHTML = `<div class="empty">ประวัติจะโชว์หลังจบเกมแรก</div>`;
   } else {
-    box.innerHTML = `<ul class="list">${items.map((it) => `
+    box.innerHTML = `<ul class="list">${items
+      .map(
+        (it) => `
       <li><div class="grow"><b>${esc(it.title)}</b><div class="tiny">${esc(it.subtitle || "")}</div></div>
-      <span class="tiny">${esc(it.when || "")}</span></li>`).join("")}</ul>`;
+      <span class="tiny">${esc(it.when || "")}</span></li>`
+      )
+      .join("")}</ul>`;
   }
 }

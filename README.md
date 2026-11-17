@@ -1,22 +1,20 @@
-# DON’T PICK THE NUMBER (NUMVERSE)
+# NUMVERSE
 
-เกมออนไลน์ทายเลข โฮสต์สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข 6 หลัก มีล็อบบี้สาธารณะและห้องส่วนตัว
+แพลตฟอร์มเล่นเกมด้วยรหัสห้อง 6 หลัก — ตอนนี้มี **หาเลข** และ **วงล้อ**
 
 ## โครงสร้างโฟลเดอร์
 
 ```
 public/
-  index.html           # User Dashboard
-  play.html            # Game engine UI
-  css/dashboard.css    # Dashboard theme
-  css/style.css        # Game styles
-  js/dashboard/        # Dashboard modules
-  js/game.js           # Game client
-  images/ · audio/
+  landing.html         # หน้าแรก (Logo / Profile / Start)
+  app.html             # User Dashboard
+  admin.html           # Admin stub (Phase 2)
+  play.html            # Game runtime
+  css/ · js/ · images/ · audio/
 server.js              # HTTP + WebSocket game server
 src/auth/              # Auth / friends
 src/dashboard/         # Dashboard REST + persist
-prisma/                # schema + migrations (games history/stats)
+prisma/                # schema + migrations
 scripts/
 ```
 
@@ -26,8 +24,8 @@ scripts/
 
 1. `npm install`
 2. `npm start`
-3. เปิด http://localhost:8787 → **User Dashboard**
-4. เล่นเกมที่ `/play.html` (สร้าง/เข้าห้องจาก Dashboard หรือหน้าเกม)
+3. เปิด http://localhost:8787 → **Landing** → Start เข้า User Dashboard
+4. เล่นเกมที่ `/play.html` (สร้าง/เข้าห้องจาก My Rooms หรือ Library)
 
 ### เปิดสาธารณะ แต่เข้าได้แค่โดเมน
 
@@ -46,24 +44,15 @@ ALLOWED_HOSTS=numverse.click,www.numverse.click
 
 | ช่องทาง | ที่อยู่ | ใครเข้าได้ |
 |---|---|---|
-| เกมสาธารณะ | โดเมน เช่น `https://numverse.click/` → `/play.html` | ผู้เล่นทั่วไป (เข้าผ่าน IP ถูกบล็อก) |
-| Admin Dashboard | `http://127.0.0.1:9100/` เท่านั้น | แอดมิน (bind localhost) |
-
-เข้า Admin จากเครื่องอื่นผ่าน SSH tunnel:
-
-```bash
-ssh -L 9100:127.0.0.1:9100 user@your-server
-```
-
-แล้วเปิด http://127.0.0.1:9100/ บนเครื่องคุณ
+| Landing + User Dashboard | `https://numverse.click/` → `/app.html` | ผู้เล่นทั่วไป |
+| Game runtime | `/play.html` | ผู้เล่นในห้อง |
+| Admin Dashboard | `/admin.html` (admin/super_admin) หรือ `http://127.0.0.1:9100/` บนเครื่องเซิร์ฟเวอร์ | แอดมิน |
 
 ให้สิทธิ์แอดมิน:
 
 ```bash
-node scripts/make-admin.js <username>
+node scripts/make-admin.js <username|email>
 ```
-
-Dashboard API ต้องเป็น role `admin` / `super_admin` / `moderator`
 
 ## Auth (Guest-First + OAuth + Email)
 
@@ -80,8 +69,11 @@ npm start
 
 หน้าเว็บ:
 
-- `/` ล็อบบี้เกม (สร้าง Guest อัตโนมัติ)
+- `/` Landing
+- `/app.html` User Dashboard
+- `/play.html` เกม
 - `/login.html` `/register.html` `/account.html`
+- `/admin.html` Admin stub
 - `/reset-password.html` `/verify-email.html`
 
 API หลัก:
@@ -95,11 +87,11 @@ API หลัก:
 | POST | `/api/v1/auth/login` | Email login (ต้องยืนยันอีเมลแล้ว) |
 | GET | `/api/v1/auth/google` | Google OAuth |
 | GET | `/api/v1/auth/discord` | Discord OAuth |
-| GET | `/api/v1/auth/link/google` | เชื่อม Google กับบัญชีปัจจุบัน |
-| GET | `/api/v1/auth/link/discord` | เชื่อม Discord กับบัญชีปัจจุบัน |
+| GET | `/api/v1/games/catalog` | คลังเกม |
+| GET | `/api/v1/dashboard/summary` | Overview stats |
 
 Guest Upgrade รักษา User ID เดิม และ rotate session หลังอัปเกรด
 
 ### Render
 
-`render.yaml` มี Postgres + migrate/seed ตอน build — ตั้ง `APP_BASE_URL` และ OAuth redirect URI ให้ตรงโดเมนจริง
+`render.yaml` ตั้ง `EMBEDDED_PG=0`, `PUBLIC_DASHBOARD=1`, `DASHBOARD_ADMIN_ONLY=0` — ตั้ง `DATABASE_URL` และ OAuth ใน Render dashboard ให้ตรงโดเมนจริง

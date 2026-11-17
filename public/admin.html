@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin — NUMVERSE</title>
+<meta name="application-name" content="NUMVERSE">
+<link rel="icon" href="/images/numverse.png" type="image/png">
+<link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+<div class="admin-stub">
+  <div class="card admin-stub-card">
+    <div class="sidebar-brand" style="padding:0 0 12px">
+      <img src="/images/numverse.png" alt="" width="42" height="42">
+      <span>NUMVERSE</span>
+      <span class="role-badge admin">ADMIN</span>
+    </div>
+    <h1>Admin Dashboard</h1>
+    <p class="muted" id="adminMsg">กำลังตรวจสอบสิทธิ์…</p>
+    <p class="tiny">Phase 2 จะมี Overview, User/Game/Room Management, Live Monitor, System และ Permissions</p>
+    <div class="actions" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" href="/app.html">กลับ User Dashboard</a>
+      <a class="btn ghost" href="/">หน้าแรก</a>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { api } from "/js/dashboard/api.js";
+const msg = document.getElementById("adminMsg");
+const { res, data } = await api("/api/v1/auth/me", { method: "GET" });
+const roles = (data && data.user && data.user.roles) || [];
+const ok = roles.includes("admin") || roles.includes("super_admin");
+if (!res.ok || !ok) {
+  msg.textContent = "ต้องเป็น admin หรือ super admin";
+  setTimeout(() => { location.href = "/app.html"; }, 1200);
+} else {
+  msg.textContent = "เข้าสู่โหมดแอดมินได้ — เครื่องมือจัดการเต็มรูปแบบกำลังพัฒนา (Phase 2)";
+}
+</script>
+</body>
+</html>

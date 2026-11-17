@@ -26,7 +26,7 @@ services:
       - key: PUBLIC_DASHBOARD
         value: "1"
       - key: DASHBOARD_ADMIN_ONLY
-        value: "1"
+        value: "0"
       - key: SUPER_ADMIN_EMAILS
         value: kimgamerchannal@gmail.com
       - key: AUTH_SECRET

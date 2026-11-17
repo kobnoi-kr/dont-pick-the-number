@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NUMVERSE</title>
+<meta name="application-name" content="NUMVERSE">
+<link rel="icon" href="/images/numverse.png" type="image/png">
+<link rel="apple-touch-icon" href="/images/numverse.png">
+<link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="/" class="brand-link">
+        <img src="/images/numverse.png" alt="" width="42" height="42">
+        <span>NUMVERSE</span>
+      </a>
+      <span class="role-badge" id="roleBadge">USER</span>
+    </div>
+    <nav class="nav" id="sideNav">
+      <div class="nav-section">MAIN MENU</div>
+      <button type="button" data-view="overview" class="active"><span class="ico">◈</span> Overview</button>
+      <button type="button" data-view="library"><span class="ico">▣</span> Game Library</button>
+      <button type="button" data-view="rooms"><span class="ico">⌂</span> My Rooms</button>
+      <div class="nav-section">ACCOUNT</div>
+      <button type="button" data-view="profile"><span class="ico">☺</span> Profile &amp; Settings</button>
+      <a class="admin-nav hidden" id="adminNavBtn" href="/admin.html"><span class="ico">🛡</span> Admin Dashboard</a>
+    </nav>
+    <div class="sidebar-user">
+      <div id="sideAvatar" class="avatar-fallback">?</div>
+      <div class="meta">
+        <div class="name" id="sideName">Loading…</div>
+        <div class="status" id="sideStatus">—</div>
+      </div>
+      <button type="button" class="logout" id="sideLogout" title="Logout">⎋</button>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <button type="button" class="icon-btn menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+    <h1 id="pageTitle">Overview</h1>
+    <a class="btn ghost sm home-link" href="/">หน้าแรก</a>
+    <button type="button" class="icon-btn" id="notifBtn" aria-label="Notifications">🔔<span class="badge-dot hidden" id="notifDot"></span></button>
+    <button type="button" class="icon-btn" id="userMenuBtn" aria-label="Account">👤</button>
+  </header>
+
+  <main class="main">
+    <div id="guestBanner" class="guest-banner hidden">
+      <div class="grow">กำลังเล่นแบบ Guest — ผูกบัญชีเพื่อเก็บความคืบหน้า</div>
+      <a class="btn sm" href="/account.html">ผูกบัญชี</a>
+      <button type="button" class="btn ghost sm" id="guestContinue">ดำเนินการต่อ</button>
+    </div>
+    <div id="viewRoot"></div>
+  </main>
+</div>
+
+<nav class="bottom-nav" id="bottomNav" aria-label="Mobile navigation">
+  <button type="button" data-view="overview" class="active">Overview</button>
+  <button type="button" data-view="library">Games</button>
+  <button type="button" data-view="rooms">Rooms</button>
+  <button type="button" data-view="profile">Me</button>
+</nav>
+
+<div id="backdrop" class="backdrop hidden"></div>
+
+<div id="notifPanel" class="card notif-panel hidden">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+    <h3 style="margin:0">Notifications</h3>
+    <button type="button" class="btn ghost sm" id="notifMarkAll">Mark all read</button>
+  </div>
+  <ul class="list" id="notifList"></ul>
+  <p class="empty tiny" id="notifEmpty">You're all caught up!</p>
+</div>
+
+<div id="createModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h3>สร้างห้อง</h3>
+    <p class="muted">ตั้งค่าห้อง แล้วเข้าล็อบบี้ทันที</p>
+    <div class="form-grid">
+      <label>ชื่อห้อง<input id="crName" maxlength="32" placeholder="ห้องของฉัน"></label>
+      <label>การมองเห็น
+        <select id="crVis">
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+        </select>
+      </label>
+      <label>เกม
+        <select id="crCat">
+          <option value="secret">หาเลข</option>
+          <option value="wheel">วงล้อ</option>
+        </select>
+      </label>
+      <label>ช่วงตัวเลข
+        <select id="crRange">
+          <option value="99">1–99</option>
+          <option value="999">1–999</option>
+          <option value="9999">1–9999</option>
+        </select>
+      </label>
+      <label>แต้มชนะ<input id="crWin" type="number" min="1" max="99" value="3"></label>
+      <label>เวลาต่อเทิร์น (วินาที, 0=ปิด)<input id="crTurn" type="number" min="0" max="120" value="0"></label>
+    </div>
+    <p class="msg" id="crMsg"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="crCancel">ยกเลิก</button>
+      <button type="button" class="btn" id="crSubmit">สร้างห้อง</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/dashboard/runtime-config.js"></script>
+<script type="module" src="/js/dashboard/app.js"></script>
+</body>
+</html>

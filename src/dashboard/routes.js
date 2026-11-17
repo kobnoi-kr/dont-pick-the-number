@@ -4,10 +4,38 @@ const { authEnabled, getPrisma } = require("../db");
 const { sendJson, readJsonBody, clientIp } = require("../auth/http");
 const { requireAuth, requireAdmin, resolveAuth, isAdminUser } = require("../auth/middleware");
 
-const DASHBOARD_ADMIN_ONLY = process.env.DASHBOARD_ADMIN_ONLY !== "0";
+/** Opt-in only — user dashboard APIs are public to signed-in/guest sessions by default. */
+const DASHBOARD_ADMIN_ONLY = process.env.DASHBOARD_ADMIN_ONLY === "1";
 const { rateLimit } = require("../auth/rate-limit");
 const { getGameApi } = require("./bridge");
 const { listAcceptedFriendIds } = require("../auth/friends");
+
+const GAME_CATALOG = [
+  {
+    id: "secret",
+    slug: "secret",
+    name: "หาเลข",
+    nameEn: "Don't Get The Secret",
+    category: "numbers",
+    categoryLabel: "ตัวเลข",
+    maxPlayers: 12,
+    description: "ห้ามโดนเลขลับ — ทายช่วงและหลบเลขที่ถูกสุ่มไว้",
+    howTo: "ตั้งช่วงตัวเลข แล้วผลัดกันเลือกเลข ใครโดนเลขลับจะแพ้รอบนั้น สะสมแต้มจนถึงเป้าชนะ",
+    popular: true
+  },
+  {
+    id: "wheel",
+    slug: "wheel",
+    name: "วงล้อ",
+    nameEn: "Number Wheel",
+    category: "wheel",
+    categoryLabel: "วงล้อ",
+    maxPlayers: 12,
+    description: "หมุนวงล้อสุ่มเลข ใครโดนเลขของตัวเองจะออกจากเกม",
+    howTo: "ผู้เล่นได้รับเลขของตัวเอง หมุนวงล้อทีละครั้ง ถ้าวงล้อชี้เลขของคุณจะตกรอบ คนสุดท้ายที่เหลือชนะ",
+    popular: true
+  }
+];
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -77,6 +105,15 @@ async function handleDashboardApi(req, res, pathname) {
     if (!admin) return true;
   }
 
+  if (pathname === "/api/v1/games/catalog") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    sendJson(res, 200, { games: GAME_CATALOG });
+    return true;
+  }
+
   if (pathname === "/api/v1/dashboard" || pathname === "/api/v1/dashboard/summary") {
     if (method(req) !== "GET") {
       sendJson(res, 405, { error: "method_not_allowed" });
@@ -84,7 +121,44 @@ async function handleDashboardApi(req, res, pathname) {
     }
     const user = await optionalUser(req);
     const stats = user ? await statsForUser(user.id) : emptyStats();
-    sendJson(res, 200, { user: user ? { id: user.id, displayName: user.displayName, accountType: user.accountType } : null, stats });
+    let roomsCreated = 0;
+    let lastGame = null;
+    if (user && authEnabled()) {
+      const prisma = await getPrisma();
+      const hosted = await prisma.game.findMany({
+        where: { metadata: { path: ["hostUserId"], equals: user.id } },
+        select: { id: true },
+        take: 500
+      }).catch(() => []);
+      roomsCreated = hosted.length;
+      const latest = await prisma.gamePlayer.findFirst({
+        where: { userId: user.id },
+        orderBy: { game: { endedAt: "desc" } },
+        include: { game: true }
+      }).catch(() => null);
+      if (latest && latest.game) {
+        lastGame = {
+          roomName: latest.game.roomName,
+          gameMode: latest.game.gameMode,
+          endedAt: latest.game.endedAt,
+          won: latest.won,
+          points: latest.points
+        };
+      }
+    }
+    const playHours = Math.round(((stats.playTimeSec || 0) / 3600) * 10) / 10;
+    sendJson(res, 200, {
+      user: user
+        ? {
+            id: user.id,
+            displayName: user.displayName,
+            accountType: user.accountType,
+            roles: (user.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean)
+          }
+        : null,
+      stats: Object.assign({}, stats, { roomsCreated, playHours }),
+      lastGame
+    });
     return true;
   }
 
@@ -108,10 +182,48 @@ async function handleDashboardApi(req, res, pathname) {
     sendJson(res, 200, {
       items: rows.map((r) => ({
         title: r.game.roomName,
-        subtitle: (r.won ? "Win" : "Played") + " · rank #" + r.rank + " · " + r.points + " pts",
+        subtitle:
+          (r.game.gameMode === "wheel" ? "วงล้อ" : "หาเลข") +
+          " · " +
+          (r.won ? "ชนะ" : "เล่น") +
+          " · #" +
+          r.rank +
+          " · " +
+          r.points +
+          " pts",
+        gameMode: r.game.gameMode,
         when: r.game.endedAt ? new Date(r.game.endedAt).toLocaleString() : ""
       }))
     });
+    return true;
+  }
+
+  if (pathname === "/api/v1/rooms/mine") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const user = await optionalUser(req);
+    const live = (game ? game.listLobbyRooms() : []).filter((r) => r.joinable || r.phase !== "over");
+    let created = [];
+    if (user && authEnabled()) {
+      const prisma = await getPrisma();
+      const rows = await prisma.game.findMany({
+        where: { metadata: { path: ["hostUserId"], equals: user.id } },
+        orderBy: { endedAt: "desc" },
+        take: 20
+      }).catch(() => []);
+      created = rows.map((g) => ({
+        id: g.id,
+        code: g.roomCode,
+        title: g.roomName,
+        gameMode: g.gameMode,
+        visibility: g.visibility,
+        playerCount: g.playerCount,
+        endedAt: g.endedAt
+      }));
+    }
+    sendJson(res, 200, { live, created });
     return true;
   }
 

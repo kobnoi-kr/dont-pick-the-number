@@ -40,6 +40,8 @@ async function persistFinishedGame(room, scoreOf) {
     const startedAt = room.startedAt ? new Date(room.startedAt) : new Date(room.created || Date.now());
     const endedAt = new Date();
     const durationSec = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+    const hostPlayer = (room.players || []).find((p) => p.id === room.hostId);
+    const hostUserId = hostPlayer && uuidLike(hostPlayer.id) ? hostPlayer.id : null;
 
     const game = await prisma.game.create({
       data: {
@@ -54,7 +56,9 @@ async function persistFinishedGame(room, scoreOf) {
         durationSec,
         metadata: {
           winTarget: room.winTarget,
-          overTitle: room.over && room.over.title
+          overTitle: room.over && room.over.title,
+          hostUserId,
+          hostName: hostPlayer ? hostPlayer.name : null
         },
         players: {
           create: ranked.map((r, i) => ({

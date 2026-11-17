@@ -79,7 +79,7 @@
       <button class="btn ghost" id="logoutAll" type="button">Logout ทุกอุปกรณ์</button>
       <button class="btn ghost danger" id="deleteAccount" type="button">ลบบัญชี</button>
       <p class="msg" id="msg"></p>
-      <p class="links"><a href="/">กลับล็อบบี้</a></p>
+      <p class="links"><a href="/app.html">กลับ Dashboard</a> · <a href="/">หน้าแรก</a></p>
     </div>
 
     <aside class="panel friends-side" id="friendsSide">
@@ -308,17 +308,8 @@ async function refresh(){
   if(isAdmin){
     const btn=$("adminDashBtn");
     const hint=$("adminBarHint");
-    const onAdminPort=location.port==="9100"||document.body.dataset.adminDashboard==="1";
-    if(onAdminPort){
-      btn.href="/";
-      if(hint) hint.textContent="เปิดศูนย์ควบคุมแอดมิน";
-    }else if(location.hostname==="127.0.0.1"||location.hostname==="localhost"){
-      btn.href="http://127.0.0.1:9100/";
-      if(hint) hint.textContent="เปิดที่พอร์ตแอดมินเครื่องนี้";
-    }else{
-      btn.href="/index.html";
-      if(hint) hint.textContent="ศูนย์ควบคุมแอดมิน";
-    }
+    btn.href="/admin.html";
+    if(hint) hint.textContent="ศูนย์ควบคุมแอดมิน";
   }
   show($("guestPrompt"), user.accountType==="guest");
   show($("profileForm"), true);
