@@ -3,9 +3,46 @@
 :root[data-theme="dark"]{--bg:#0f1524;--card:#192136;--text:#e8edf8;--muted:#98a4bf;--line:#2b3654;--chip:#222c47;--dead:#141b2e;--blue:#3b82f6;--blue-h:#60a5fa;--bad:#f87171;--mark:#fb923c;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Thai",Tahoma,sans-serif;display:flex;align-items:safe center;justify-content:center;padding:16px}
+body.lobby-mode{
+  background-color:#06101f;
+  background-image:url(/images/Background.png);
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  background-attachment:fixed;
+}
 .stage{display:flex;align-items:flex-start;justify-content:center;gap:16px;width:min(980px,100%)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px;width:100%;max-width:560px;flex:1 1 520px;box-shadow:0 8px 30px rgba(30,50,100,.08)}
 .side{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px 18px 18px;width:100%;max-width:340px;flex:0 0 340px;box-shadow:0 8px 30px rgba(30,50,100,.08)}
+body.lobby-mode main.card.lobby-card{
+  background:rgba(10,16,30,.72);
+  border-color:rgba(96,165,250,.28);
+  box-shadow:0 16px 48px rgba(0,0,0,.35),0 0 0 1px rgba(59,130,246,.12);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  color:#e8edf8;
+}
+body.lobby-mode .lobby-slot,
+body.lobby-mode .lobby-code-card,
+body.lobby-mode .lobby-actions-card{
+  background:rgba(18,28,48,.78);
+  border-color:rgba(96,165,250,.22);
+}
+body.lobby-mode .sub,
+body.lobby-mode .lobby-count,
+body.lobby-mode .lobby-rules,
+body.lobby-mode .lobby-slot-status,
+body.lobby-mode .lobby-code-label{color:#9eb0d0}
+body.lobby-mode .lobby-room-title,
+body.lobby-mode .lobby-slot-name,
+body.lobby-mode .lobby-status,
+body.lobby-mode .lobby-code{color:#e8edf8}
+body.lobby-mode .gear-btn,
+body.lobby-mode .icon-chip{
+  background:rgba(18,28,48,.85);
+  border-color:rgba(96,165,250,.28);
+  color:#e8edf8;
+}
 h1{margin:0 0 6px;font-size:1.7rem;text-align:center;letter-spacing:.5px}
 h2.side-title{margin:0;font-size:1.15rem;text-align:center}
 .brand{display:flex;justify-content:center;margin:0 0 10px}
@@ -46,6 +83,18 @@ h2.side-title{margin:0;font-size:1.15rem;text-align:center}
 .stage.lobby-stage{width:min(1100px,100%);align-items:stretch}
 main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .lobby-screen{display:flex;flex-direction:column;gap:16px}
+.lobby-brand{
+  display:flex;align-items:center;gap:12px;margin:0 0 2px;
+}
+.lobby-brand-mark{
+  width:56px;height:56px;object-fit:contain;border-radius:14px;
+  background:rgba(6,12,24,.55);
+  box-shadow:0 0 0 1px rgba(96,165,250,.35),0 0 22px rgba(59,130,246,.28);
+}
+.lobby-brand-name{
+  font-weight:800;letter-spacing:.08em;font-size:1.2rem;color:#e8edf8;
+  text-shadow:0 0 18px rgba(96,165,250,.35);
+}
 .lobby-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .lobby-room-title{margin:0;font-size:1.55rem;font-weight:800}
 .lobby-meta-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
