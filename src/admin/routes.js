@@ -324,7 +324,8 @@ async function handleAdminApi(req, res, pathname) {
       const wantsUsername = Object.prototype.hasOwnProperty.call(body, "username");
       const wantsDisplayName = Object.prototype.hasOwnProperty.call(body, "displayName");
       const wantsResetExp = body.resetExp === true || body.resetExp === "true" || body.resetExp === 1;
-      if (!wantsStatus && !wantsUsername && !wantsDisplayName && !wantsResetExp) {
+      const wantsAddExp = Object.prototype.hasOwnProperty.call(body, "addExp");
+      if (!wantsStatus && !wantsUsername && !wantsDisplayName && !wantsResetExp && !wantsAddExp) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
@@ -338,8 +339,8 @@ async function handleAdminApi(req, res, pathname) {
         authAccounts: { select: { provider: true, providerEmail: true } }
       };
 
-      // —— Reset EXP / Level ——
-      if (wantsResetExp && !wantsStatus && !wantsUsername && !wantsDisplayName) {
+      // —— Add / Reset EXP ——
+      if ((wantsResetExp || wantsAddExp) && !wantsStatus && !wantsUsername && !wantsDisplayName) {
         const authAdmin = await requireAdmin(req, res);
         if (!authAdmin) return true;
         const { userHasPermission } = require("../auth/middleware");
@@ -366,6 +367,75 @@ async function handleAdminApi(req, res, pathname) {
           sendJson(res, 403, { error: "cannot_modify_super_admin" });
           return true;
         }
+
+        if (wantsAddExp) {
+          const { adminAddExp } = require("../dashboard/levels");
+          let result;
+          try {
+            result = await adminAddExp(prisma, userId, body.addExp);
+          } catch (err) {
+            if (err && err.code === "invalid_amount") {
+              sendJson(res, 400, { error: "invalid_amount" });
+              return true;
+            }
+            throw err;
+          }
+          if (!result) {
+            sendJson(res, 400, { error: "add_exp_failed" });
+            return true;
+          }
+          const gain = result.gain;
+          const leveled = result.after.level > result.before.level;
+          const title = "ได้รับ EXP จากระบบ";
+          const bodyText = leveled
+            ? `ระบบมอบ +${gain} EXP ให้คุณ · ขึ้นเลเวล ${result.after.level}「${result.after.title}」แล้ว`
+            : `ระบบมอบ +${gain} EXP ให้คุณ · ตอนนี้มี ${result.exp} EXP (Level ${result.after.level})`;
+          await prisma.notification.create({
+            data: {
+              userId,
+              type: "system_grant",
+              title,
+              body: bodyText,
+              payload: {
+                kind: "system",
+                fullBody:
+                  bodyText +
+                  "\n\nดูความคืบหน้าได้ที่เมนู Level" +
+                  (leveled ? " และสวมยศใหม่ได้ที่เมนู ตกแต่ง" : ""),
+                gain,
+                exp: result.exp,
+                level: result.after.level,
+                href: "/app#level"
+              }
+            }
+          });
+          const gameApi = getGameApi();
+          if (gameApi && typeof gameApi.notifyUser === "function") {
+            try {
+              gameApi.notifyUser(userId, { type: "system_grant" });
+            } catch {
+              /* ignore */
+            }
+          }
+          await writeAdminLog(prisma, {
+            adminId: auth.user.id,
+            action: "user.add_exp",
+            targetId: userId,
+            metadata: {
+              gain,
+              before: { exp: result.before.exp, level: result.before.level },
+              after: { exp: result.exp, level: result.after.level }
+            },
+            ipAddress: ip
+          });
+          const updated = await prisma.user.findUnique({
+            where: { id: userId },
+            include: userInclude
+          });
+          sendJson(res, 200, { user: serializeUser(updated), gain, leveled });
+          return true;
+        }
+
         const updated = await prisma.user.update({
           where: { id: userId },
           data: { exp: 0, level: 1 },

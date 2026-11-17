@@ -138,20 +138,19 @@ function levelFromExp(config, totalExp) {
   };
 }
 
-async function awardExp(prisma, userId, { won } = {}) {
-  if (!prisma || !userId) return null;
+async function applyExpGain(prisma, userId, gain, { notifyLevelUp = true } = {}) {
+  const amount = Math.floor(Number(gain) || 0);
+  if (!prisma || !userId || amount === 0) return null;
   const config = await loadLevelConfig(prisma);
-  const gain = (won ? config.expWin : 0) + config.expPlay;
-  if (gain <= 0) return null;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, exp: true, level: true, accountType: true, status: true }
   });
-  if (!user || user.accountType !== "registered" || user.status !== "active") return null;
+  if (!user || user.accountType !== "registered" || user.status === "deleted") return null;
 
   const before = levelFromExp(config, user.exp || 0);
-  const nextExp = (user.exp || 0) + gain;
+  const nextExp = Math.max(0, (user.exp || 0) + amount);
   const after = levelFromExp(config, nextExp);
 
   await prisma.user.update({
@@ -167,7 +166,7 @@ async function awardExp(prisma, userId, { won } = {}) {
     /* ignore */
   }
 
-  if (after.level > before.level) {
+  if (notifyLevelUp && after.level > before.level) {
     await prisma.notification
       .create({
         data: {
@@ -187,7 +186,26 @@ async function awardExp(prisma, userId, { won } = {}) {
       .catch(() => {});
   }
 
-  return { gain, before, after, exp: nextExp };
+  return { gain: amount, before, after, exp: nextExp };
+}
+
+async function awardExp(prisma, userId, { won } = {}) {
+  if (!prisma || !userId) return null;
+  const config = await loadLevelConfig(prisma);
+  const gain = (won ? config.expWin : 0) + config.expPlay;
+  if (gain <= 0) return null;
+  return applyExpGain(prisma, userId, gain);
+}
+
+/** Admin/system grant — returns result for notification fan-out. */
+async function adminAddExp(prisma, userId, amount) {
+  const gain = Math.floor(Number(amount) || 0);
+  if (gain < 1 || gain > 1_000_000) {
+    const err = new Error("invalid_amount");
+    err.code = "invalid_amount";
+    throw err;
+  }
+  return applyExpGain(prisma, userId, gain, { notifyLevelUp: true });
 }
 
 function progressPayload(user, config) {
@@ -314,6 +332,8 @@ module.exports = {
   ensureLevelConfig,
   levelFromExp,
   awardExp,
+  applyExpGain,
+  adminAddExp,
   progressPayload,
   handleLevelsApi,
   handleAdminLevelsApi

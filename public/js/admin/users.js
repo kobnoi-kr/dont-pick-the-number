@@ -145,8 +145,14 @@ export async function renderUsers(root, { user }) {
         canResetExp
           ? `<div class="user-card-section">
         <h3>Level / EXP</h3>
-        <p class="tiny muted" style="margin:0 0 10px">ลบ EXP แล้วเลเวลจะกลับไป 1</p>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <p class="tiny muted" style="margin:0 0 10px">Level ${Number(u.level) || 1} · ${Number(u.exp) || 0} EXP</p>
+        <div style="display:grid;grid-template-columns:minmax(120px,1fr) auto;gap:8px;align-items:end;max-width:320px">
+          <label class="tiny">เพิ่ม EXP
+            <input class="input" id="uAddExp" type="number" min="1" max="1000000" value="100" />
+          </label>
+          <button type="button" class="btn sm" id="uAddExpBtn">Add EXP</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
           <button type="button" class="btn ghost sm danger-outline" id="uResetExp">ลบ EXP</button>
           <span class="tiny" id="uExpMsg"></span>
         </div>
@@ -212,6 +218,41 @@ export async function renderUsers(root, { user }) {
       };
     });
 
+    const addExpBtn = panel.querySelector("#uAddExpBtn");
+    if (addExpBtn) {
+      addExpBtn.onclick = async () => {
+        const msg = panel.querySelector("#uExpMsg");
+        const amount = Math.floor(Number(panel.querySelector("#uAddExp").value) || 0);
+        if (amount < 1) {
+          if (msg) msg.textContent = "ใส่จำนวน EXP อย่างน้อย 1";
+          return;
+        }
+        if (msg) msg.textContent = "กำลังเพิ่ม…";
+        addExpBtn.disabled = true;
+        const r = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ addExp: amount })
+        });
+        addExpBtn.disabled = false;
+        if (!r.res.ok) {
+          const err = (r.data && r.data.error) || "";
+          if (msg) {
+            msg.textContent =
+              err === "cannot_modify_super_admin"
+                ? "แก้ super_admin ไม่ได้"
+                : err === "invalid_amount"
+                  ? "จำนวน EXP ไม่ถูกต้อง"
+                  : "เพิ่มไม่สำเร็จ";
+          }
+          return;
+        }
+        if (msg) {
+          msg.textContent = r.data && r.data.leveled ? `+${amount} EXP · ขึ้นเลเวลแล้ว` : `+${amount} EXP แล้ว`;
+        }
+        await openDetail(id);
+        await load();
+      };
+    }
     const resetExp = panel.querySelector("#uResetExp");
     if (resetExp) {
       resetExp.onclick = async () => {

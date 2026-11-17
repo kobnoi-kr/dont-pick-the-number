@@ -39,7 +39,14 @@ function catOf(n) {
   if (type === "room_invitation") return "invite";
   if (type === "game_finished") return "game";
   if (type === "friend_request" || type === "friend") return "friend";
-  if (type === "admin_reply" || type === "ranking_reward" || type === "level_up") return "other";
+  if (
+    type === "admin_reply" ||
+    type === "ranking_reward" ||
+    type === "level_up" ||
+    type === "system_grant"
+  ) {
+    return "other";
+  }
   return "other";
 }
 
@@ -47,6 +54,7 @@ function notifMeta(n) {
   const type = String(n.type || "");
   const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
   if (type === "admin_reply") return { label: "แอดมินตอบ", cls: "notif-admin", icon: "A", detail: true };
+  if (type === "system_grant") return { label: "จากระบบ", cls: "notif-admin", icon: "S", detail: true };
   if (type === "ranking_reward") return { label: "รางวัล", cls: "notif-admin notif-reward", icon: "★", detail: true };
   if (type === "level_up") return { label: "Level up", cls: "notif-admin notif-reward", icon: "↑", detail: true };
   if (type === "announcement") {
@@ -234,7 +242,14 @@ function renderList() {
       const id = li.getAttribute("data-id");
       const row = cacheItems.find((n) => n.id === id);
       const meta = row ? notifMeta(row) : null;
-      if (row && meta && (meta.detail || String(row.type) === "admin_reply" || String(row.type) === "ranking_reward")) {
+      if (
+        row &&
+        meta &&
+        (meta.detail ||
+          String(row.type) === "admin_reply" ||
+          String(row.type) === "ranking_reward" ||
+          String(row.type) === "system_grant")
+      ) {
         openNotifDetail(row, meta);
       }
       await api("/api/v1/notifications/" + id, {
@@ -313,10 +328,10 @@ function paintNotifSoundToggle() {
   btn.innerHTML = `<i class="fi fi-rr-bell" aria-hidden="true"></i>`;
 }
 
-/** Live WS: play ping for admin-style messages (admin reply + ranking rewards). */
+/** Live WS: play ping for admin-style messages. */
 export function onNotificationPush(msg) {
   const type = msg ? String(msg.type || "") : "";
-  if (type === "admin_reply" || type === "ranking_reward") {
+  if (type === "admin_reply" || type === "ranking_reward" || type === "system_grant") {
     playAdminNotifPing();
   }
 }
