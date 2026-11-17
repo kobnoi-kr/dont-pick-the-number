@@ -914,7 +914,6 @@ function renderLobbyGrid(){
     const connected=!meta||meta.connected||meta.bot;
     const ready=ranked||(meta&&meta.connected);
     const champ=isChampion(name);
-    const gender=meta&&meta.gender?String(meta.gender):"";
     slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline")+(champ?" champion":"");
     const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
     av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
@@ -937,27 +936,6 @@ function renderLobbyGrid(){
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
     nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
-    const pills=document.createElement("div");
-    pills.className="nv-pills lobby-slot-pills";
-    const genderLabel=gender==="male"?"ชาย":gender==="female"?"หญิง":gender==="lgbtq"?"LGBTQ+":"—";
-    const ageLabel=meta&&meta.age!=null&&meta.age!==""?String(meta.age):"—";
-    const genderPill=document.createElement("span");
-    genderPill.className="nv-pill gender"+(gender?" gender-"+gender:"");
-    genderPill.textContent=genderLabel;
-    const agePill=document.createElement("span");
-    agePill.className="nv-pill age";
-    agePill.textContent=ageLabel;
-    const titlePill=document.createElement("span");
-    titlePill.className="nv-pill title"+(meta&&meta.titleClass?" "+meta.titleClass:"");
-    titlePill.textContent=(meta&&meta.title)||"—";
-    pills.append(genderPill,agePill,titlePill);
-    const adminLabel=adminRoleLabel(meta&&meta.roles);
-    if(adminLabel){
-      const adminPill=document.createElement("span");
-      adminPill.className="nv-pill admin";
-      adminPill.textContent=adminLabel;
-      pills.appendChild(adminPill);
-    }
     const acts=document.createElement("div");
     acts.className="lobby-slot-acts";
     const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
@@ -1024,7 +1002,7 @@ function renderLobbyGrid(){
       nm.addEventListener("click", openCard);
       avWrap.title="ดูโปรไฟล์";
     }
-    slot.append(avWrap,nm,pills,status,acts);
+    slot.append(avWrap,nm,status,acts);
     grid.appendChild(slot);
   }
 }
