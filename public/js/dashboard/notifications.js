@@ -39,7 +39,7 @@ function catOf(n) {
   if (type === "room_invitation") return "invite";
   if (type === "game_finished") return "game";
   if (type === "friend_request" || type === "friend") return "friend";
-  if (type === "admin_reply") return "other";
+  if (type === "admin_reply" || type === "ranking_reward") return "other";
   return "other";
 }
 
@@ -47,6 +47,7 @@ function notifMeta(n) {
   const type = String(n.type || "");
   const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
   if (type === "admin_reply") return { label: "แอดมินตอบ", cls: "notif-admin", icon: "A", detail: true };
+  if (type === "ranking_reward") return { label: "รางวัล", cls: "notif-admin notif-reward", icon: "★", detail: true };
   if (type === "announcement") {
     if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!", detail: true };
     if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!", detail: true };
@@ -101,7 +102,20 @@ function openNotifDetail(n, meta) {
     (n.payload && (n.payload.fullBody || n.payload.reply || n.payload.message)) ||
     n.body ||
     "";
-  if (body) body.textContent = String(full || "ไม่มีรายละเอียด");
+  if (body) {
+    body.textContent = String(full || "ไม่มีรายละเอียด");
+    if (n.type === "ranking_reward") {
+      const link = document.createElement("a");
+      link.className = "btn sm";
+      link.href = (n.payload && n.payload.href) || "/app#decorate";
+      link.textContent = "ไปที่ตกแต่ง";
+      link.style.marginTop = "14px";
+      link.style.display = "inline-flex";
+      link.onclick = () => modal.classList.add("hidden");
+      body.appendChild(document.createElement("br"));
+      body.appendChild(link);
+    }
+  }
   modal.classList.remove("hidden");
 }
 
@@ -219,7 +233,7 @@ function renderList() {
       const id = li.getAttribute("data-id");
       const row = cacheItems.find((n) => n.id === id);
       const meta = row ? notifMeta(row) : null;
-      if (row && meta && (meta.detail || String(row.type) === "admin_reply")) {
+      if (row && meta && (meta.detail || String(row.type) === "admin_reply" || String(row.type) === "ranking_reward")) {
         openNotifDetail(row, meta);
       }
       await api("/api/v1/notifications/" + id, {
@@ -298,9 +312,10 @@ function paintNotifSoundToggle() {
   btn.innerHTML = `<i class="fi fi-rr-bell" aria-hidden="true"></i>`;
 }
 
-/** Live WS: play ping only for admin reply messages. */
+/** Live WS: play ping for admin-style messages (admin reply + ranking rewards). */
 export function onNotificationPush(msg) {
-  if (msg && String(msg.type || "") === "admin_reply") {
+  const type = msg ? String(msg.type || "") : "";
+  if (type === "admin_reply" || type === "ranking_reward") {
     playAdminNotifPing();
   }
 }

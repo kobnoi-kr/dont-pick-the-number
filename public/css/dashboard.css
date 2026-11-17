@@ -1126,6 +1126,21 @@ td.row-actions > a.btn:last-child {
 .notif-item.notif-admin .notif-pill { background: rgba(86,119,252,.24) !important; color: #93c5fd !important; }
 .notif-item.notif-admin.unread { box-shadow: inset 4px 0 0 #5677FC !important; }
 
+.notif-item.notif-reward {
+  background: linear-gradient(135deg, rgba(86,119,252,.12), rgba(251,191,36,.12)) !important;
+  border-color: rgba(251,191,36,.45) !important;
+}
+.notif-item.notif-reward .notif-icon {
+  background: rgba(251,191,36,.22) !important;
+  color: #fde68a !important;
+  border-color: rgba(251,191,36,.5) !important;
+}
+.notif-item.notif-reward .notif-pill {
+  background: rgba(251,191,36,.22) !important;
+  color: #fde68a !important;
+}
+.notif-item.notif-reward.unread { box-shadow: inset 4px 0 0 #fbbf24 !important; }
+
 .notif-item.notif-default .notif-icon { color: #94a3b8 !important; }
 .notif-item.notif-default .notif-pill { color: #94a3b8 !important; }
 .notif-item.notif-default.unread { box-shadow: inset 4px 0 0 #64748b !important; }

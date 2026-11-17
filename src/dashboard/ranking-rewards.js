@@ -2,11 +2,60 @@
 
 const { getPrisma, authEnabled } = require("../db");
 const { previousRankingWindow } = require("./ranking-period");
+const { getGameApi } = require("./bridge");
 const {
   ensureCosmeticsCatalog,
   grantCosmetic,
-  RANK_TITLE_IDS
+  RANK_TITLE_IDS,
+  STARTER_COSMETICS
 } = require("./cosmetics");
+
+function periodLabelTh(period) {
+  return period === "monthly" ? "ประจำเดือน" : "ประจำสัปดาห์";
+}
+
+function cosmeticName(cosmeticId) {
+  const hit = STARTER_COSMETICS.find((c) => c.id === cosmeticId);
+  return (hit && hit.name) || cosmeticId || "ยศพิเศษ";
+}
+
+async function notifyRankingReward(prisma, { userId, period, rank, cosmeticId, windowLabel }) {
+  const titleName = cosmeticName(cosmeticId);
+  const periodTh = periodLabelTh(period);
+  const title = `ได้รับรางวัล Top ${rank} ${periodTh}`;
+  const body = `คุณได้รับยศ「${titleName}」แล้ว — ดูและสวมใส่ได้ที่เมนู ตกแต่ง`;
+  const fullBody =
+    `ยินดีด้วย! คุณติด Top ${rank} Ranking ${periodTh}` +
+    (windowLabel ? ` (${windowLabel})` : "") +
+    `\n\nรางวัล: ยศ「${titleName}」\nสามารถดูและสวมใส่ได้ที่เมนู ตกแต่ง ใน Dashboard`;
+
+  await prisma.notification.create({
+    data: {
+      userId,
+      type: "ranking_reward",
+      title: String(title).slice(0, 160),
+      body: String(body).slice(0, 500),
+      payload: {
+        kind: "reward",
+        period,
+        rank,
+        cosmeticId,
+        windowLabel: windowLabel || null,
+        fullBody,
+        href: "/app#decorate"
+      }
+    }
+  });
+
+  const game = getGameApi();
+  if (game && typeof game.notifyUser === "function") {
+    try {
+      game.notifyUser(userId, { type: "ranking_reward" });
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 async function topUsersForWindow(prisma, since, until) {
   const players = await prisma.gamePlayer.findMany({
@@ -70,6 +119,23 @@ async function grantPeriodRewards(prisma, period) {
           where: { id: userId },
           data: { equippedTitleId: cosmeticId }
         });
+      }
+      try {
+        await notifyRankingReward(prisma, {
+          userId,
+          period,
+          rank,
+          cosmeticId,
+          windowLabel: window.label
+        });
+      } catch (notifyErr) {
+        console.warn(
+          "[ranking-rewards] notify failed",
+          period,
+          window.label,
+          rank,
+          notifyErr && notifyErr.message
+        );
       }
       granted += 1;
     } catch (err) {
