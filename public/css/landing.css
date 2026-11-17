@@ -96,6 +96,16 @@ body {
   transition: background .15s, transform .15s;
 }
 .btn.start:hover { background: var(--blue2); transform: translateY(-1px); }
+.landing-legal {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.landing-legal a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.landing-legal a:hover { color: var(--text); text-decoration: underline; }
 @media (max-width: 520px) {
   .landing-logo { width: min(100%, 300px); }
   .profile-name { max-width: 110px; }
