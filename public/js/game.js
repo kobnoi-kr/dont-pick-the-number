@@ -262,7 +262,7 @@ function runPendingAction(){
     setTimeout(()=>{
       if(!wantRoom&&!spectating&&!pendingAction){
         clearActiveRoom();
-        location.replace("/app.html#rooms");
+        location.replace("/app#rooms");
       }
     }, 1200);
   }
@@ -2135,13 +2135,13 @@ function showGate(){
   closeCodeModal();
   closeGuide();
   document.title="NUMVERSE";
-  location.replace("/app.html#rooms");
+  location.replace("/app#rooms");
 }
 function leaveCurrentRoom(){
   if(spectating){
     clearActiveRoom();
     send({t:"unwatch"});
-    location.replace("/app.html#rooms");
+    location.replace("/app#rooms");
     return;
   }
   if(isHost()){
@@ -2716,7 +2716,7 @@ function connect(){
       if(window.NVMaint&&window.NVMaint.applyLiveMaintenance){
         window.NVMaint.applyLiveMaintenance(msg.message||"");
       }
-      location.replace("/app.html");
+      location.replace("/app");
       return;
     }else if(msg.t==="left"||msg.t==="roomClosed"){
       // Ignore stale left while we are actively entering a room.
@@ -2725,13 +2725,13 @@ function connect(){
       // Maintenance kick also sends roomClosed — prefer maintenance redirect.
       if(msg.message&&/ปิดปรับปรุง|maintenance/i.test(String(msg.message))){
         try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
-        location.replace("/app.html");
+        location.replace("/app");
         return;
       }
       roomVisibility="";
       paintInviteBtn();
       if(msg.t==="roomClosed"&&msg.message&&$("err")) $("err").textContent=msg.message;
-      location.replace("/app.html#rooms");
+      location.replace("/app#rooms");
       return;
     }else if(msg.t==="renamed"){
       if(msg.name) setLocalName(msg.name);
@@ -2924,18 +2924,18 @@ async function bootOnline(){
   if(loginLink){
     loginLink.onclick=()=>{
       if(authUser&&authUser.accountType==="guest") openAuthChoiceModal();
-      else location.href="login.html";
+      else location.href="/login";
     };
   }
   const authChoiceLink=$("authChoiceLink");
   const authChoiceLogin=$("authChoiceLogin");
   const authChoiceCancel=$("authChoiceCancel");
   const authChoiceModal=$("authChoiceModal");
-  if(authChoiceLink) authChoiceLink.onclick=()=>{ location.href="/app.html#profile"; };
+  if(authChoiceLink) authChoiceLink.onclick=()=>{ location.href="/app#profile"; };
   if(authChoiceLogin) authChoiceLogin.onclick=async()=>{
     try{ await fetch("/api/v1/auth/logout",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"}); }
     catch(e){}
-    location.href="login.html";
+    location.href="/login";
   };
   if(authChoiceCancel) authChoiceCancel.onclick=()=>closeAuthChoiceModal();
   if(authChoiceModal) authChoiceModal.addEventListener("click",e=>{ if(e.target===authChoiceModal) closeAuthChoiceModal(); });

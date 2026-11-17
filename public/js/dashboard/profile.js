@@ -99,7 +99,7 @@ export async function renderProfile(root, { user, onSaved }) {
           <div class="row-actions" id="pfLinkRow" style="margin-top:10px"></div>
           ${
             isElevatedAdmin(u)
-              ? `<a class="btn block" style="margin-top:10px" href="/admin.html">Admin Dashboard</a>`
+              ? `<a class="btn block" style="margin-top:10px" href="/admin">Admin Dashboard</a>`
               : ""
           }
         </div>
@@ -296,7 +296,7 @@ export async function renderProfile(root, { user, onSaved }) {
   root.querySelector("#pfLogout").onclick = () => logout();
   root.querySelector("#pfLogoutAll").onclick = async () => {
     await api("/api/v1/auth/logout-all", { method: "POST", body: "{}" });
-    location.href = "/login.html";
+    location.href = "/login";
   };
 
   const modal = root.querySelector("#deleteModal");

@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>เข้าสู่ระบบ — NUMVERSE</title>
-<link rel="icon" href="/images/numverse.png" type="image/png">
+<link rel="icon" href="/images/n-logo.png" type="image/png">
 <link rel="stylesheet" href="/css/auth-pages.css">
 </head>
 <body>
@@ -29,7 +29,7 @@
       </a>
     </div>
     <p class="msg" id="msg"></p>
-    <p class="links"><a href="/">หน้าแรก</a> · <a href="/app.html">Dashboard</a></p>
+    <p class="links"><a href="/">หน้าแรก</a> · <a href="/app">Dashboard</a></p>
   </div>
 </div>
 <script src="/js/auth-client.js"></script>
@@ -39,7 +39,7 @@
   const msg=$("msg");
   const err=qs("error");
   const next=qs("next");
-  if(next==="/admin.html" || (next&&next.indexOf("/admin")===0)){
+  if(next==="/admin" || next==="/admin.html" || (next&&next.indexOf("/admin")===0)){
     setMsg(msg, "ล็อกอินด้วยบัญชีแอดมิน (Google/Discord) แล้วจะเข้าหน้า Admin ได้", true);
   }
   if(err){
@@ -60,8 +60,8 @@
       const data=await me.json();
       const roles=(data.user&&data.user.roles)||[];
       const isAdmin=roles.includes("admin")||roles.includes("super_admin")||roles.includes("moderator");
-      if(isAdmin && (next==="/admin.html" || (next&&next.indexOf("/admin")===0))){
-        location.href="/admin.html";
+      if(isAdmin && (next==="/admin" || next==="/admin.html" || (next&&next.indexOf("/admin")===0))){
+        location.href="/admin";
         return;
       }
     }

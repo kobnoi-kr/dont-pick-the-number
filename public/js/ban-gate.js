@@ -122,7 +122,7 @@ export function applyBanNotice(msg = {}) {
       <h1>${esc(titleFor(status))}</h1>
       <p>${esc(message)}</p>
       <div class="nv-ban-actions">
-        <a class="primary" href="/login.html" id="nvBanLogin">ไปหน้าเข้าสู่ระบบ</a>
+        <a class="primary" href="/login" id="nvBanLogin">ไปหน้าเข้าสู่ระบบ</a>
         <button type="button" id="nvBanDismiss">ปิด</button>
       </div>
     </div>

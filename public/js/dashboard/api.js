@@ -34,5 +34,5 @@ export function playUrl(opts = {}) {
   if (opts.name) q.set("name", opts.name);
   if (opts.setup) q.set("setup", JSON.stringify(opts.setup));
   const s = q.toString();
-  return "/play.html" + (s ? "?" + s : "");
+  return "/play" + (s ? "?" + s : "");
 }

@@ -39,7 +39,7 @@ function setAvatar(el, user) {
       label.textContent = user.accountType === "registered" ? "โปรไฟล์" : "Guest";
       name.textContent = user.displayName || user.username || "Player";
       setAvatar(avatar, user);
-      link.href = "/app.html#profile";
+      link.href = "/app#profile";
       if (user.id) localStorage.setItem("dpn-token", user.id);
       if (user.displayName || user.username) {
         localStorage.setItem("dpn-name", user.displayName || user.username);
@@ -62,7 +62,7 @@ function setAvatar(el, user) {
   } catch {
     label.textContent = "เข้าสู่ระบบ";
     name.textContent = "Guest";
-    link.href = "/login.html";
+    link.href = "/login";
   }
 
   const gate = await enforceMaintenanceGate({ hardBlock: true });

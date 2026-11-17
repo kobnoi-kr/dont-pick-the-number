@@ -49,7 +49,7 @@ function showMaintenanceOverlay(message, { adminBypass = false } = {}) {
       <p>${esc(message || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง")}</p>
       <div class="nv-maint-actions">
         <button type="button" id="nvMaintRetry">ลองใหม่</button>
-        ${adminBypass ? `<a class="primary" href="/admin.html">ไปหน้า Admin</a>` : ""}
+        ${adminBypass ? `<a class="primary" href="/admin">ไปหน้า Admin</a>` : ""}
       </div>
     </div>
   `;

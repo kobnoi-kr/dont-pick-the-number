@@ -28,7 +28,7 @@ async function createEmailVerification(prisma, userId) {
 }
 
 async function sendVerificationEmail(req, email, token) {
-  const link = publicBaseUrl(req) + "/verify-email.html?token=" + encodeURIComponent(token);
+  const link = publicBaseUrl(req) + "/verify-email?token=" + encodeURIComponent(token);
   await sendMail({
     to: email,
     subject: "ยืนยันอีเมล NUMVERSE",
@@ -180,7 +180,7 @@ async function requestPasswordReset(prisma, req, email) {
       expiresAt: new Date(Date.now() + 60 * 60 * 1000)
     }
   });
-  const link = publicBaseUrl(req) + "/reset-password.html?token=" + encodeURIComponent(token);
+  const link = publicBaseUrl(req) + "/reset-password?token=" + encodeURIComponent(token);
   await sendMail({
     to: emailNorm,
     subject: "รีเซ็ตรหัสผ่าน NUMVERSE",

@@ -493,7 +493,7 @@ async function handleDashboardApi(req, res, pathname) {
 
   const liveWatch = pathname.match(/^\/api\/v1\/live-games\/([^/]+)\/watch$/);
   if (liveWatch) {
-    sendJson(res, 200, { ok: true, hint: "open /play.html?watch=1&code=" + liveWatch[1] });
+    sendJson(res, 200, { ok: true, hint: "open /play?watch=1&code=" + liveWatch[1] });
     return true;
   }
 

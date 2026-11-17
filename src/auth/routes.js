@@ -54,7 +54,7 @@ function lobbyRedirect() {
 }
 
 function loginErrorRedirect(code) {
-  return "/login.html?error=" + encodeURIComponent(code || "oauth_failed");
+  return "/login?error=" + encodeURIComponent(code || "oauth_failed");
 }
 
 async function handleGuest(req, res) {
@@ -257,14 +257,14 @@ async function finishOAuth(req, res, provider) {
           include: { userRoles: { include: { role: true } } }
         });
         await rotateAndIssueSession(prisma, req, res, user);
-        redirect(res, "/account.html?linked=" + provider);
+        redirect(res, "/account?linked=" + provider);
         return true;
       } catch (linkErr) {
         // Keep the current profile — do not jump to the other account.
         if (linkErr && linkErr.code === "provider_already_linked") {
           redirect(
             res,
-            "/account.html?error=provider_already_linked&provider=" + encodeURIComponent(provider)
+            "/account?error=provider_already_linked&provider=" + encodeURIComponent(provider)
           );
           return true;
         }
@@ -298,7 +298,7 @@ async function finishOAuth(req, res, provider) {
       });
       await rotateAndIssueSession(prisma, req, res, fresh || result.user);
       if (result.linked) {
-        redirect(res, "/account.html?linked=" + provider);
+        redirect(res, "/account?linked=" + provider);
         return true;
       }
       redirect(res, lobbyRedirect());
@@ -306,7 +306,7 @@ async function finishOAuth(req, res, provider) {
       if (loginErr && loginErr.code === "provider_already_linked") {
         redirect(
           res,
-          "/account.html?error=provider_already_linked&provider=" + encodeURIComponent(provider)
+          "/account?error=provider_already_linked&provider=" + encodeURIComponent(provider)
         );
         return true;
       }

@@ -70,11 +70,49 @@ const TYPES = {
   ".css": "text/css; charset=utf-8",
   ".mp3": "audio/mpeg",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2"
 };
+
+function safePublicRel(name) {
+  const file = path.normalize(path.join(PUBLIC, name));
+  const rel = path.relative(PUBLIC, file);
+  if (rel.startsWith("..") || path.isAbsolute(rel) || rel.includes("\0")) return null;
+  return rel.split(path.sep).join("/");
+}
+
+function publicFileExists(rel) {
+  try {
+    return fs.existsSync(path.join(PUBLIC, rel)) && fs.statSync(path.join(PUBLIC, rel)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Map /app → app.html, keep real assets as-is. */
+function resolvePublicName(pathname) {
+  if (pathname === "/" || pathname === "") return PUBLIC_PAGE;
+  const raw = String(pathname || "").replace(/^\/+/, "");
+  const rel = safePublicRel(raw);
+  if (!rel) return null;
+  if (publicFileExists(rel)) return rel;
+  if (!path.extname(rel)) {
+    const htmlRel = rel + ".html";
+    if (publicFileExists(htmlRel)) return htmlRel;
+  }
+  return null;
+}
+
+function prettyPathFromHtml(pathname) {
+  if (pathname === "/index.html") return PUBLIC_DASHBOARD ? "/admin" : "/app";
+  if (!pathname.toLowerCase().endsWith(".html")) return pathname;
+  const base = pathname.slice(0, -5);
+  return base || "/";
+}
 
 /** โดเมนที่อนุญาตให้เข้า (จาก APP_BASE_URL + ALLOWED_HOSTS) — บล็อกการเข้าผ่าน IP */
 function collectAllowedHosts() {
@@ -1710,13 +1748,13 @@ function isDashboardAsset(name) {
 }
 
 function sendStaticFile(res, name) {
-  const file = path.normalize(path.join(PUBLIC, name));
-  const rel = path.relative(PUBLIC, file);
-  if (rel.startsWith("..") || path.isAbsolute(rel) || rel.includes("\0")) {
+  const rel = safePublicRel(name);
+  if (!rel) {
     res.writeHead(404);
     res.end("not found");
     return;
   }
+  const file = path.join(PUBLIC, rel);
   const stream = fs.createReadStream(file);
   stream.on("error", () => {
     if (res.headersSent) {
@@ -1770,14 +1808,21 @@ async function servePublic(req, res) {
     res.end(JSON.stringify({ error: "not_found" }));
     return;
   }
-  if (pathname === "/index.html") {
-    res.writeHead(302, { Location: PUBLIC_DASHBOARD ? "/admin.html" : "/app.html" });
+  // Pretty URLs: /app.html → /app (keep query string)
+  if (pathname.toLowerCase().endsWith(".html")) {
+    const pretty = prettyPathFromHtml(pathname);
+    res.writeHead(302, { Location: pretty + url.search });
     res.end();
     return;
   }
-  let name = pathname === "/" ? PUBLIC_PAGE : pathname.replace(/^\/+/, "");
+  const name = resolvePublicName(pathname);
+  if (!name) {
+    res.writeHead(404);
+    res.end("not found");
+    return;
+  }
   if (!PUBLIC_DASHBOARD && isDashboardAsset(name)) {
-    res.writeHead(302, { Location: "/app.html" });
+    res.writeHead(302, { Location: "/app" + url.search });
     res.end();
     return;
   }
@@ -1803,7 +1848,18 @@ async function serveAdmin(req, res) {
     res.end(JSON.stringify({ error: "not_found" }));
     return;
   }
-  let name = pathname === "/" ? ADMIN_PAGE : pathname.replace(/^\/+/, "");
+  if (pathname.toLowerCase().endsWith(".html")) {
+    const pretty = prettyPathFromHtml(pathname);
+    res.writeHead(302, { Location: pretty + url.search });
+    res.end();
+    return;
+  }
+  const name = pathname === "/" ? ADMIN_PAGE : resolvePublicName(pathname);
+  if (!name) {
+    res.writeHead(404);
+    res.end("not found");
+    return;
+  }
   sendStaticFile(res, name);
 }
 
@@ -2286,7 +2342,7 @@ setInterval(() => {
     .catch(() => {});
 }, 15000);
 server.listen(PORT, HOST, () => {
-  console.log("Public game: http://localhost:" + PORT + " (play.html)");
+  console.log("Public game: http://localhost:" + PORT + " (/play)");
   console.log("Bind public: " + HOST + ":" + PORT + (HOST === "0.0.0.0" ? " (เครือข่าย)" : " (local)"));
   if (ENFORCE_HOST) {
     console.log("Public host allowlist: " + [...ALLOWED_HOSTS].join(", ") + " (+ localhost)");
