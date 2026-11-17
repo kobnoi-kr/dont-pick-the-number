@@ -258,6 +258,17 @@ function clearPoints(room) {
     else player.scoreSecret = 0;
   });
 }
+function setChampions(room, names) {
+  const ids = [];
+  for (const name of names || []) {
+    const player = byName(room, name);
+    if (player && !ids.includes(player.id)) ids.push(player.id);
+  }
+  room.lastWinners = ids;
+}
+function clearChampions(room) {
+  room.lastWinners = [];
+}
 function currentName(room) {
   if (!room.alive.length) return "";
   const index = ((room.turn % room.alive.length) + room.alive.length) % room.alive.length;
@@ -410,6 +421,7 @@ function blankRoom(code, visibility, host) {
     wheelGone: [],
     wheelRot: 0,
     over: null,
+    lastWinners: [],
     activeSpin: null,
     timer: null,
     turnTimer: null,
@@ -494,7 +506,8 @@ function snap(room, player, opts) {
       connected: item.connected,
       host: item.id === room.hostId,
       bot: !!item.bot,
-      auto: !!(item.auto || item.bot)
+      auto: !!(item.auto || item.bot),
+      champion: Array.isArray(room.lastWinners) && room.lastWinners.includes(item.id)
     })),
     youAuto: !!(player && (player.auto || player.bot)),
     order: room.order,
@@ -685,6 +698,7 @@ function finishRound(room) {
   clearTurnTimer(room);
   room.phase = "over";
   room.activeSpin = null;
+  if (won) setChampions(room, champs);
   room.over = {
     title,
     note,
@@ -790,6 +804,7 @@ function onTurnTimeout(room, markAuto) {
 }
 function begin(room) {
   const count = room.secretCount;
+  clearChampions(room);
   room.gameMin = room.min;
   room.gameMax = room.max;
   room.secretTotal = count;
@@ -811,6 +826,7 @@ function begin(room) {
 function startPick(room) {
   cancelSpin(room);
   clearTurnTimer(room);
+  clearChampions(room);
   room.wheelMin = room.min;
   room.wheelMax = room.max;
   room.wheelOrder = room.order.slice();
@@ -839,6 +855,7 @@ function finishWheel(room) {
   });
   room.phase = "over";
   room.activeSpin = null;
+  if (won) setChampions(room, [winner]);
   room.over = {
     title: won ? winner + " ชนะแล้ว!" : winner ? winner + " เป็นคนสุดท้าย" : "ไม่มีผู้ชนะ",
     note: won ? "ถึง " + room.winTarget + " แต้ม" : winner ? "ได้ 1 แต้ม" : "",
@@ -1230,11 +1247,16 @@ function onAgain(ws) {
   const room = ctx.room;
   if (room.phase !== "over" || !room.over) return;
   if (!orderReady(room)) {
+    // Back to lobby: reset scores only if the match already had a winner.
+    const resetScores = !!room.over.reset;
     room.phase = "lobby";
     room.order = [];
+    room.over = null;
+    if (resetScores) clearPoints(room);
     broadcast(room);
     return fail(ws, "ผู้เล่นในห้องเปลี่ยน กลับไปสุ่มลำดับใหม่");
   }
+  // Continue match: wipe scores only after someone hit winTarget.
   if (room.over.reset) clearPoints(room);
   if (room.over.mode === "wheel") startPick(room);
   else begin(room);
@@ -1244,6 +1266,9 @@ function onAbort(ws) {
   const ctx = seat(ws);
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่พากลับห้องได้");
   const room = ctx.room;
+  // If returning from a finished match that reached winTarget → reset lobby scores.
+  // Otherwise keep scores so the series can continue.
+  const resetScores = room.phase === "over" && !!(room.over && room.over.reset);
   cancelSpin(room);
   clearTurnTimer(room);
   room.phase = "lobby";
@@ -1262,6 +1287,7 @@ function onAbort(ws) {
   room.players.forEach((player) => {
     if (!isBot(player)) player.auto = false;
   });
+  if (resetScores) clearPoints(room);
   broadcast(room);
 }
 function onClear(ws) {

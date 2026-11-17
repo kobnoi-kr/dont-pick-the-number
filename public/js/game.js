@@ -3,6 +3,7 @@ const WHEEL_COLORS=["#2563eb","#dc2626","#16a34a","#d97706","#7c3aed","#db2777",
 const BAND_A="#9f1239", BAND_B="#111827", DEAD_SLICE="#475569";
 let gameMin=1, gameMax=99, secrets=[], secretAll=[], secretTotal=1, winTarget=3, pointAll=true, lo, hi, picked, pageFrom=1, useCustom=false, pickMin=1, pickMax=99;
 let players=[], scores={}, order=[], alive=[], roundOrder=[], turn=0, nextOrder=[], spinning=false, rot=0, spinTimer=0;
+let lastWinners=[]; // offline: champion names; online uses playerMeta.champion
 let gameCat="secret", wheelMin=1, wheelMax=99, wheelOrder=[], picks={}, pickEach=1, pickCursor=0, pickFrom=1;
 let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
 const $=id=>document.getElementById(id);
@@ -309,6 +310,19 @@ function myName(){
   return p?p.name:"";
 }
 function playerByName(name){ return playerMeta.find(p=>p.name===name)||null; }
+function isChampion(name){
+  if(onlineMode){
+    const meta=playerByName(name);
+    return !!(meta&&meta.champion);
+  }
+  return lastWinners.includes(name);
+}
+function setLocalChampions(names){
+  lastWinners=Array.isArray(names)?names.filter(Boolean):[];
+}
+function clearLocalChampions(){
+  lastWinners=[];
+}
 function screenOpen(id){
   const el=$(id);
   return !!el&&!el.classList.contains("hidden");
@@ -403,6 +417,7 @@ function begin(min,max,count){
     $("err").textContent=winErr;
     return;
   }
+  clearLocalChampions();
   winTarget=target;
   pointAll=!!$("restModes").querySelector("[data-rest='all'].on");
   if(count==null) count=secretTotal;
@@ -417,6 +432,7 @@ function begin(min,max,count){
   $("msg").textContent="";
   $("again").textContent="เล่นอีกครั้ง";
   $("again").dataset.reset="";
+  $("back").textContent="เลือกโหมดใหม่";
   show("play");
   render();
 }
@@ -561,8 +577,9 @@ function renderScores(el){
   ranked.forEach((name,i)=>{
     const li=document.createElement("li");
     if((scores[name]||0)===best&&best>0) li.classList.add("top");
+    if(isChampion(name)) li.classList.add("champion");
     const label=document.createElement("span");
-    label.textContent=(i+1)+". "+name;
+    label.textContent=(i+1)+". "+name+(isChampion(name)?" ✦":"");
     const out=document.createElement("span");
     out.className="out";
     const rank=outRank.get(name);
@@ -612,6 +629,7 @@ function finishRound(){
   saveScores();
   const champs=gained.filter(name=>(scores[name]||0)>=winTarget);
   const won=champs.length>0;
+  if(won) setLocalChampions(champs);
   const champText=champs.length<=1?champs[0]||"":champs.length===2?champs.join(" กับ "):champs.slice(0,-1).join(", ")+" และ "+champs[champs.length-1];
   if(!roundOrder.length){
     $("overTitle").textContent="คุณเลือกโดนเลขลับ!";
@@ -638,6 +656,7 @@ function finishRound(){
   $("again").textContent=won?"เริ่มแมตช์ใหม่":"เล่นอีกครั้ง";
   $("again").dataset.reset=won?"1":"";
   $("again").dataset.mode="";
+  $("back").textContent=won?"กลับเมนู · รีแต้ม":"เลือกโหมดใหม่";
   $("secretLabel").textContent="เลขลับคือ";
   setOverOutOrder(outOrderFrom(picked,true));
   renderOverHist(null);
@@ -791,7 +810,8 @@ function renderLobbyGrid(){
     const hostFlag=!!(meta&&meta.host);
     const connected=!meta||meta.connected||meta.bot;
     const ready=ranked||(meta&&meta.connected);
-    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline");
+    const champ=isChampion(name);
+    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline")+(champ?" champion":"");
     const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
     av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
     if(meta&&meta.avatarUrl){
@@ -805,7 +825,7 @@ function renderLobbyGrid(){
     const crown=hostFlag?`<span class="lobby-crown" title="โฮสต์">♛</span>`:"";
     const status=document.createElement("div");
     status.className="lobby-slot-status"+(ready?" on":"");
-    status.textContent=hostFlag?"HOST":(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE"));
+    status.textContent=champ?"WINNER":(hostFlag?"HOST":(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE")));
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
     nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
@@ -829,8 +849,15 @@ function renderLobbyGrid(){
       acts.appendChild(kick);
     }
     const avWrap=document.createElement("div");
-    avWrap.className="lobby-av-wrap";
+    avWrap.className="lobby-av-wrap"+(champ?" champion":"");
     avWrap.innerHTML=crown;
+    if(champ){
+      const mark=document.createElement("span");
+      mark.className="lobby-champ-mark";
+      mark.title="ผู้ชนะ";
+      mark.textContent="✦";
+      avWrap.appendChild(mark);
+    }
     avWrap.appendChild(av);
     const pts=Math.max(0, Number(meta&&meta.score!=null?meta.score:scores[name])||0);
     if(pts>0){
@@ -870,16 +897,18 @@ function renderPlayers(){
     const showRank=(playing&&roundOrder.length>0)||((picking||wheeling)&&wheelOrder.length>0)||ranked;
     rank.textContent=showRank?String(i+1):"•";
     const meta=onlineMode?playerByName(name):null;
+    const champ=isChampion(name);
+    if(champ) row.classList.add("champion");
     const avWrap=document.createElement(meta&&meta.avatarUrl?"img":"span");
     if(meta&&meta.avatarUrl){
-      avWrap.className="pavatar";
+      avWrap.className="pavatar"+(champ?" champion":"");
       avWrap.src=meta.avatarUrl;
       avWrap.alt="";
       avWrap.width=28;
       avWrap.height=28;
       avWrap.referrerPolicy="no-referrer";
     }else{
-      avWrap.className="pavatar ph";
+      avWrap.className="pavatar ph"+(champ?" champion":"");
       avWrap.textContent=(name||"?").slice(0,1).toUpperCase();
     }
     const nm=document.createElement("span");
@@ -889,11 +918,14 @@ function renderPlayers(){
       const tags=[];
       if(meta.id===myId) tags.push("คุณ");
       if(meta.host) tags.push("โฮสต์");
+      if(champ) tags.push("ผู้ชนะ");
       if(meta.bot) tags.push("บอท");
       else if(meta.auto) tags.push("ออโต้");
       if(!meta.connected&&!meta.bot) tags.push("หลุด");
       if(tags.length) nm.textContent=name+" · "+tags.join(" · ");
       if(!meta.connected&&!meta.bot) row.classList.add("off");
+    }else if(champ){
+      nm.textContent=name+" · ผู้ชนะ";
     }
     const sc=document.createElement("span");
     sc.className="pscore";
@@ -1121,6 +1153,11 @@ function invalidateWheel(){
 }
 function leaveGame(){
   invalidateWheel();
+  // Offline: returning from a finished match that hit winTarget clears scores.
+  if(!$("over").classList.contains("hidden") && $("again").dataset.reset==="1"){
+    players.forEach(name=>{ scores[name]=0; });
+    saveScores();
+  }
   show("start");
   renderPlayers();
 }
@@ -1255,6 +1292,7 @@ function undoPick(){
 }
 function startPick(min, max){
   invalidateWheel();
+  clearLocalChampions();
   wheelMin=min;
   wheelMax=max;
   wheelOrder=order.slice();
@@ -1264,6 +1302,8 @@ function startPick(min, max){
   wheelAlive=[];
   wheelLog=[];
   wheelGone=[];
+  $("again").dataset.reset="";
+  $("back").textContent="เลือกโหมดใหม่";
   show("pick");
   $("pickMode").textContent="ช่วง "+min+"–"+max+" · คนละ "+pickEach+" เลข · ถึง "+winTarget+" แต้มชนะ · เลขที่ออกจะถูกตัดจากวงล้อ";
   $("pickMsg").textContent="";
@@ -1445,6 +1485,7 @@ function finishWheel(){
   if(winner) scores[winner]=(scores[winner]||0)+1;
   saveScores();
   const won=!!(winner&&(scores[winner]||0)>=winTarget);
+  if(won) setLocalChampions([winner]);
   if(won){
     $("overTitle").textContent=winner+" ชนะแล้ว!";
     $("overNote").textContent="ถึง "+winTarget+" แต้ม";
@@ -1465,6 +1506,7 @@ function finishWheel(){
   $("again").textContent=won?"เริ่มแมตช์ใหม่":"รอบถัดไป";
   $("again").dataset.reset=won?"1":"";
   $("again").dataset.mode="wheel";
+  $("back").textContent=won?"กลับเมนู · รีแต้ม":"เลือกโหมดใหม่";
   renderScores($("finalScores"));
   show("over");
   renderPlayers();
@@ -2366,7 +2408,10 @@ function applySnap(s){
     shown.classList.toggle("many",!!s.over.many);
     renderOverHist(s.over.hist);
     $("again").textContent=s.over.again||"เล่นอีกครั้ง";
+    $("again").dataset.reset=s.over.reset?"1":"";
     $("again").disabled=!isHost();
+    $("back").textContent=s.over.reset?"กลับล็อบบี้ · รีแต้ม":"กลับล็อบบี้";
+    $("back").disabled=!isHost();
     renderScores($("finalScores"));
     show("over");
     renderPlayers();
