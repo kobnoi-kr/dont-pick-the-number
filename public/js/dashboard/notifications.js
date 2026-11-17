@@ -39,7 +39,7 @@ function catOf(n) {
   if (type === "room_invitation") return "invite";
   if (type === "game_finished") return "game";
   if (type === "friend_request" || type === "friend") return "friend";
-  if (type === "admin_reply" || type === "ranking_reward") return "other";
+  if (type === "admin_reply" || type === "ranking_reward" || type === "level_up") return "other";
   return "other";
 }
 
@@ -48,6 +48,7 @@ function notifMeta(n) {
   const kind = n.payload && n.payload.kind ? String(n.payload.kind) : "";
   if (type === "admin_reply") return { label: "แอดมินตอบ", cls: "notif-admin", icon: "A", detail: true };
   if (type === "ranking_reward") return { label: "รางวัล", cls: "notif-admin notif-reward", icon: "★", detail: true };
+  if (type === "level_up") return { label: "Level up", cls: "notif-admin notif-reward", icon: "↑", detail: true };
   if (type === "announcement") {
     if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!", detail: true };
     if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!", detail: true };

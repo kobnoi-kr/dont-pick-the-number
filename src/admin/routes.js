@@ -14,6 +14,7 @@ const { getGameApi } = require("../dashboard/bridge");
 const { writeAdminLog } = require("./audit");
 const { publishAnnouncement, isDueNow } = require("./publish-announcement");
 const { invalidatePublicSettingsCache } = require("../system/public-settings");
+const { handleAdminLevelsApi } = require("../dashboard/levels");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -68,6 +69,8 @@ async function handleAdminApi(req, res, pathname) {
   const prisma = await getPrisma();
   const game = getGameApi();
   const ip = clientIp(req);
+
+  if (await handleAdminLevelsApi(req, res, pathname)) return true;
 
   // —— Overview ——
   if (pathname === "/api/v1/admin/overview") {

@@ -138,6 +138,13 @@ async function main() {
     console.warn("Cosmetics seed skipped:", err && err.message ? err.message : err);
   }
 
+  try {
+    const { ensureLevelConfig } = require("../src/dashboard/levels");
+    await ensureLevelConfig(prisma);
+  } catch (err) {
+    console.warn("Level config seed skipped:", err && err.message ? err.message : err);
+  }
+
   console.log("Seeded roles, permissions, and system settings");
 }
 

@@ -10,6 +10,7 @@ const TITLES = {
   library: "Game Library",
   rooms: "My Rooms",
   ranking: "Ranking",
+  level: "Level",
   friends: "Friends",
   decorate: "ตกแต่งโปรไฟล์",
   shop: "Shop",

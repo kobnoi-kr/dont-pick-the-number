@@ -120,6 +120,13 @@ async function persistFinishedGame(room, scoreOf) {
           payload: { gameId: game.id, roomCode: room.code, rank: gp.rank, won: gp.won }
         }
       }).catch(() => {});
+
+      try {
+        const { awardExp } = require("./levels");
+        await awardExp(prisma, gp.userId, { won: !!gp.won });
+      } catch (expErr) {
+        console.warn("[persistFinishedGame] awardExp", expErr && expErr.message ? expErr.message : expErr);
+      }
     }
 
     // Activity: only when a match reached winTarget (over.reset).

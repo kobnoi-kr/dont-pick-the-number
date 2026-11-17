@@ -77,6 +77,8 @@ function publicUser(user) {
     friendCode: user.friendCode || null,
     gender: user.gender || null,
     age: user.age == null ? null : user.age,
+    level: user.level == null ? 1 : user.level,
+    exp: user.exp == null ? 0 : user.exp,
     accountType: user.accountType,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt,

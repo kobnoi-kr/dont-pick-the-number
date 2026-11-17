@@ -16,6 +16,7 @@ const { getGameApi } = require("./bridge");
 const { listAcceptedFriendIds, friendshipRelation } = require("../auth/friends");
 const { rankingWindow } = require("./ranking-period");
 const { handleCosmeticsApi, publicCosmetic } = require("./cosmetics");
+const { handleLevelsApi } = require("./levels");
 
 const GAME_CATALOG = [
   {
@@ -98,6 +99,9 @@ async function handleDashboardApi(req, res, pathname) {
   const game = getGameApi();
   if (pathname.startsWith("/api/v1/cosmetics") || pathname.startsWith("/api/v1/shop/")) {
     return handleCosmeticsApi(req, res, pathname);
+  }
+  if (pathname.startsWith("/api/v1/levels")) {
+    return handleLevelsApi(req, res, pathname);
   }
   const isDashPath =
     pathname.startsWith("/api/v1/dashboard") ||

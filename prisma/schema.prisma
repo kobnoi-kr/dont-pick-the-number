@@ -51,6 +51,8 @@ model User {
   friendCode       String?      @unique @map("friend_code") @db.VarChar(16)
   gender           Gender?
   age              Int?
+  level            Int          @default(1)
+  exp              Int          @default(0)
   equippedTitleId  String?      @map("equipped_title_id") @db.VarChar(64)
   equippedFrameId  String?      @map("equipped_frame_id") @db.VarChar(64)
   equippedEffectId String?      @map("equipped_effect_id") @db.VarChar(64)

@@ -9,6 +9,7 @@ import { renderRanking } from "./ranking.js";
 import { renderProfile } from "./profile.js";
 import { renderDecorate } from "./decorate.js";
 import { renderShop } from "./shop.js";
+import { renderLevel } from "./level.js";
 import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
 import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
@@ -133,6 +134,7 @@ async function navigate(view) {
   else if (state.view === "library") await renderLibrary(root, ctx);
   else if (state.view === "rooms") await renderRooms(root, ctx);
   else if (state.view === "ranking") await renderRanking(root, ctx);
+  else if (state.view === "level") await renderLevel(root, ctx);
   else if (state.view === "friends") await renderFriends(root, ctx);
   else if (state.view === "decorate") await renderDecorate(root, ctx);
   else if (state.view === "shop") await renderShop(root, ctx);

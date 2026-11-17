@@ -13,6 +13,7 @@ import { renderSystem } from "./system.js";
 import { renderLogs } from "./logs.js";
 import { renderInbox } from "./inbox.js";
 import { renderSettings } from "./settings.js";
+import { renderLevels } from "./levels.js";
 
 const TITLES = {
   overview: "Overview",
@@ -22,6 +23,7 @@ const TITLES = {
   games: "Game Management",
   rooms: "Room Management",
   announcements: "Announcements",
+  levels: "Level & ยศ",
   inbox: "ข้อความติดต่อ",
   permissions: "Admin & Permissions",
   system: "System Management",
@@ -123,6 +125,7 @@ async function showView(view) {
   else if (next === "games") await renderGames(root, ctx);
   else if (next === "rooms") await renderRooms(root, ctx);
   else if (next === "announcements") await renderAnnouncements(root);
+  else if (next === "levels") await renderLevels(root, ctx);
   else if (next === "inbox") await renderInbox(root, { onOpenCount: setInboxBadge });
   else if (next === "permissions") await renderPermissions(root, ctx);
   else if (next === "system") await renderSystem(root, ctx);
