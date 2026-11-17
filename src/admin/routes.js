@@ -316,6 +316,103 @@ async function handleAdminApi(req, res, pathname) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
+
+      const wantsStatus = Object.prototype.hasOwnProperty.call(body, "status");
+      const wantsUsername = Object.prototype.hasOwnProperty.call(body, "username");
+      const wantsDisplayName = Object.prototype.hasOwnProperty.call(body, "displayName");
+      if (!wantsStatus && !wantsUsername && !wantsDisplayName) {
+        sendJson(res, 400, { error: "invalid_body" });
+        return true;
+      }
+
+      const userInclude = {
+        userRoles: {
+          include: {
+            role: { include: { rolePermissions: { include: { permission: true } } } }
+          }
+        },
+        authAccounts: { select: { provider: true, providerEmail: true } }
+      };
+
+      // —— Rename username / display name ——
+      if ((wantsUsername || wantsDisplayName) && !wantsStatus) {
+        const auth = await requirePermission(req, res, "users.ban");
+        if (!auth) return true;
+        const target = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { userRoles: { include: { role: true } } }
+        });
+        if (!target || target.status === "deleted") {
+          sendJson(res, 404, { error: "not_found" });
+          return true;
+        }
+        if (
+          userHasRole(target, "super_admin") &&
+          !userHasRole(auth.user, "super_admin")
+        ) {
+          sendJson(res, 403, { error: "cannot_modify_super_admin" });
+          return true;
+        }
+
+        const data = {};
+        if (wantsUsername) {
+          const username = String(body.username || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .slice(0, 64);
+          if (username.length < 2) {
+            sendJson(res, 400, { error: "invalid_username" });
+            return true;
+          }
+          const clash = await prisma.user.findFirst({
+            where: {
+              id: { not: userId },
+              status: { not: "deleted" },
+              username: { equals: username, mode: "insensitive" }
+            },
+            select: { id: true }
+          });
+          if (clash) {
+            sendJson(res, 409, { error: "username_taken" });
+            return true;
+          }
+          data.username = username;
+        }
+        if (wantsDisplayName) {
+          const displayName = String(body.displayName || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .slice(0, 64);
+          if (displayName.length < 1) {
+            sendJson(res, 400, { error: "invalid_display_name" });
+            return true;
+          }
+          data.displayName = displayName;
+        }
+
+        const updated = await prisma.user.update({
+          where: { id: userId },
+          data,
+          include: userInclude
+        });
+        await writeAdminLog(prisma, {
+          adminId: auth.user.id,
+          action: "user.rename",
+          targetId: userId,
+          metadata: {
+            before: { username: target.username, displayName: target.displayName },
+            after: {
+              username: updated.username,
+              displayName: updated.displayName
+            }
+          },
+          ipAddress: ip
+        });
+        sendJson(res, 200, { user: serializeUser(updated) });
+        return true;
+      }
+
+      // —— Status change ——
       const nextStatus = body.status;
       if (!["active", "suspended", "banned", "deleted"].includes(nextStatus)) {
         sendJson(res, 400, { error: "invalid_status" });
@@ -348,14 +445,7 @@ async function handleAdminApi(req, res, pathname) {
       const updated = await prisma.user.update({
         where: { id: userId },
         data: { status: nextStatus },
-        include: {
-          userRoles: {
-            include: {
-              role: { include: { rolePermissions: { include: { permission: true } } } }
-            }
-          },
-          authAccounts: { select: { provider: true, providerEmail: true } }
-        }
+        include: userInclude
       });
       const gameApi = getGameApi();
       if (nextStatus === "banned" || nextStatus === "suspended" || nextStatus === "deleted") {
@@ -387,7 +477,6 @@ async function handleAdminApi(req, res, pathname) {
           /* ignore */
         }
       } else if (nextStatus === "active") {
-        // Clear client-side sticky ban overlay if they reconnect.
         if (gameApi && typeof gameApi.notifyUnbanned === "function") {
           try {
             gameApi.notifyUnbanned(userId);

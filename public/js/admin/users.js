@@ -88,6 +88,7 @@ export async function renderUsers(root, { user }) {
     const canUnban = hasPerm(user, "users.unban");
     const canDelete = hasPerm(user, "users.delete");
     const canRoles = hasPerm(user, "admins.manage");
+    const canRename = canBan;
     panel.innerHTML = `
       <div class="row-between">
         <div>
@@ -96,6 +97,26 @@ export async function renderUsers(root, { user }) {
         </div>
         <button type="button" class="btn ghost sm" id="uClose">ปิด</button>
       </div>
+      ${
+        canRename
+          ? `<div style="margin-top:16px">
+        <h3 style="margin:0 0 8px">เปลี่ยนชื่อ</h3>
+        <p class="tiny muted" style="margin:0 0 10px">Username ใช้ระบุบัญชี · Display name คือชื่อที่แสดง</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          <label class="tiny">Username
+            <input class="input" id="uUsername" maxlength="64" value="${esc(u.username || "")}" />
+          </label>
+          <label class="tiny">Display name
+            <input class="input" id="uDisplayName" maxlength="64" value="${esc(u.displayName || "")}" />
+          </label>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
+          <button type="button" class="btn sm" id="uSaveName">บันทึกชื่อ</button>
+          <span class="tiny" id="uNameMsg"></span>
+        </div>
+      </div>`
+          : ""
+      }
       <div class="actions" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">
         ${canUnban ? `<button type="button" class="btn sm" data-status="active">Unban / Activate</button>` : ""}
         ${canBan ? `<button type="button" class="btn ghost sm" data-status="suspended">Suspend</button>` : ""}
@@ -133,6 +154,46 @@ export async function renderUsers(root, { user }) {
         await load();
       };
     });
+    const saveName = panel.querySelector("#uSaveName");
+    if (saveName) {
+      saveName.onclick = async () => {
+        const msg = panel.querySelector("#uNameMsg");
+        const username = (panel.querySelector("#uUsername").value || "").trim();
+        const displayName = (panel.querySelector("#uDisplayName").value || "").trim();
+        if (username.length < 2) {
+          if (msg) msg.textContent = "Username อย่างน้อย 2 ตัวอักษร";
+          return;
+        }
+        if (!displayName) {
+          if (msg) msg.textContent = "ใส่ Display name ด้วย";
+          return;
+        }
+        if (msg) msg.textContent = "กำลังบันทึก…";
+        saveName.disabled = true;
+        const r = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ username, displayName })
+        });
+        saveName.disabled = false;
+        if (!r.res.ok) {
+          const err = (r.data && r.data.error) || "";
+          if (msg) {
+            msg.textContent =
+              err === "username_taken"
+                ? "Username นี้มีคนใช้แล้ว"
+                : err === "cannot_modify_super_admin"
+                  ? "แก้ super_admin ไม่ได้"
+                  : err === "invalid_username"
+                    ? "Username ไม่ถูกต้อง"
+                    : "บันทึกไม่สำเร็จ";
+          }
+          return;
+        }
+        if (msg) msg.textContent = "บันทึกแล้ว";
+        await openDetail(id);
+        await load();
+      };
+    }
     const revoke = panel.querySelector("#uRevoke");
     if (revoke) {
       revoke.onclick = async () => {
