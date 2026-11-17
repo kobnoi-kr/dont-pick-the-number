@@ -15,7 +15,7 @@ const DEFAULTS = {
   guest_create_per_ip_hour: 40,
   activity_log_enabled: true,
   activity_log_retention_days: 30,
-  game_history_retention_days: 7
+  game_history_retention_days: 30
 };
 
 /** @type {Map<string, number[]>} */
@@ -323,6 +323,19 @@ function stopCleanupScheduler() {
 async function ensureCleanupDefaults(prisma) {
   for (const [key, value] of Object.entries(DEFAULTS)) {
     try {
+      // Bump old 7-day game history default → 30 so Monthly ranking has a full month.
+      if (key === "game_history_retention_days") {
+        const existing = await prisma.systemSetting.findUnique({ where: { key } });
+        const cur = existing ? Number(existing.value) : NaN;
+        if (!existing || cur === 7) {
+          await prisma.systemSetting.upsert({
+            where: { key },
+            update: { value: 30 },
+            create: { key, value: 30 }
+          });
+          continue;
+        }
+      }
       await prisma.systemSetting.upsert({
         where: { key },
         update: {},

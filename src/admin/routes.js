@@ -1010,7 +1010,7 @@ async function handleAdminApi(req, res, pathname) {
             value = Math.min(365, Math.max(1, Number(value) || 30));
           }
           if (key === "game_history_retention_days") {
-            value = Math.min(365, Math.max(1, Number(value) || 7));
+            value = Math.min(365, Math.max(1, Number(value) || 30));
           }
           if (key === "db_size_limit_mb") {
             value = Math.min(1024 * 1024, Math.max(64, Number(value) || 1024));

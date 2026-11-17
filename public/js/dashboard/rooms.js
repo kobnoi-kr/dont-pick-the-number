@@ -104,7 +104,7 @@ export async function renderRooms(root, { openCreate, user } = {}) {
       <div class="page-head" style="margin-bottom:10px">
         <div>
           <h3 style="margin:0">ประวัติเกม</h3>
-          <p class="muted tiny" style="margin:6px 0 0">ห้องที่คุณสร้างแล้วเล่นจบ — เก็บ 7 วัน (สร้างแล้วลบ/ออกโดยยังไม่จบจะไม่ขึ้นที่นี่)</p>
+          <p class="muted tiny" style="margin:6px 0 0">ห้องที่คุณสร้างแล้วเล่นจบ — เก็บ 30 วัน (สร้างแล้วลบ/ออกโดยยังไม่จบจะไม่ขึ้นที่นี่)</p>
         </div>
       </div>
       <div id="pastRooms"><div class="loading">Loading…</div></div>

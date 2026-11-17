@@ -127,7 +127,7 @@ export async function renderSettings(root, { user }) {
             <input class="input" id="sGuestRate" type="number" min="0" max="1000" value="${Number.isFinite(Number(s.guest_create_per_ip_hour)) ? Number(s.guest_create_per_ip_hour) : 40}" ${canManage ? "" : "disabled"}/>
           </label>
           <label class="tiny">เก็บประวัติห้อง/เกม (วัน)
-            <input class="input" id="sGameHistDays" type="number" min="1" max="365" value="${Number.isFinite(Number(s.game_history_retention_days)) ? Number(s.game_history_retention_days) : 7}" ${canManage ? "" : "disabled"}/>
+            <input class="input" id="sGameHistDays" type="number" min="1" max="365" value="${Number.isFinite(Number(s.game_history_retention_days)) ? Number(s.game_history_retention_days) : 30}" ${canManage ? "" : "disabled"}/>
           </label>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
@@ -296,7 +296,7 @@ export async function renderSettings(root, { user }) {
             guest_session_days: Number(root.querySelector("#sGuestSess").value) || 7,
             cleanup_interval_minutes: Number(root.querySelector("#sCleanEvery").value) || 60,
             guest_create_per_ip_hour: Number(root.querySelector("#sGuestRate").value) || 0,
-            game_history_retention_days: Number(root.querySelector("#sGameHistDays").value) || 7
+            game_history_retention_days: Number(root.querySelector("#sGameHistDays").value) || 30
           },
           root.querySelector("#sMsgClean")
         );
