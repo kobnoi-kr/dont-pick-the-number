@@ -967,18 +967,30 @@ function renderPlayers(){
     rank.textContent=showRank?String(i+1):"•";
     const meta=onlineMode?playerByName(name):null;
     const champ=isChampion(name);
+    const isAutoUser=!!(meta&&meta.auto&&!meta.bot);
     if(champ) row.classList.add("champion");
-    const avWrap=document.createElement(meta&&meta.avatarUrl?"img":"span");
+    if(isAutoUser) row.classList.add("is-auto");
+    const face=document.createElement(meta&&meta.avatarUrl?"img":"span");
     if(meta&&meta.avatarUrl){
-      avWrap.className="pavatar"+(champ?" champion":"");
-      avWrap.src=meta.avatarUrl;
-      avWrap.alt="";
-      avWrap.width=28;
-      avWrap.height=28;
-      avWrap.referrerPolicy="no-referrer";
+      face.className="pavatar"+(champ?" champion":"");
+      face.src=meta.avatarUrl;
+      face.alt="";
+      face.width=28;
+      face.height=28;
+      face.referrerPolicy="no-referrer";
     }else{
-      avWrap.className="pavatar ph"+(champ?" champion":"");
-      avWrap.textContent=(name||"?").slice(0,1).toUpperCase();
+      face.className="pavatar ph"+(champ?" champion":"");
+      face.textContent=(name||"?").slice(0,1).toUpperCase();
+    }
+    const avWrap=document.createElement("span");
+    avWrap.className="pavatar-wrap"+(isAutoUser?" is-auto":"")+(champ?" champion":"");
+    avWrap.appendChild(face);
+    if(isAutoUser){
+      const autoTag=document.createElement("span");
+      autoTag.className="pavatar-auto-tag";
+      autoTag.textContent="AUTO";
+      autoTag.title="เล่นอัตโนมัติ";
+      avWrap.appendChild(autoTag);
     }
     const nm=document.createElement("span");
     nm.className="pname";
