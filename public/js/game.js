@@ -1395,6 +1395,15 @@ function spinNumber(){
   }
   wheelAnim=requestAnimationFrame(frame);
 }
+function paintGameModeBadge(cat){
+  const wheel=cat==="wheel";
+  const ico=$("gameModeIco");
+  const name=$("gameModeName");
+  const hint=$("gameModeHint");
+  if(ico) ico.textContent=wheel?"🎡":"🔢";
+  if(name) name.textContent=wheel?"วงล้อ":"หาเลข";
+  if(hint) hint.textContent=wheel?"วงล้อสุ่มเลข":"ห้ามโดนเลขลับ";
+}
 function applyCat(next){
   const cat=next==="wheel"?"wheel":"secret";
   const changed=cat!==gameCat;
@@ -1413,6 +1422,7 @@ function applyCat(next){
       x.setAttribute("aria-pressed",on?"true":"false");
     }
   }
+  paintGameModeBadge(cat);
   $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
   $("sideHint").textContent=wheel
     ?"แต่ละคนเลือกได้หลายเลข · วงล้อสุ่มแล้วตัดเลขที่ออกออกไปเรื่อยๆ · โดนเลขตัวไหนคนนั้นออก · คนสุดท้ายได้ 1 แต้ม"

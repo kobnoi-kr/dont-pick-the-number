@@ -31,6 +31,16 @@ h2.side-title{margin:0;font-size:1.15rem;text-align:center}
 .game-pick-body b{font-size:1.05rem}
 .game-pick-body small{color:var(--muted);font-size:.85rem}
 .game-pick-card:disabled{opacity:.55;cursor:not-allowed}
+.game-mode-badge{
+  display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;
+  border-radius:14px;border:1px solid var(--line);background:var(--chip);
+}
+.game-mode-badge .game-mode-ico{
+  width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+  background:rgba(37,99,235,.12);font-size:1.45rem;flex:0 0 auto;
+}
+.game-mode-badge b{display:block;font-size:1.05rem}
+.game-mode-badge small{display:block;color:var(--muted);font-size:.85rem;margin-top:2px}
 .restmodes{grid-template-columns:1fr 1fr}
 .restmodes .mode{padding:12px 8px;font-size:.88rem}
 .mode{border:1px solid var(--line);background:var(--chip);color:var(--text);border-radius:12px;padding:12px 4px;cursor:pointer;font-weight:700;font-size:.95rem}

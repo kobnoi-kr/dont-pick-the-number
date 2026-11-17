@@ -38,7 +38,8 @@ export async function renderRooms(root, { openCreate } = {}) {
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">ห้องที่เคยสร้าง</h3>
+      <h3 style="margin-top:0">เกมที่คุณโฮสต์จบแล้ว</h3>
+      <p class="muted tiny" style="margin:0 0 10px">บันทึกเมื่อเล่นจบเท่านั้น — สร้างแล้วลบ/ออกจากห้องโดยยังไม่จบเกมจะไม่ขึ้นที่นี่</p>
       <div id="pastRooms"><div class="loading">Loading…</div></div>
     </div>
   `;
@@ -121,7 +122,7 @@ export async function renderRooms(root, { openCreate } = {}) {
 
   const created = (mine.data && mine.data.created) || [];
   if (!created.length) {
-    pastBox.innerHTML = `<div class="empty">ยังไม่มีประวัติห้องที่คุณสร้าง</div>`;
+    pastBox.innerHTML = `<div class="empty">ยังไม่มีเกมที่จบแล้ว<br><span class="tiny">สร้างห้องแล้วเล่นจนจบอย่างน้อย 1 รอบ ถึงจะมีประวัติ</span></div>`;
   } else {
     pastBox.innerHTML = `
       <table class="table">

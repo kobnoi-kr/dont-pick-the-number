@@ -63,24 +63,17 @@
     </form>
     <form id="setup">
       <p id="hostOnlyNote" class="host-only-note">เฉพาะโฮสต์ที่ตั้งค่าห้องและเริ่มเกมได้</p>
-      <p class="label">เลือกเกม</p>
-      <div class="game-pick" id="cats">
-        <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true">
-          <span class="game-pick-ico" aria-hidden="true">🔢</span>
-          <span class="game-pick-body">
-            <b>หาเลข</b>
-            <small>ห้ามโดนเลขลับ</small>
-          </span>
-        </button>
-        <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false">
-          <span class="game-pick-ico" aria-hidden="true">🎡</span>
-          <span class="game-pick-body">
-            <b>วงล้อ</b>
-            <small>วงล้อสุ่มเลข</small>
-          </span>
-        </button>
+      <div id="gameModeBadge" class="game-mode-badge">
+        <span class="game-mode-ico" id="gameModeIco" aria-hidden="true">🔢</span>
+        <div>
+          <b id="gameModeName">หาเลข</b>
+          <small id="gameModeHint">ห้ามโดนเลขลับ</small>
+        </div>
       </div>
-      <p class="label">ตั้งค่าเกมที่เลือก</p>
+      <div id="cats" class="hidden" aria-hidden="true">
+        <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true" tabindex="-1"></button>
+        <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false" tabindex="-1"></button>
+      </div>
       <p class="label">เลือกช่วงตัวเลข</p>
       <div class="modes" id="modes">
         <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
