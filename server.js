@@ -1952,6 +1952,47 @@ attachGameApi({
       broadcastAllCore(toastMsg, send);
       broadcastAllCore(notifMsg, send);
     }
+  },
+  /** Close every room and boot all connected clients into maintenance. */
+  forceMaintenance(message) {
+    const text =
+      String(message || "").trim() || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง";
+    const codes = [...rooms.keys()];
+    for (const code of codes) {
+      const room = rooms.get(code);
+      if (!room) continue;
+      cancelSpin(room);
+      clearTurnTimer(room);
+      if (room.emptyTimer) {
+        clearTimeout(room.emptyTimer);
+        room.emptyTimer = null;
+      }
+      const everyone = room.players.slice();
+      const spectators = Array.isArray(room.spectators) ? room.spectators.slice() : [];
+      rooms.delete(room.code);
+      for (const player of everyone) {
+        const sock = player.ws;
+        if (sock) {
+          byWs.delete(sock);
+          player.ws = null;
+          send(sock, { t: "maintenance", message: text });
+          send(sock, { t: "roomClosed", message: text });
+        }
+      }
+      for (const sp of spectators) {
+        const sock = sp.ws;
+        if (sock) {
+          byWs.delete(sock);
+          send(sock, { t: "maintenance", message: text });
+          send(sock, { t: "roomClosed", message: text });
+        }
+      }
+    }
+    broadcastLobby();
+    const payload = { t: "maintenance", message: text, enabled: true };
+    broadcastAllCore(payload, send);
+    for (const sock of watchers) send(sock, payload);
+    return { roomsClosed: codes.length };
   }
 });
 

@@ -2526,6 +2526,10 @@ function connect(){
       if(!wantRoom&&!spectating&&!pendingAction) showGate();
       else renderLobby(msg);
       if(pendingAction) runPendingAction();
+    }else if(msg.t==="maintenance"){
+      try{ sessionStorage.setItem("nv-maint-msg", msg.message||""); }catch(_){}
+      location.replace("/app.html");
+      return;
     }else if(msg.t==="left"||msg.t==="roomClosed"){
       roomVisibility="";
       paintInviteBtn();

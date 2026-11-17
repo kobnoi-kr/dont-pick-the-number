@@ -94,4 +94,14 @@ export async function enforceMaintenanceGate({ hardBlock = true } = {}) {
   }
 }
 
+/** Live WS push: kick UI into maintenance without waiting for refresh. */
+export function applyLiveMaintenance(message, { bypass = false } = {}) {
+  if (bypass) {
+    hideMaintenanceOverlay();
+    return { blocked: false };
+  }
+  showMaintenanceOverlay(message || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง");
+  return { blocked: true };
+}
+
 export default enforceMaintenanceGate;

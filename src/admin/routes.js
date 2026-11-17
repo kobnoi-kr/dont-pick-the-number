@@ -804,6 +804,8 @@ async function handleAdminApi(req, res, pathname) {
         sendJson(res, 400, { error: "invalid_body" });
         return true;
       }
+      const before = await getSetting(prisma, "maintenance_enabled", false);
+      const beforeOn = before === true || before === "true" || before === 1;
       const allowed = [
         "maintenance_enabled",
         "maintenance_message",
@@ -823,11 +825,28 @@ async function handleAdminApi(req, res, pathname) {
       }
       invalidatePublicSettingsCache();
       // Force refresh so open/close server takes effect immediately
+      let afterOn = beforeOn;
       try {
         const { loadPublicSettings } = require("../system/public-settings");
-        await loadPublicSettings(true);
+        const fresh = await loadPublicSettings(true);
+        afterOn = !!fresh.maintenanceEnabled;
       } catch {
         /* ignore */
+      }
+      // Turning maintenance ON → kick everyone out of rooms immediately
+      if (!beforeOn && afterOn) {
+        const gameApi = getGameApi();
+        const msg =
+          body.settings.maintenance_message != null
+            ? String(body.settings.maintenance_message || "").trim()
+            : "";
+        if (gameApi && typeof gameApi.forceMaintenance === "function") {
+          try {
+            gameApi.forceMaintenance(msg);
+          } catch {
+            /* ignore */
+          }
+        }
       }
       await writeAdminLog(prisma, {
         adminId: auth.user.id,

@@ -8,7 +8,7 @@ import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
-import { enforceMaintenanceGate } from "/js/maintenance-gate.js";
+import { enforceMaintenanceGate, applyLiveMaintenance } from "/js/maintenance-gate.js";
 
 const state = {
   user: null,
@@ -152,6 +152,13 @@ onDashboardMessage((msg) => {
     onLiveAnnouncement(msg.announcement);
     refreshNotifications();
   }
+  if (msg.t === "maintenance" && msg.enabled !== false) {
+    const roles = (state.user && state.user.roles) || [];
+    const isAdmin =
+      roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+    const result = applyLiveMaintenance(msg.message, { bypass: isAdmin });
+    if (result.blocked) return;
+  }
   if (msg.t === "dashboard:update" && state.view === "overview") navigate("overview");
   if ((msg.t === "friend:update" || msg.t === "presence") && state.view === "friends") {
     navigate("friends");
@@ -176,6 +183,22 @@ onDashboardMessage((msg) => {
     paintUser(state.user);
   } catch (err) {
     paintUser(null);
+  }
+
+  try {
+    const kicked = sessionStorage.getItem("nv-maint-msg");
+    if (kicked != null) {
+      sessionStorage.removeItem("nv-maint-msg");
+      const roles = (state.user && state.user.roles) || [];
+      const isAdmin =
+        roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+      if (!isAdmin) {
+        applyLiveMaintenance(kicked || "ระบบปิดปรับปรุงชั่วคราว กรุณากลับมาใหม่ภายหลัง");
+        return;
+      }
+    }
+  } catch {
+    /* ignore */
   }
 
   const gate = await enforceMaintenanceGate({ hardBlock: true });

@@ -13,6 +13,63 @@ function modeLabel(mode) {
   return mode === "wheel" ? "วงล้อ" : "หาเลข";
 }
 
+function ensureJoinCodeModal() {
+  let modal = document.getElementById("dashJoinModal");
+  if (modal) return modal;
+  modal = document.createElement("div");
+  modal.id = "dashJoinModal";
+  modal.className = "modal hidden";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `
+    <div class="modal-card">
+      <h3>เข้าห้องส่วนตัว</h3>
+      <p class="muted" id="dashJoinHint">ใส่รหัสห้อง 6 หลัก</p>
+      <form id="dashJoinForm" class="form-grid" autocomplete="off">
+        <label>รหัสห้อง
+          <input id="dashJoinCode" class="input" inputmode="numeric" maxlength="6" placeholder="เช่น 123456" aria-label="รหัสห้อง">
+        </label>
+        <p class="msg" id="dashJoinMsg"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="dashJoinCancel">ยกเลิก</button>
+          <button type="submit" class="btn">เข้าห้อง</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+  modal.querySelector("#dashJoinCancel").onclick = () => modal.classList.add("hidden");
+  modal.querySelector("#dashJoinForm").onsubmit = (e) => {
+    e.preventDefault();
+    const code = modal.querySelector("#dashJoinCode").value.replace(/\D/g, "").slice(0, 6);
+    const msg = modal.querySelector("#dashJoinMsg");
+    if (!/^\d{6}$/.test(code)) {
+      msg.textContent = "ใส่รหัส 6 หลัก";
+      return;
+    }
+    const name = localStorage.getItem("dpn-name") || "";
+    location.href = playUrl({ code, name });
+  };
+  return modal;
+}
+
+function openPrivateJoinModal(roomTitle) {
+  const modal = ensureJoinCodeModal();
+  const hint = modal.querySelector("#dashJoinHint");
+  const input = modal.querySelector("#dashJoinCode");
+  const msg = modal.querySelector("#dashJoinMsg");
+  hint.textContent = roomTitle
+    ? `ห้อง “${roomTitle}” ล็อกอยู่ · ใส่รหัส 6 หลัก`
+    : "ใส่รหัสห้อง 6 หลักเพื่อเข้าห้องส่วนตัว";
+  msg.textContent = "";
+  input.value = "";
+  modal.classList.remove("hidden");
+  requestAnimationFrame(() => input.focus());
+}
+
 export async function renderRooms(root, { openCreate } = {}) {
   root.innerHTML = `
     <section class="page-head">
@@ -77,26 +134,34 @@ export async function renderRooms(root, { openCreate } = {}) {
         <thead><tr><th>ห้อง</th><th>โฮสต์</th><th>ผู้เล่น</th><th>เกม</th><th>สถานะ</th><th></th></tr></thead>
         <tbody>
           ${live
-            .map(
-              (r) => `
+            .map((r) => {
+              const priv = r.visibility === "private";
+              const codeLabel = priv ? "🔒 ล็อก" : r.code || "—";
+              let actions = "";
+              if (r.joinable) {
+                if (priv) {
+                  actions = `<button class="btn sm" data-private-join="1" data-title="${esc(r.title || "Room")}">ใส่รหัส</button>`;
+                } else {
+                  actions = `<button class="btn sm" data-join="${esc(r.code)}">เข้า</button>
+                       <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`;
+                }
+              } else if (r.phase !== "lobby" && r.phase !== "over") {
+                actions = priv
+                  ? `<button class="btn ghost sm" disabled>ส่วนตัว</button>`
+                  : `<a class="btn ghost sm" href="${playUrl({ code: r.code, watch: true })}">ดูสด</a>`;
+              } else {
+                actions = `<button class="btn sm" disabled>เต็ม</button>`;
+              }
+              return `
             <tr>
-              <td><b>${esc(r.title || "Room")}</b><div class="tiny">${r.code || "—"} · ${r.visibility === "private" ? "Private" : "Public"}</div></td>
+              <td><b>${esc(r.title || "Room")}</b><div class="tiny">${codeLabel} · ${priv ? "Private" : "Public"}</div></td>
               <td>${esc(r.host || "—")}</td>
               <td>${r.count}/${r.max}</td>
               <td>${modeLabel(r.cat)}</td>
               <td>${statusPill(r)}</td>
-              <td class="row-actions">
-                ${
-                  r.joinable
-                    ? `<button class="btn sm" data-join="${esc(r.code)}">เข้า</button>
-                       <button class="btn ghost sm" data-copy="${esc(r.code)}">คัดลอกรหัส</button>`
-                    : r.phase !== "lobby" && r.phase !== "over"
-                      ? `<a class="btn ghost sm" href="${playUrl({ code: r.code, watch: true })}">ดูสด</a>`
-                      : `<button class="btn sm" disabled>เต็ม</button>`
-                }
-              </td>
-            </tr>`
-            )
+              <td class="row-actions">${actions}</td>
+            </tr>`;
+            })
             .join("")}
         </tbody>
       </table>`;
@@ -106,6 +171,9 @@ export async function renderRooms(root, { openCreate } = {}) {
     btn.onclick = () => {
       location.href = playUrl({ code: btn.getAttribute("data-join") });
     };
+  });
+  liveBox.querySelectorAll("[data-private-join]").forEach((btn) => {
+    btn.onclick = () => openPrivateJoinModal(btn.getAttribute("data-title") || "");
   });
   liveBox.querySelectorAll("[data-copy]").forEach((btn) => {
     btn.onclick = async () => {
