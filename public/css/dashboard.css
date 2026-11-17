@@ -1214,6 +1214,16 @@ td.row-actions > a.btn:last-child {
 }
 .level-tier-lv { font-weight: 800; font-variant-numeric: tabular-nums; }
 .level-tier-title { font-weight: 750; }
+.level-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.level-pager.hidden { display: none; }
+.level-pager .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 
 .level-admin-table { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .level-admin-row {
