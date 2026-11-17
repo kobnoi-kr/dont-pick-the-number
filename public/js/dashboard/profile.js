@@ -10,8 +10,37 @@ function isElevatedAdmin(user) {
   return roles.includes("admin") || roles.includes("super_admin");
 }
 
+function resizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error("invalid_file"));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read_failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode_failed"));
+      img.onload = () => {
+        const size = 96;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+        if (dataUrl.length > 24000) return reject(new Error("too_large"));
+        resolve(dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function renderProfile(root, { user, onSaved }) {
   const u = user || {};
+  let pendingAvatar = undefined;
   const settingsRes = await api("/api/v1/settings", { method: "GET" });
   const s = (settingsRes.data && settingsRes.data.settings) || {
     language: "th",
@@ -19,39 +48,55 @@ export async function renderProfile(root, { user, onSaved }) {
     preferences: {}
   };
   const pref = s.preferences || {};
-  const providers = await api("/api/v1/account/providers", { method: "GET" });
-  const linked = ((providers.data && providers.data.providers) || []).map((p) => p.provider);
+  const providersRes = await api("/api/v1/account/providers", { method: "GET" });
+  const providers = (providersRes.data && providersRes.data.providers) || [];
+  const linked = new Set(providers.map((p) => p.provider));
+  const sessRes = await api("/api/v1/account/sessions", { method: "GET" });
+  const sessions = (sessRes.data && sessRes.data.sessions) || [];
+  const guest = u.accountType === "guest";
 
   root.innerHTML = `
     <div class="content-grid">
       <div class="card">
         <h2>โปรไฟล์</h2>
-        <div style="display:flex;gap:14px;align-items:center;margin:12px 0">
-          ${
+        <p class="tiny">${esc((u.roles || []).join(" · ") || u.accountType || "guest")}</p>
+        <div class="avatar-edit">
+          <div id="pfAvatarPreview" class="avatar-preview-lg">${
             u.avatarUrl
-              ? `<img src="${esc(u.avatarUrl)}" width="72" height="72" style="border-radius:50%;object-fit:cover;border:1px solid var(--nv-border)" referrerpolicy="no-referrer">`
-              : `<span class="avatar-fallback" style="width:72px;height:72px;font-size:1.4rem">${esc((u.displayName || "?").slice(0, 1))}</span>`
-          }
-          <div>
-            <div style="font-weight:800;font-size:1.2rem">${esc(u.displayName || u.username || "Player")}</div>
-            <div class="tiny">@${esc(u.username || "—")} · ${esc(u.accountType || "guest")}</div>
+              ? `<img src="${esc(u.avatarUrl)}" alt="" referrerpolicy="no-referrer">`
+              : esc((u.displayName || "?").slice(0, 1).toUpperCase())
+          }</div>
+          <div class="row-actions">
+            <label class="btn ghost sm">เลือกรูป
+              <input id="pfAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            </label>
+            <button type="button" class="btn ghost sm" id="pfAvatarClear">ลบรูป</button>
           </div>
         </div>
         <form id="profileForm" class="form-grid">
           <label>Display Name<input id="pfName" maxlength="64" value="${esc(u.displayName || "")}" required></label>
           <label>Username<input value="${esc(u.username || "")}" disabled></label>
-          <label>Avatar URL<input id="pfAvatar" value="${esc(u.avatarUrl || "")}" placeholder="https://..."></label>
           <button class="btn" type="submit">บันทึกโปรไฟล์</button>
         </form>
         <p class="msg" id="pfMsg"></p>
+        ${
+          guest
+            ? `<div class="guest-upgrade">
+                <p class="muted">ผูกบัญชีเพื่อเก็บเพื่อนและสถิติ</p>
+                <div class="oauth-row">
+                  <a class="btn ghost sm" href="/api/v1/auth/google">Google</a>
+                  <a class="btn ghost sm" href="/api/v1/auth/discord">Discord</a>
+                </div>
+              </div>`
+            : ""
+        }
       </div>
 
       <div class="panel-right">
         <div class="card">
           <h3>เชื่อมต่อบัญชี</h3>
-          <p class="tiny">Google: ${linked.includes("google") ? "เชื่อมแล้ว" : "ยังไม่เชื่อม"}</p>
-          <p class="tiny">Discord: ${linked.includes("discord") ? "เชื่อมแล้ว" : "ยังไม่เชื่อม"}</p>
-          <a class="btn ghost block" style="margin-top:10px" href="/account.html">จัดการ Google / Discord / Sessions</a>
+          <ul class="list" id="pfProviders"></ul>
+          <div class="row-actions" id="pfLinkRow" style="margin-top:10px"></div>
           ${
             isElevatedAdmin(u)
               ? `<a class="btn block" style="margin-top:10px" href="/admin.html">Admin Dashboard</a>`
@@ -69,29 +114,128 @@ export async function renderProfile(root, { user, onSaved }) {
           <p class="msg" id="privMsg"></p>
         </div>
         <div class="card">
-          <h3>บัญชี</h3>
-          <button type="button" class="btn ghost block" id="pfLogout">Logout</button>
-          <a class="btn ghost block danger-outline" style="margin-top:8px" href="/account.html">ลบบัญชี / ตั้งค่าเพิ่มเติม</a>
+          <h3>Sessions</h3>
+          <ul class="list" id="pfSessions"></ul>
+          <button type="button" class="btn ghost block" id="pfLogout" style="margin-top:10px">Logout</button>
+          <button type="button" class="btn ghost block" id="pfLogoutAll" style="margin-top:8px">Logout ทุกอุปกรณ์</button>
+          <button type="button" class="btn ghost block danger-outline" id="pfDelete" style="margin-top:8px">ลบบัญชี</button>
         </div>
       </div>
-    </div>`;
+    </div>
+    <div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <h3>ลบบัญชี?</h3>
+        <p class="muted">การลบไม่สามารถย้อนกลับได้</p>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="deleteCancel">ยกเลิก</button>
+          <button type="button" class="btn" id="deleteConfirm" style="background:#b91c1c">ยืนยันลบ</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  function paintPreview(url) {
+    const box = root.querySelector("#pfAvatarPreview");
+    if (url) box.innerHTML = `<img src="${esc(url)}" alt="" referrerpolicy="no-referrer">`;
+    else box.textContent = (root.querySelector("#pfName").value || "?").slice(0, 1).toUpperCase();
+  }
+
+  const provBox = root.querySelector("#pfProviders");
+  providers.forEach((p) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${esc(p.provider)}${p.providerEmail ? " · " + esc(p.providerEmail) : ""}</span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn ghost sm";
+    btn.textContent = "ยกเลิกเชื่อม";
+    btn.onclick = async () => {
+      const r = await api("/api/v1/account/unlink/" + p.provider, { method: "DELETE" });
+      const map = {
+        last_provider: "ถอดไม่ได้ — นี่คือวิธีล็อกอินสุดท้าย",
+        provider_not_linked: "ยังไม่ได้เชื่อม",
+        cannot_unlink: "ถอดการเชื่อมไม่สำเร็จ"
+      };
+      const msg = root.querySelector("#pfMsg");
+      msg.textContent = r.res.ok ? "ยกเลิกแล้ว" : map[r.data && r.data.error] || (r.data && r.data.error) || "ล้มเหลว";
+      msg.classList.toggle("ok", r.res.ok);
+      if (r.res.ok) renderProfile(root, { user, onSaved });
+    };
+    li.appendChild(btn);
+    provBox.appendChild(li);
+  });
+  if (!providers.length) {
+    provBox.innerHTML = `<li><span class="tiny">ยังไม่ได้เชื่อมบัญชี</span></li>`;
+  }
+
+  const linkRow = root.querySelector("#pfLinkRow");
+  if (!guest) {
+    if (!linked.has("google")) {
+      linkRow.innerHTML += `<a class="btn ghost sm" href="/api/v1/auth/link/google">เชื่อม Google</a>`;
+    }
+    if (!linked.has("discord")) {
+      linkRow.innerHTML += `<a class="btn ghost sm" href="/api/v1/auth/link/discord">เชื่อม Discord</a>`;
+    }
+  }
+
+  const sessBox = root.querySelector("#pfSessions");
+  sessions.forEach((sItem) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<div><div>${esc((sItem.userAgent || "device").slice(0, 48))}</div><div class="tiny">${esc(sItem.ipAddress || "")} · ${esc(
+      new Date(sItem.lastSeenAt).toLocaleString()
+    )}</div></div>`;
+    if (sItem.current) {
+      const b = document.createElement("span");
+      b.className = "pill ok";
+      b.textContent = "เครื่องนี้";
+      li.appendChild(b);
+    } else {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn ghost sm";
+      btn.textContent = "revoke";
+      btn.onclick = async () => {
+        await api("/api/v1/account/sessions/" + sItem.id, { method: "DELETE" });
+        renderProfile(root, { user, onSaved });
+      };
+      li.appendChild(btn);
+    }
+    sessBox.appendChild(li);
+  });
+  if (!sessions.length) sessBox.innerHTML = `<li><span class="tiny">ไม่มี session</span></li>`;
+
+  root.querySelector("#pfAvatarFile").onchange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      pendingAvatar = await resizeImageFile(file);
+      paintPreview(pendingAvatar);
+      const msg = root.querySelector("#pfMsg");
+      msg.textContent = "เลือกรูปแล้ว — กดบันทึกโปรไฟล์";
+      msg.classList.add("ok");
+    } catch {
+      const msg = root.querySelector("#pfMsg");
+      msg.textContent = "อัปโหลดรูปไม่สำเร็จ";
+      msg.classList.remove("ok");
+    }
+  };
+  root.querySelector("#pfAvatarClear").onclick = () => {
+    pendingAvatar = null;
+    paintPreview("");
+  };
 
   root.querySelector("#profileForm").onsubmit = async (e) => {
     e.preventDefault();
     const msg = root.querySelector("#pfMsg");
-    const body = JSON.stringify({
-      displayName: root.querySelector("#pfName").value.trim(),
-      avatarUrl: root.querySelector("#pfAvatar").value.trim() || null
+    const body = { displayName: root.querySelector("#pfName").value.trim() };
+    if (pendingAvatar !== undefined) body.avatarUrl = pendingAvatar;
+    const { res, data } = await api("/api/v1/account/profile", {
+      method: "PATCH",
+      body: JSON.stringify(body)
     });
-    const { res, data } = await api("/api/v1/account/profile", { method: "PATCH", body });
-    if (!res.ok) {
-      msg.textContent = (data && data.error) || "save_failed";
-      msg.classList.remove("ok");
-      return;
-    }
-    msg.textContent = "บันทึกแล้ว";
-    msg.classList.add("ok");
-    if (onSaved && data && data.user) onSaved(data.user);
+    msg.textContent = res.ok ? "บันทึกแล้ว" : (data && data.error) || "บันทึกไม่สำเร็จ";
+    msg.classList.toggle("ok", res.ok);
+    if (res.ok && onSaved && data && data.user) onSaved(data.user);
   };
 
   root.querySelector("#privForm").onsubmit = async (e) => {
@@ -112,4 +256,41 @@ export async function renderProfile(root, { user, onSaved }) {
   };
 
   root.querySelector("#pfLogout").onclick = () => logout();
+  root.querySelector("#pfLogoutAll").onclick = async () => {
+    await api("/api/v1/auth/logout-all", { method: "POST", body: "{}" });
+    location.href = "/login.html";
+  };
+
+  const modal = root.querySelector("#deleteModal");
+  root.querySelector("#pfDelete").onclick = () => modal.classList.remove("hidden");
+  root.querySelector("#deleteCancel").onclick = () => modal.classList.add("hidden");
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+  root.querySelector("#deleteConfirm").onclick = async () => {
+    const { res, data } = await api("/api/v1/account/delete", { method: "DELETE" });
+    if (res.ok) {
+      location.href = "/";
+      return;
+    }
+    modal.classList.add("hidden");
+    const msg = root.querySelector("#pfMsg");
+    msg.textContent = (data && data.error) || "ลบบัญชีไม่สำเร็จ";
+    msg.classList.remove("ok");
+  };
+
+  const q = new URLSearchParams(location.search);
+  const linkedParam = q.get("linked");
+  const err = q.get("error");
+  if (linkedParam || err) {
+    const msg = root.querySelector("#pfMsg");
+    if (linkedParam) {
+      msg.textContent = "เชื่อม " + linkedParam + " แล้ว";
+      msg.classList.add("ok");
+    } else {
+      msg.textContent = err === "provider_already_linked" ? "บัญชีนี้ถูกผูกกับโปรไฟล์อื่นแล้ว" : err;
+      msg.classList.remove("ok");
+    }
+    history.replaceState({}, "", location.pathname + location.hash);
+  }
 }

@@ -4,6 +4,7 @@ const TITLES = {
   overview: "Overview",
   library: "Game Library",
   rooms: "My Rooms",
+  friends: "Friends",
   profile: "Profile & Settings"
 };
 

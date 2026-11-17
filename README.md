@@ -72,7 +72,7 @@ npm start
 - `/` Landing
 - `/app.html` User Dashboard
 - `/play.html` เกม
-- `/login.html` `/register.html` `/account.html`
+- `/login.html` `/register.html` · account/friends → `/app.html#profile` / `#friends`
 - `/admin.html` Admin stub
 - `/reset-password.html` `/verify-email.html`
 

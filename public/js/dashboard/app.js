@@ -4,6 +4,7 @@ import { connectDashboardWs, onDashboardMessage } from "./ws.js";
 import { renderOverview } from "./overview.js";
 import { renderLibrary } from "./library.js";
 import { renderRooms } from "./rooms.js";
+import { renderFriends } from "./friends.js";
 import { renderProfile } from "./profile.js";
 import { wireNotifications, refreshNotifications } from "./notifications.js";
 
@@ -64,6 +65,10 @@ async function navigate(view) {
   location.hash = state.view === "overview" ? "" : "#" + state.view;
   shell.setActive(state.view);
   const root = document.getElementById("viewRoot");
+  if (root._friendsTimer) {
+    clearInterval(root._friendsTimer);
+    root._friendsTimer = null;
+  }
   root.innerHTML = `<div class="card"><div class="loading">Loading…</div></div>`;
   const ctx = {
     user: state.user,
@@ -78,6 +83,7 @@ async function navigate(view) {
   if (state.view === "overview") await renderOverview(root, ctx);
   else if (state.view === "library") await renderLibrary(root, ctx);
   else if (state.view === "rooms") await renderRooms(root, ctx);
+  else if (state.view === "friends") await renderFriends(root, ctx);
   else if (state.view === "profile") await renderProfile(root, ctx);
   else await renderOverview(root, ctx);
 }
@@ -102,6 +108,9 @@ onDashboardMessage((msg) => {
   if (msg.t === "lobby" && state.view === "rooms") navigate("rooms");
   if (msg.t === "notification:new") refreshNotifications();
   if (msg.t === "dashboard:update" && state.view === "overview") navigate("overview");
+  if ((msg.t === "friend:update" || msg.t === "presence") && state.view === "friends") {
+    navigate("friends");
+  }
 });
 
 (async function boot() {

@@ -1740,14 +1740,16 @@ function typedName(){
       return profile;
     }
   }
-  const name=$("myName").value.trim().replace(/\s+/g," ").slice(0,24);
+  const input=$("myName");
+  const name=(input?input.value:localStorage.getItem("dpn-name")||"").trim().replace(/\s+/g," ").slice(0,24);
   if(name) localStorage.setItem("dpn-name", name);
   return name;
 }
 function setLocalName(name){
   const clean=String(name||"").trim().replace(/\s+/g," ").slice(0,24);
   if(!clean) return "";
-  $("myName").value=clean;
+  const input=$("myName");
+  if(input) input.value=clean;
   localStorage.setItem("dpn-name", clean);
   return clean;
 }
@@ -1782,9 +1784,9 @@ function closeCodeModal(){
 }
 const GUIDE={
   room:`<section><h4>เริ่มต้นใช้งาน</h4><ul>
-<li>ใส่ชื่อของคุณก่อนสร้างหรือเข้าห้อง</li>
-<li>สร้าง <b>ห้องสาธารณะ</b> เพื่อโชว์ในล็อบบี้ออนไลน์ หรือ <b>ห้องส่วนตัว</b> ที่ต้องใส่รหัสถึงจะเข้าได้</li>
-<li>เข้าห้องด้วยรหัส 6 หลัก หรือกดเข้าจากลิสต์ล็อบบี้</li>
+<li>สร้างหรือเข้าห้องจาก <b>Dashboard → My Rooms</b></li>
+<li>สร้างห้อง Public/Private หรือใส่รหัส 6 หลักเพื่อเข้า</li>
+<li>หน้านี้ใช้ตอนอยู่ในห้องแล้วเท่านั้น</li>
 </ul></section>
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
@@ -1858,11 +1860,19 @@ function showGate(){
   closeCodeModal();
   closeGuide();
   document.title="NUMVERSE";
-  show("gate");
+  if(pendingAction){
+    show("gate");
+    return;
+  }
+  location.replace("/app.html#rooms");
 }
 function showErr(message){
-  if(netPhase==="gate") $("gateMsg").textContent=message;
-  else if(screenOpen("start")) $("err").textContent=message;
+  if(netPhase==="gate"){
+    const el=$("gateMsg");
+    if(el) el.textContent=message;
+    return;
+  }
+  if(screenOpen("start")) $("err").textContent=message;
   else if(screenOpen("play")) $("msg").textContent=message;
   else if(screenOpen("pick")) $("pickMsg").textContent=message;
   else $("perr").textContent=message;
@@ -2216,9 +2226,11 @@ function resumeLiveSpin(){
 document.addEventListener("visibilitychange", resumeLiveSpin);
 function renderLobby(msg){
   const list=$("roomList");
+  if(!list) return;
   list.textContent="";
   const found=Array.isArray(msg.rooms)?msg.rooms:[];
-  $("lobbyEmpty").classList.toggle("hidden",found.length>0);
+  const empty=$("lobbyEmpty");
+  if(empty) empty.classList.toggle("hidden",found.length>0);
   found.forEach(room=>{
     const priv=room.visibility==="private";
     const li=document.createElement("li");
@@ -2256,23 +2268,23 @@ function renderLobby(msg){
   });
 }
 function joinCode(code){
-  const name=typedName();
-  if(!name){ $("gateMsg").textContent="ใส่ชื่อก่อน"; return false; }
+  const name=typedName()||localStorage.getItem("dpn-name")||"";
+  if(!name){ if($("gateMsg")) $("gateMsg").textContent="ใส่ชื่อก่อน"; return false; }
   const clean=String(code||"").replace(/\D/g,"").slice(0,6);
   if(!/^\d{6}$/.test(clean)){
-    if(!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
-    else $("gateMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
+    if($("codeModal")&&!$("codeModal").classList.contains("hidden")) $("codeModalMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
+    else if($("gateMsg")) $("gateMsg").textContent="รหัสต้องเป็นตัวเลข 6 หลัก";
     return false;
   }
-  $("gateMsg").textContent="";
+  if($("gateMsg")) $("gateMsg").textContent="";
   send({t:"join",code:clean,name,token:myToken(),avatarUrl:myAvatar()});
   closeCodeModal();
   return true;
 }
 function makeRoom(visibility){
-  const name=typedName();
-  if(!name){ $("gateMsg").textContent="ใส่ชื่อก่อน"; return; }
-  $("gateMsg").textContent="";
+  const name=typedName()||localStorage.getItem("dpn-name")||"";
+  if(!name){ if($("gateMsg")) $("gateMsg").textContent="ใส่ชื่อก่อน"; return; }
+  if($("gateMsg")) $("gateMsg").textContent="";
   send({t:"create",visibility,name,token:myToken(),avatarUrl:myAvatar()});
 }
 function pushNums(){
@@ -2302,12 +2314,12 @@ function connect(){
   let ws;
   try{ ws=new WebSocket(proto+"://"+location.host+"/ws"); }
   catch(e){
-    $("connMsg").textContent="เปิดจากเซิร์ฟเวอร์เกม แล้วรัน npm start";
+    if($("connMsg")) $("connMsg").textContent="เปิดจากเซิร์ฟเวอร์เกม แล้วรัน npm start";
     return;
   }
   sock=ws;
   ws.onopen=()=>{
-    $("connMsg").textContent="";
+    if($("connMsg")) $("connMsg").textContent="";
     send({t:"hello",token:myToken(),name:localStorage.getItem("dpn-name")||typedName(),avatarUrl:myAvatar()});
     setTimeout(runPendingAction, 50);
   };
@@ -2320,13 +2332,14 @@ function connect(){
       onSnap(msg);
     }
     else if(msg.t==="lobby"){
-      if(!wantRoom&&!spectating) showGate();
-      renderLobby(msg);
+      if(!wantRoom&&!spectating&&!pendingAction) showGate();
+      else renderLobby(msg);
       if(pendingAction) runPendingAction();
     }else if(msg.t==="left"){
       roomVisibility="";
       paintInviteBtn();
-      showGate();
+      location.replace("/app.html#rooms");
+      return;
     }else if(msg.t==="renamed"){
       if(msg.name) setLocalName(msg.name);
     }else if(msg.t==="friendsOnline"){
@@ -2355,22 +2368,21 @@ function connect(){
     sock=null;
     const note="ขาดการเชื่อมต่อ กำลังเชื่อมใหม่…";
     if(wantRoom) $("roomNote").textContent=note;
-    else $("connMsg").textContent=note;
+    else if($("connMsg")) $("connMsg").textContent=note;
     clearTimeout(connTimer);
     connTimer=setTimeout(connect,800);
   };
 }
 async function bootOnline(){
   readPlayParams();
+  if(!pendingAction){
+    location.replace("/app.html#rooms");
+    return;
+  }
   await ensureAuth();
   const saved=localStorage.getItem("dpn-name");
   if(saved&&$("myName")) $("myName").value=saved;
-  const dashLink=document.createElement("p");
-  dashLink.className="hint";
-  dashLink.innerHTML='<a href="/app.html" style="color:inherit">← กลับ Dashboard</a>';
-  const gate=$("gate");
-  if(gate) gate.appendChild(dashLink);
-  $("myName").addEventListener("change",typedName);
+  if($("myName")) $("myName").addEventListener("change",typedName);
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   setInterval(paintTurnClock, 250);
   function toggleAuto(){
@@ -2408,7 +2420,7 @@ async function bootOnline(){
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };
   $("wheelRepick").onclick=()=>{ if(isHost()) send({t:"repick"}); };
   $("leaveRoom").onclick=()=>{
-    if(spectating){ send({t:"unwatch"}); location.href="/"; return; }
+    if(spectating){ send({t:"unwatch"}); location.replace("/app.html#rooms"); return; }
     send({t:"leave"});
   };
   $("renameRoomBtn").onclick=()=>openRenameRoom();
@@ -2421,7 +2433,7 @@ async function bootOnline(){
   $("codeModal").addEventListener("click",e=>{ if(e.target===$("codeModal")) closeCodeModal(); });
   $("codeModalForm").onsubmit=e=>{
     e.preventDefault();
-    if(!typedName()){ $("codeModalMsg").textContent="ใส่ชื่อของคุณก่อนที่หน้าแรก"; return; }
+    if(!(typedName()||localStorage.getItem("dpn-name"))){ $("codeModalMsg").textContent="ใส่ชื่อใน Dashboard ก่อน"; return; }
     joinCode($("codeModalInput").value);
   };
   $("codeModalInput").addEventListener("input",()=>{ $("codeModalInput").value=$("codeModalInput").value.replace(/\D/g,"").slice(0,6); });
@@ -2442,10 +2454,14 @@ async function bootOnline(){
       $("copyCode").textContent="คัดลอกไม่สำเร็จ";
     }
   };
-  $("makePublic").onclick=()=>makeRoom("public");
-  $("makePrivate").onclick=()=>makeRoom("private");
-  $("joinForm").onsubmit=e=>{ e.preventDefault(); joinCode($("joinCode").value); };
-  $("joinCode").addEventListener("input",()=>{ $("joinCode").value=$("joinCode").value.replace(/\D/g,"").slice(0,6); });
+  const makePublic=$("makePublic");
+  const makePrivate=$("makePrivate");
+  const joinForm=$("joinForm");
+  const joinCodeInput=$("joinCode");
+  if(makePublic) makePublic.onclick=()=>makeRoom("public");
+  if(makePrivate) makePrivate.onclick=()=>makeRoom("private");
+  if(joinForm) joinForm.onsubmit=e=>{ e.preventDefault(); joinCode(joinCodeInput&&joinCodeInput.value); };
+  if(joinCodeInput) joinCodeInput.addEventListener("input",()=>{ joinCodeInput.value=joinCodeInput.value.replace(/\D/g,"").slice(0,6); });
   const loginLink=$("loginLink");
   if(loginLink){
     loginLink.onclick=()=>{
@@ -2457,7 +2473,7 @@ async function bootOnline(){
   const authChoiceLogin=$("authChoiceLogin");
   const authChoiceCancel=$("authChoiceCancel");
   const authChoiceModal=$("authChoiceModal");
-  if(authChoiceLink) authChoiceLink.onclick=()=>{ location.href="account.html"; };
+  if(authChoiceLink) authChoiceLink.onclick=()=>{ location.href="/app.html#profile"; };
   if(authChoiceLogin) authChoiceLogin.onclick=async()=>{
     try{ await fetch("/api/v1/auth/logout",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"}); }
     catch(e){}

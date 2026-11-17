@@ -27,33 +27,20 @@
       <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
     </div>
     <h1 class="sr-only">NUMVERSE</h1>
-    <p class="sub">สร้างห้อง แล้วให้เพื่อนเข้าด้วยรหัสตัวเลข · <a href="/app.html" style="color:inherit">Dashboard</a></p>
-    <label class="field" id="nameFieldWrap">ชื่อของคุณ
-      <input id="myName" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่จะโชว์ในห้อง">
-    </label>
-    <div class="auth-bar" id="authBar">
-      <div id="authAvatar" class="auth-avatar" aria-hidden="true"></div>
+    <p class="sub">กำลังเข้าห้อง…</p>
+    <input id="myName" type="hidden" maxlength="24" autocomplete="nickname" value="">
+    <div class="auth-bar hidden" id="authBar" aria-hidden="true">
+      <div id="authAvatar" class="auth-avatar"></div>
       <div class="auth-meta">
         <span id="authLabel" class="hint">Guest</span>
         <span id="authName" class="auth-name hidden"></span>
       </div>
-      <a class="btn auth-account-btn hidden" id="accountLink" href="account.html">บัญชี</a>
+      <a class="btn auth-account-btn hidden" id="accountLink" href="/app.html#profile">บัญชี</a>
       <button type="button" class="textbtn" id="loginLink">เข้าสู่ระบบ</button>
     </div>
-    <p class="label">สร้างห้อง</p>
-    <div class="modes cats">
-      <button type="button" class="mode" id="makePublic">ห้องสาธารณะ</button>
-      <button type="button" class="mode" id="makePrivate">ห้องส่วนตัว</button>
-    </div>
-    <form id="joinForm" class="jump">
-      <input id="joinCode" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="รหัส 6 หลัก">
-      <button class="btn" type="submit">เข้าห้อง</button>
-    </form>
-    <p class="label lobby-label"><span class="live-dot" aria-hidden="true"></span>ล็อบบี้ที่กำลังออนไลน์</p>
-    <ul id="roomList" class="rooms"></ul>
-    <p id="lobbyEmpty" class="hint">ยังไม่มีห้องออนไลน์</p>
     <p id="gateMsg" class="msg"></p>
-    <p id="connMsg" class="hint"></p>
+    <p id="connMsg" class="hint">เชื่อมต่อเซิร์ฟเวอร์…</p>
+    <p class="hint"><a href="/app.html#rooms" style="color:inherit">← กลับ Dashboard</a></p>
   </section>
 
   <section id="start" class="hidden">

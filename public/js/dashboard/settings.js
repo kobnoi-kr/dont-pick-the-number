@@ -47,7 +47,7 @@ export async function renderSettings(root) {
         </div>
         <div class="card">
           <h3>Account</h3>
-          <a class="btn ghost block" href="/account.html">Connected accounts & sessions</a>
+          <a class="btn ghost block" href="/app.html#profile">Connected accounts & sessions</a>
           <a class="btn ghost block" style="margin-top:8px" href="/login.html">Switch account</a>
         </div>
       </div>
