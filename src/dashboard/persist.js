@@ -142,6 +142,7 @@ async function persistFinishedGame(room, scoreOf) {
           if (ptsGain > 0) {
             await awardShopPts(prisma, gp.userId, ptsGain, {
               humans,
+              modePts: shopCfg.mode,
               gameId: game.id,
               roomCode: room.code,
               mode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret"

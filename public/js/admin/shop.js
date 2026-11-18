@@ -125,7 +125,15 @@ export async function renderShopAdmin(root, { user }) {
   let msg = "";
   let msgOk = false;
   let pendingImage = "";
-  let ptsCfg = { enabled: true, baseWin: 25, perHumanOpponent: 15, maxBonusHumans: 11 };
+  let ptsCfg = {
+    enabled: true,
+    mode: "random",
+    baseWin: 25,
+    perHumanOpponent: 15,
+    maxBonusHumans: 11,
+    randomMin: 20,
+    randomMax: 100
+  };
 
   async function load() {
     const [shopRes, settingsRes] = await Promise.all([
@@ -146,9 +154,12 @@ export async function renderShopAdmin(root, { user }) {
       if (raw && typeof raw === "object") {
         ptsCfg = {
           enabled: raw.enabled !== false,
+          mode: raw.mode === "formula" ? "formula" : "random",
           baseWin: Number(raw.baseWin) || 25,
           perHumanOpponent: Number(raw.perHumanOpponent) || 15,
-          maxBonusHumans: Number(raw.maxBonusHumans) || 11
+          maxBonusHumans: Number(raw.maxBonusHumans) || 11,
+          randomMin: Number(raw.randomMin) || 20,
+          randomMax: Number(raw.randomMax) || 100
         };
       }
     }
@@ -202,11 +213,23 @@ export async function renderShopAdmin(root, { user }) {
 
       <div class="card">
         <h3 style="margin-top:0">ตั้งค่ารางวัล pts</h3>
-        <p class="tiny muted" style="margin:0 0 10px">ชนะเกมได้ pts · ไม่นับบอท · สูตร = base + (ผู้เล่นจริงในล็อบบี้ − 1) × โบนัส</p>
+        <p class="tiny muted" style="margin:0 0 10px">ชนะเกมได้ pts · ไม่นับบอท · เลือกโหมดสุ่มช่วง หรือสูตรตามจำนวนคนจริง</p>
         <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
           <label class="shop-flag" style="align-items:center">
             <input type="checkbox" id="ptsEnabled" ${ptsCfg.enabled ? "checked" : ""}>
             เปิดระบบ Shop / ให้ pts
+          </label>
+          <label>โหมดรางวัล
+            <select class="input" id="ptsMode">
+              <option value="random"${ptsCfg.mode !== "formula" ? " selected" : ""}>สุ่มช่วง</option>
+              <option value="formula"${ptsCfg.mode === "formula" ? " selected" : ""}>สูตรตามคนจริง</option>
+            </select>
+          </label>
+          <label>สุ่มต่ำสุด
+            <input class="input" id="ptsRandomMin" type="number" min="0" max="100000" step="1" value="${ptsCfg.randomMin}">
+          </label>
+          <label>สุ่มสูงสุด
+            <input class="input" id="ptsRandomMax" type="number" min="0" max="100000" step="1" value="${ptsCfg.randomMax}">
           </label>
           <label>pts พื้นฐานเมื่อชนะ
             <input class="input" id="ptsBase" type="number" min="0" max="100000" step="1" value="${ptsCfg.baseWin}">
@@ -218,6 +241,7 @@ export async function renderShopAdmin(root, { user }) {
             <input class="input" id="ptsMaxHumans" type="number" min="0" max="32" step="1" value="${ptsCfg.maxBonusHumans}">
           </label>
         </div>
+        <p class="tiny muted" style="margin:8px 0 0">โหมดสุ่มใช้แค่ต่ำสุด–สูงสุด · โหมดสูตรใช้ base / ต่อคน / เพดานคน</p>
         <div class="row-actions" style="margin-top:12px">
           <button type="button" class="btn sm" id="ptsSaveBtn">บันทึกตั้งค่า pts</button>
         </div>
@@ -416,11 +440,15 @@ export async function renderShopAdmin(root, { user }) {
     }
 
     function readPtsForm(enabledOverride) {
+      const modeEl = root.querySelector("#ptsMode");
       return {
         enabled:
           enabledOverride != null
             ? !!enabledOverride
             : !!(root.querySelector("#ptsEnabled") && root.querySelector("#ptsEnabled").checked),
+        mode: modeEl && modeEl.value === "formula" ? "formula" : "random",
+        randomMin: Number(root.querySelector("#ptsRandomMin") && root.querySelector("#ptsRandomMin").value),
+        randomMax: Number(root.querySelector("#ptsRandomMax") && root.querySelector("#ptsRandomMax").value),
         baseWin: Number(root.querySelector("#ptsBase") && root.querySelector("#ptsBase").value),
         perHumanOpponent: Number(root.querySelector("#ptsPer") && root.querySelector("#ptsPer").value),
         maxBonusHumans: Number(

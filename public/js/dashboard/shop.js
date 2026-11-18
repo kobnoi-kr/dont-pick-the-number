@@ -214,7 +214,9 @@ export async function renderShop(root, { user } = {}) {
           }
           ${
             rewards
-              ? `<p class="tiny muted shop-reward-hint">ชนะได้ ${rewards.baseWin} pts + ${rewards.perHumanOpponent} pts ต่อผู้เล่นจริงในล็อบบี้ (ไม่นับบอท)</p>`
+              ? rewards.mode === "formula"
+                ? `<p class="tiny muted shop-reward-hint">ชนะได้ ${rewards.baseWin} pts + ${rewards.perHumanOpponent} pts ต่อผู้เล่นจริงในล็อบบี้ (ไม่นับบอท)</p>`
+                : `<p class="tiny muted shop-reward-hint">ชนะแล้วสุ่มได้ ${rewards.randomMin ?? 20}–${rewards.randomMax ?? 100} pts</p>`
               : ""
           }
         </div>
