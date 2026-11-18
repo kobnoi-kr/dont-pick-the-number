@@ -1996,10 +1996,14 @@ function onRoomChat(ws, msg) {
   if (!ws.accountType || ws.accountType !== "registered") {
     return fail(ws, "เข้าสู่ระบบก่อนถึงจะพิมพ์แชทในห้องได้");
   }
-  const text = String(msg.body || msg.text || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 48);
+  // Clip by Unicode code points so emoji don't get cut mid-surrogate
+  const text = Array.from(
+    String(msg.body || msg.text || "")
+      .trim()
+      .replace(/\s+/g, " ")
+  )
+    .slice(0, 64)
+    .join("");
   if (!text) return;
   const limited = (() => {
     try {
@@ -2010,13 +2014,34 @@ function onRoomChat(ws, msg) {
     }
   })();
   if (!limited.ok) return fail(ws, "พิมพ์ถี่เกินไป");
+
+  const toId = String((msg && msg.toId) || "").trim();
+  let target = null;
+  if (toId) {
+    if (toId === ctx.player.id) return fail(ws, "ส่งหาตัวเองไม่ได้");
+    target = ctx.room.players.find((p) => p.id === toId);
+    if (!target || target.bot) return fail(ws, "หาผู้รับไม่เจอ");
+    if (!target.connected) return fail(ws, "ผู้รับออฟไลน์");
+  }
+
   const payload = {
     t: "roomChat",
     fromId: ctx.player.id,
     fromName: ctx.player.name,
     body: text,
+    private: !!target,
+    toId: target ? target.id : null,
+    toName: target ? target.name : null,
     at: Date.now()
   };
+
+  if (target) {
+    // Private 1:1 — only sender + recipient
+    send(ctx.player.ws, payload);
+    send(target.ws, payload);
+    return;
+  }
+
   for (const player of ctx.room.players) send(player.ws, payload);
   if (Array.isArray(ctx.room.spectators)) {
     for (const sp of ctx.room.spectators) send(sp.ws, payload);

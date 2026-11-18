@@ -392,12 +392,51 @@ function show(n){
 function paintRoomChatBar(){
   const bar=$("roomChatBar");
   const hint=$("roomChatHint");
+  const panel=$("roomEmojiPanel");
+  const emojiBtn=$("roomEmojiBtn");
   const inRoom=onlineMode&&!spectating&&document.body.classList.contains("room-bg");
   const registered=canUseFriends();
   if(bar) bar.classList.toggle("hidden", !(inRoom&&registered));
   if(hint) hint.classList.toggle("hidden", !(inRoom&&!registered));
+  if(!(inRoom&&registered)){
+    if(panel) panel.classList.add("hidden");
+    if(emojiBtn) emojiBtn.setAttribute("aria-expanded","false");
+  }else{
+    paintRoomChatTargets();
+  }
 }
-function showRoomChatBubble(fromId, body){
+function paintRoomChatTargets(){
+  const sel=$("roomChatTo");
+  const bar=$("roomChatBar");
+  const input=$("roomChatInput");
+  if(!sel) return;
+  const prev=sel.value||"";
+  const others=(playerMeta||[]).filter(p=>p&&p.id&&p.id!==myId&&!p.bot&&p.connected);
+  const keep=others.some(p=>p.id===prev)?prev:"";
+  sel.innerHTML=`<option value="">ทุกคน</option>`+others.map(p=>{
+    const label=String(p.name||"ผู้เล่น").slice(0,16);
+    return `<option value="${escHtml(p.id)}">${escHtml(label)}</option>`;
+  }).join("");
+  sel.value=keep;
+  const priv=!!sel.value;
+  if(bar) bar.classList.toggle("is-private", priv);
+  if(input){
+    input.placeholder=priv?"ข้อความส่วนตัว…":"พิมพ์แชทหรืออิโมจิ…";
+  }
+}
+function setRoomChatTarget(userId){
+  const sel=$("roomChatTo");
+  if(!sel) return;
+  paintRoomChatTargets();
+  const id=String(userId||"");
+  if(id&&Array.from(sel.options).some(o=>o.value===id)) sel.value=id;
+  else sel.value="";
+  paintRoomChatTargets();
+  const input=$("roomChatInput");
+  if(input) input.focus();
+  paintRoomChatBar();
+}
+function showRoomChatBubble(fromId, body, meta){
   const pid=String(fromId||"");
   const text=String(body||"").trim();
   if(!pid||!text) return;
@@ -408,8 +447,22 @@ function showRoomChatBubble(fromId, body){
     roomChatBubbles.delete(pid);
     document.querySelectorAll('[data-pid="'+CSS.escape(pid)+'"] .pchat-bubble').forEach(el=>el.remove());
   }, ROOM_CHAT_MS);
-  roomChatBubbles.set(pid, { body:text, until, timer });
+  roomChatBubbles.set(pid, {
+    body:text,
+    until,
+    timer,
+    private:!!(meta&&meta.private),
+    toName:meta&&meta.toName?String(meta.toName):"",
+    toId:meta&&meta.toId?String(meta.toId):"",
+    fromMe:!!(meta&&meta.fromMe)
+  });
   paintRoomChatBubbles();
+}
+function chatLooksLikeEmoji(s){
+  const t=String(s||"").trim();
+  if(!t) return false;
+  if(/[0-9A-Za-z\u0E00-\u0E7F]/.test(t)) return false;
+  return Array.from(t).length<=8;
 }
 function paintRoomChatBubbles(){
   const now=Date.now();
@@ -425,7 +478,16 @@ function paintRoomChatBubbles(){
         bubble.className="pchat-bubble";
         wrap.appendChild(bubble);
       }
-      bubble.textContent=entry.body;
+      bubble.classList.toggle("is-emoji", chatLooksLikeEmoji(entry.body)&&!entry.private);
+      bubble.classList.toggle("is-private", !!entry.private);
+      if(entry.private){
+        const tip=entry.fromMe
+          ?("ถึง "+(entry.toName||"ผู้เล่น"))
+          :"ส่วนตัว";
+        bubble.innerHTML=`<span class="pchat-lock" title="${escHtml(tip)}">🔒</span>${escHtml(entry.body)}`;
+      }else{
+        bubble.textContent=entry.body;
+      }
     });
   });
 }
@@ -1236,6 +1298,7 @@ function renderPlayers(){
   paintAutoButtons();
   paintRoomChatBubbles();
   paintRoomChatBar();
+  paintRoomChatTargets();
 }
 function paintAutoButtons(){
   const show=onlineMode&&(netPhase==="play"||netPhase==="pick"||netPhase==="snake")&&!spectating;
@@ -2297,6 +2360,15 @@ async function openPlayerProfileModal(userId){
   if(rel.status==="self"){
     if(hint) hint.textContent="นี่คือคุณ";
     return;
+  }
+  const inRoomPeer=playerMeta.some(p=>p&&p.id===userId&&!p.bot&&p.connected);
+  if(inRoomPeer&&canUseFriends()){
+    const whisper=mk("แชทส่วนตัว","ghost");
+    whisper.onclick=()=>{
+      closePlayerProfileModal();
+      setRoomChatTarget(userId);
+    };
+    acts.appendChild(whisper);
   }
   if(!canUseFriends()){
     if(hint) hint.textContent="เข้าสู่ระบบด้วยบัญชีจริงเพื่อเพิ่มเพื่อน";
@@ -3387,7 +3459,12 @@ function connect(){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
     }else if(msg.t==="roomChat"){
       if(msg.fromId){
-        showRoomChatBubble(msg.fromId, msg.body||"");
+        showRoomChatBubble(msg.fromId, msg.body||"", {
+          private:!!msg.private,
+          toId:msg.toId||"",
+          toName:msg.toName||"",
+          fromMe:msg.fromId===myId
+        });
         if(msg.fromId!==myId) playClip(ROOM_CHAT_SOUND);
       }
     }else if(msg.t==="err"){
@@ -3585,7 +3662,60 @@ async function bootOnline(){
       else location.href="/login";
     };
   }
+  const ROOM_EMOJIS=[
+    "😀","😁","😂","🤣","😊","😍","😘","😎",
+    "🤩","😇","🙂","😉","😭","😤","😡","🤔",
+    "😴","🤒","🤢","😈","👻","💀","🔥","✨",
+    "💥","❤️","🧡","💛","💚","💙","💜","🖤",
+    "👍","👎","👏","🙌","🤝","✌️","🤞","💪",
+    "🎮","🎲","🐍","🪜","🏆","🥇","🎯","⚡",
+    "🍀","🎉","🎊","💯","✅","❌","⭐","🌟"
+  ];
+  function clipRoomChat(s){
+    return Array.from(String(s||"").trim().replace(/\s+/g," ")).slice(0,64).join("");
+  }
   const roomChatForm=$("roomChatBar");
+  const roomEmojiBtn=$("roomEmojiBtn");
+  const roomEmojiPanel=$("roomEmojiPanel");
+  function setEmojiPanel(open){
+    if(!roomEmojiPanel||!roomEmojiBtn) return;
+    roomEmojiPanel.classList.toggle("hidden",!open);
+    roomEmojiBtn.setAttribute("aria-expanded", open?"true":"false");
+  }
+  if(roomEmojiPanel){
+    roomEmojiPanel.innerHTML=ROOM_EMOJIS.map(e=>`<button type="button" data-emoji="${e}" aria-label="${e}">${e}</button>`).join("");
+    roomEmojiPanel.onclick=e=>{
+      const btn=e.target.closest("[data-emoji]");
+      if(!btn) return;
+      const input=$("roomChatInput");
+      if(!input) return;
+      const emoji=btn.getAttribute("data-emoji")||"";
+      const next=clipRoomChat(input.value+emoji);
+      input.value=next;
+      input.focus();
+      try{
+        const end=input.value.length;
+        input.setSelectionRange(end,end);
+      }catch(_){}
+    };
+  }
+  if(roomEmojiBtn){
+    roomEmojiBtn.onclick=e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(!canUseFriends()){ paintRoomChatBar(); return; }
+      setEmojiPanel(roomEmojiPanel&&roomEmojiPanel.classList.contains("hidden"));
+    };
+  }
+  document.addEventListener("click",e=>{
+    if(!roomEmojiPanel||roomEmojiPanel.classList.contains("hidden")) return;
+    if(e.target.closest("#roomChatBar")) return;
+    setEmojiPanel(false);
+  });
+  const roomChatTo=$("roomChatTo");
+  if(roomChatTo){
+    roomChatTo.onchange=()=>paintRoomChatTargets();
+  }
   if(roomChatForm){
     roomChatForm.onsubmit=e=>{
       e.preventDefault();
@@ -3594,10 +3724,14 @@ async function bootOnline(){
         return;
       }
       const input=$("roomChatInput");
-      const body=(input&&input.value?input.value:"").trim().replace(/\s+/g," ").slice(0,48);
+      const body=clipRoomChat(input&&input.value?input.value:"");
       if(!body) return;
-      send({t:"roomChat",body});
+      const toId=roomChatTo&&roomChatTo.value?String(roomChatTo.value):"";
+      const payload={t:"roomChat",body};
+      if(toId) payload.toId=toId;
+      send(payload);
       if(input) input.value="";
+      setEmojiPanel(false);
     };
   }
   const authChoiceLink=$("authChoiceLink");
