@@ -2078,7 +2078,36 @@ function isDashboardAsset(name) {
   return false;
 }
 
-function sendStaticFile(res, name) {
+function staticCacheControl(rel) {
+  const ext = path.extname(rel).toLowerCase();
+  // HTML always revalidate so deploys show up immediately.
+  if (ext === ".html" || !ext) return "no-cache";
+  // Images / fonts / audio — long cache (biggest win for load time).
+  if (
+    ext === ".png" ||
+    ext === ".jpg" ||
+    ext === ".jpeg" ||
+    ext === ".webp" ||
+    ext === ".gif" ||
+    ext === ".svg" ||
+    ext === ".ico" ||
+    ext === ".woff2" ||
+    ext === ".mp3"
+  ) {
+    return "public, max-age=604800, stale-while-revalidate=86400";
+  }
+  // CSS/JS have no content-hash in filenames — short cache + revalidate.
+  if (ext === ".css" || ext === ".js") {
+    return "public, max-age=3600, must-revalidate";
+  }
+  return "public, max-age=300, must-revalidate";
+}
+
+function fileEtag(stat) {
+  return '"' + Number(stat.size).toString(16) + "-" + Math.trunc(Number(stat.mtimeMs)).toString(16) + '"';
+}
+
+function sendStaticFile(res, name, req) {
   const rel = safePublicRel(name);
   if (!rel) {
     res.writeHead(404);
@@ -2086,20 +2115,48 @@ function sendStaticFile(res, name) {
     return;
   }
   const file = path.join(PUBLIC, rel);
-  const stream = fs.createReadStream(file);
-  stream.on("error", () => {
-    if (res.headersSent) {
-      res.destroy();
+  fs.stat(file, (err, stat) => {
+    if (err || !stat || !stat.isFile()) {
+      if (!res.headersSent) {
+        res.writeHead(404);
+        res.end("not found");
+      }
       return;
     }
-    res.writeHead(404);
-    res.end("not found");
-  });
-  stream.on("open", () => {
-    res.writeHead(200, {
+    const etag = fileEtag(stat);
+    const cacheControl = staticCacheControl(rel);
+    const headers = {
       "Content-Type": TYPES[path.extname(file).toLowerCase()] || "application/octet-stream",
-      "Cache-Control": "no-cache"
+      "Cache-Control": cacheControl,
+      ETag: etag,
+      "Last-Modified": stat.mtime.toUTCString(),
+      "Content-Length": stat.size
+    };
+    const inm = req && req.headers && req.headers["if-none-match"];
+    if (inm && String(inm) === etag) {
+      res.writeHead(304, {
+        ETag: etag,
+        "Cache-Control": cacheControl,
+        "Last-Modified": headers["Last-Modified"]
+      });
+      res.end();
+      return;
+    }
+    if (req && String(req.method || "").toUpperCase() === "HEAD") {
+      res.writeHead(200, headers);
+      res.end();
+      return;
+    }
+    const stream = fs.createReadStream(file);
+    stream.on("error", () => {
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
+      res.writeHead(404);
+      res.end("not found");
     });
+    res.writeHead(200, headers);
     stream.pipe(res);
   });
 }
@@ -2157,7 +2214,7 @@ async function servePublic(req, res) {
     res.end();
     return;
   }
-  sendStaticFile(res, name);
+  sendStaticFile(res, name, req);
 }
 
 async function serveAdmin(req, res) {
@@ -2191,7 +2248,7 @@ async function serveAdmin(req, res) {
     res.end("not found");
     return;
   }
-  sendStaticFile(res, name);
+  sendStaticFile(res, name, req);
 }
 
 setInterval(() => {
