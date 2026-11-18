@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snake &amp; Ladders — UI Mock</title>
+    <link rel="stylesheet" href="/css/snake-ladders.css" />
+  </head>
+  <body>
+    <div class="sl-app">
+      <header class="sl-header">
+        <h1>Snake &amp; Ladders</h1>
+        <span class="sl-badge">Phase 2 · UI mock (local engine)</span>
+      </header>
+
+      <div class="sl-layout">
+        <div class="sl-board-wrap">
+          <div id="sl-board" class="sl-board" aria-label="Game board"></div>
+          <svg id="sl-paths" class="sl-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div id="sl-tokens" class="sl-tokens" aria-hidden="true"></div>
+        </div>
+
+        <aside class="sl-panel">
+          <h2>Match panel</h2>
+          <div class="sl-meta">
+            <div>Room: <strong id="sl-room">—</strong></div>
+            <div>Status: <strong id="sl-status">—</strong></div>
+            <div>Turn: <strong id="sl-turn">—</strong></div>
+          </div>
+
+          <ul id="sl-players" class="sl-players"></ul>
+
+          <div class="sl-dice-block">
+            <div id="sl-dice" class="sl-dice" aria-live="polite">—</div>
+            <button id="sl-roll" class="sl-btn" type="button">Roll dice</button>
+            <button id="sl-reset" class="sl-btn secondary" type="button">Reset mock match</button>
+          </div>
+
+          <div id="sl-banner" class="sl-banner" role="status"></div>
+          <div id="sl-log" class="sl-log" aria-live="polite"></div>
+        </aside>
+      </div>
+
+      <p class="sl-foot">
+        Local mock only — no Socket / DB. Engine rules match Phase 1.
+        <a href="/">Back to lobby</a>
+      </p>
+    </div>
+    <script type="module" src="/js/snake-ladders/mock-app.js"></script>
+  </body>
+</html>

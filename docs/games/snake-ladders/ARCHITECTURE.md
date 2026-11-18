@@ -26,14 +26,26 @@ src/games/snake-ladders/
 └── index.js
 ```
 
-UI / WS integration come in later phases. Engine stays pure (no DOM, no Prisma, no `server.js` imports).
+Server engine stays pure (no DOM, no Prisma, no `server.js` imports).
+
+### Phase 2 mock UI (local only)
+
+```text
+public/snake-ladders.html
+public/css/snake-ladders.css
+public/js/snake-ladders/
+├── engine.js    # browser port of Phase 1 rules
+└── mock-app.js  # board / dice / panel / animations
+```
+
+Open `/snake-ladders` — no WS or DB. Phase 3 will replace the browser engine with server-authoritative state.
 
 ## Integration plan (later phases)
 
 1. Add catalog mode `snake` without breaking `secret` / `wheel`
 2. Room capacity override 2–6 for this mode only
 3. Server-authoritative roll via WS command → engine → broadcast state
-4. Play UI board overlay in existing play flow
+4. Replace mock page wiring with play-flow board overlay
 
 ## Guardrails
 
