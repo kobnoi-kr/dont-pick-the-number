@@ -3318,6 +3318,21 @@ body.modal-open {
   max-height: 460px;
   overflow: auto;
   margin-top: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.gift-item-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.gift-item-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gift-item-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+.gift-item-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.36);
 }
 .gift-item-card {
   display: flex;

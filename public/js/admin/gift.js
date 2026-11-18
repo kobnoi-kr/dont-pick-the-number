@@ -134,6 +134,11 @@ export async function renderGift(root, { user }) {
   }
 
   function paint() {
+    const prevItemsScroll = root.querySelector("#giftItems")?.scrollTop ?? 0;
+    const prevUsersScroll = root.querySelector("#giftUserList")?.scrollTop ?? 0;
+    const prevPageScroll =
+      window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
     const catalogFiltered =
       kindFilter === "all" ? items : items.filter((it) => it.kind === kindFilter);
     const ownedFiltered =
@@ -547,6 +552,12 @@ export async function renderGift(root, { user }) {
         await loadOwned();
       };
     }
+
+    const itemsEl = root.querySelector("#giftItems");
+    if (itemsEl) itemsEl.scrollTop = prevItemsScroll;
+    const usersEl = root.querySelector("#giftUserList");
+    if (usersEl) usersEl.scrollTop = prevUsersScroll;
+    window.scrollTo(0, prevPageScroll);
   }
 
   paint();
