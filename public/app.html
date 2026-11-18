@@ -7,10 +7,19 @@
 <meta name="application-name" content="NUMVERSE">
 <link rel="icon" href="/images/n-logo.png" type="image/png">
 <link rel="apple-touch-icon" href="/images/n-logo.png">
+<link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
 <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
+  <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
+    <div class="nv-boot-inner">
+      <img class="nv-boot-logo" src="/images/numverse.png" alt="NUMVERSE" width="220" height="124" decoding="async" fetchpriority="high">
+      <div class="nv-boot-bar" aria-hidden="true"><span></span></div>
+      <p class="nv-boot-label">Loading</p>
+    </div>
+  </div>
+  <script src="/js/boot-splash.js" defer></script>
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
