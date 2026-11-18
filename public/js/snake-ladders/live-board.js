@@ -1,5 +1,5 @@
 /**
- * Server-driven Snake & Ladders board for /play (Phase 3).
+ * Server-driven Snake & Ladders board for /play (Phase 3–5).
  * Does not roll locally — parent calls update(state) after WS snaps.
  */
 
@@ -57,6 +57,8 @@ export function createLiveBoard(opts) {
           <div class="sl-dice" data-el="dice">—</div>
           <button type="button" class="sl-btn" data-el="roll">ทอยลูกเต๋า</button>
         </div>
+        <div class="sl-banner" data-el="banner" role="status"></div>
+        <p class="sl-wait" data-el="wait">รอกระดานจากเซิร์ฟเวอร์…</p>
         <div class="sl-log" data-el="log"></div>
       </aside>
     </div>
@@ -71,19 +73,22 @@ export function createLiveBoard(opts) {
     roll: root.querySelector('[data-el="roll"]'),
     status: root.querySelector('[data-el="status"]'),
     turn: root.querySelector('[data-el="turn"]'),
-    log: root.querySelector('[data-el="log"]')
+    log: root.querySelector('[data-el="log"]'),
+    banner: root.querySelector('[data-el="banner"]'),
+    wait: root.querySelector('[data-el="wait"]')
   };
 
   /** @type {Map<string, HTMLElement>} */
   const tokenEls = new Map();
   let builtFor = "";
-  let lastVersion = -1;
   let lastMoveKey = "";
+  let lastSession = "";
   let youId = "";
+  let spectator = false;
   let animating = false;
 
   els.roll.addEventListener("click", () => {
-    if (animating || els.roll.disabled) return;
+    if (spectator || animating || els.roll.disabled) return;
     if (onRoll) onRoll();
   });
 
@@ -186,12 +191,25 @@ export function createLiveBoard(opts) {
           el.style.top = `${c.y + off.dy}%`;
         }
       }
-      el.classList.toggle("is-active", p.turnOrder === state.currentTurn && state.status === "playing");
+      el.classList.toggle(
+        "is-active",
+        p.turnOrder === state.currentTurn && state.status === "playing"
+      );
     }
   }
 
+  function pulseDice() {
+    els.dice.classList.remove("is-rolling");
+    // reflow so animation retriggers
+    void els.dice.offsetWidth;
+    els.dice.classList.add("is-rolling");
+    setTimeout(() => els.dice.classList.remove("is-rolling"), 480);
+  }
+
   function renderPanel(state) {
-    els.status.textContent = state.status || "—";
+    els.status.textContent = spectator
+      ? (state.status || "—") + " · ชม"
+      : state.status || "—";
     const active = (state.players || []).find((p) => p.turnOrder === state.currentTurn);
     els.turn.textContent = active
       ? `${active.username} (#${state.turnNumber || 0})`
@@ -212,21 +230,36 @@ export function createLiveBoard(opts) {
         `;
         els.players.appendChild(li);
       });
+
+    if (state.status === "finished" && state.winnerId) {
+      const w = (state.players || []).find((p) => p.userId === state.winnerId);
+      els.banner.textContent = `${w ? w.username : "ผู้เล่น"} ชนะ!`;
+      els.banner.classList.add("is-visible");
+    } else {
+      els.banner.classList.remove("is-visible");
+      els.banner.textContent = "";
+    }
+
     const can =
+      !spectator &&
       !animating &&
       state.status === "playing" &&
       active &&
       active.userId === youId;
     els.roll.disabled = !can;
-    els.roll.textContent = can
-      ? "ทอยลูกเต๋า"
-      : animating
-        ? "กำลังเดิน…"
-        : state.status === "finished"
-          ? "จบเกม"
-          : active
-            ? `รอ ${active.username}`
-            : "ทอยลูกเต๋า";
+    if (spectator) {
+      els.roll.textContent = "ชมอย่างเดียว";
+    } else if (can) {
+      els.roll.textContent = "ทอยลูกเต๋า";
+    } else if (animating) {
+      els.roll.textContent = "กำลังเดิน…";
+    } else if (state.status === "finished") {
+      els.roll.textContent = "จบเกม";
+    } else if (active) {
+      els.roll.textContent = `รอ ${active.username}`;
+    } else {
+      els.roll.textContent = "ทอยลูกเต๋า";
+    }
   }
 
   function escapeHtml(s) {
@@ -247,6 +280,7 @@ export function createLiveBoard(opts) {
     const userId = state.lastMoverId;
     if (!userId) return;
 
+    pulseDice();
     const el = tokenEls.get(userId);
     if (el) el.classList.add("is-moving");
     animating = true;
@@ -261,21 +295,38 @@ export function createLiveBoard(opts) {
 
   /**
    * @param {object|null} state publicState from server
-   * @param {{youId?: string}} [meta]
+   * @param {{youId?: string, spectator?: boolean}} [meta]
    */
   async function update(state, meta) {
+    youId = (meta && meta.youId) || youId || "";
+    spectator = !!(meta && meta.spectator);
+    root.classList.toggle("is-spectator", spectator);
+
     if (!state) {
-      root.classList.add("hidden");
+      els.wait.classList.add("is-visible");
+      els.wait.textContent = "รอกระดานจากเซิร์ฟเวอร์…";
+      els.roll.disabled = true;
+      els.roll.textContent = spectator ? "ชมอย่างเดียว" : "รอ…";
       return;
     }
+
+    els.wait.classList.remove("is-visible");
     root.classList.remove("hidden");
-    youId = (meta && meta.youId) || youId || "";
+
+    const session = String(state.sessionId || state.roomId || "");
+    if (session && session !== lastSession) {
+      lastSession = session;
+      lastMoveKey = "";
+      els.log.innerHTML = "";
+      if (spectator) log("เริ่มชมแมตช์");
+    }
+
     const key = `${state.boardSize}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
     if (key !== builtFor) buildBoard(state);
     if (tokenEls.size !== (state.players || []).length) ensureTokens(state.players);
 
     const moveKey = state.lastMove
-      ? `${state.version}:${state.lastDice}:${state.lastMove.from}:${state.lastMove.final}`
+      ? `${state.version}:${state.lastDice}:${state.lastMove.from}:${state.lastMove.final}:${state.lastMoverId || ""}`
       : "";
     const shouldAnim =
       moveKey &&
@@ -286,7 +337,6 @@ export function createLiveBoard(opts) {
 
     if (shouldAnim) {
       lastMoveKey = moveKey;
-      lastVersion = state.version;
       const who =
         (state.players || []).find((p) => p.userId === state.lastMoverId) ||
         (state.players || []).find((p) => p.position === state.lastMove.final) ||
@@ -294,6 +344,7 @@ export function createLiveBoard(opts) {
       const name = who ? who.username : "?";
       if (state.lastMove.bounced) {
         log(`${name} ทอยได้ ${state.lastDice} — เด้ง (ต้องพอดี 100)`);
+        pulseDice();
       } else {
         let msg = `${name} ทอย ${state.lastDice}: ${state.lastMove.from} → ${state.lastMove.landed}`;
         if (state.lastMove.portal) {
@@ -302,9 +353,8 @@ export function createLiveBoard(opts) {
         log(msg);
       }
       await animateLastMove(state);
-    } else {
-      lastVersion = state.version;
-      if (moveKey) lastMoveKey = moveKey;
+    } else if (moveKey) {
+      lastMoveKey = moveKey;
     }
 
     placeTokens(state, null);

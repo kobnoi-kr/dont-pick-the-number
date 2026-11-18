@@ -52,10 +52,11 @@ phase: "snake" while playing
 
 Catalog id `snake`, capacity 2–6 via `roomMaxPlayers(room)`.
 
-## Remaining
+## Phases 4–5 (done)
 
-- Phase 4 spectator UX on snake board
-- Phase 5 polish
+- Spectators receive `snap(..., { spectator: true })` with full `snake` public state
+- Client: `show("snakeGame")`, roll locked, banner, quit → `unwatch`
+- Polish: dice pulse, win banner, waiting copy, CSS scoped for `/play`
 
 ## Guardrails
 

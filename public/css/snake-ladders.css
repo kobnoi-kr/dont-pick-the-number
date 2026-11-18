@@ -18,23 +18,20 @@
   --sl-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html,
-body {
+/* Mock page only — do not override /play global styles */
+body.sl-mock-page {
   margin: 0;
   min-height: 100%;
+  padding: 16px;
   background: radial-gradient(1200px 600px at 20% -10%, #1a2a3d 0%, var(--sl-bg) 55%);
   color: var(--sl-text);
   font-family: var(--sl-font);
 }
 
-body {
-  padding: 16px;
+body.sl-mock-page *,
+body.sl-mock-page *::before,
+body.sl-mock-page *::after {
+  box-sizing: border-box;
 }
 
 .sl-app {
@@ -64,10 +61,58 @@ body {
 
 #snakeGame .sl-board-wrap {
   max-height: min(70vh, 640px);
+  background: var(--sl-panel);
+  border: 1px solid var(--sl-border);
+  border-radius: var(--sl-radius);
 }
 
 #snakeGame .brand.compact {
   margin-bottom: 8px;
+}
+
+#snakeGame .sl-panel {
+  background: var(--sl-panel);
+  border: 1px solid var(--sl-border);
+  color: var(--sl-text);
+}
+
+#snakeGame .sl-cell {
+  color: var(--sl-muted);
+}
+
+.snake-spectate-note {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(61, 156, 240, 0.35);
+  background: rgba(61, 156, 240, 0.12);
+  color: #9ec9f5;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sl-wait {
+  display: none;
+  margin: 0;
+  padding: 8px;
+  text-align: center;
+  color: var(--sl-muted);
+  font-size: 0.82rem;
+}
+
+.sl-wait.is-visible {
+  display: block;
+}
+
+.sl-live.is-spectator .sl-btn {
+  opacity: 0.7;
+}
+
+@media (max-width: 900px) {
+  #snakeGame .sl-board-wrap {
+    max-height: min(58vh, 480px);
+  }
 }
 
 .sl-header {

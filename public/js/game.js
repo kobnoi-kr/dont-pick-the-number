@@ -15,7 +15,7 @@ function ensureSnakeBoard(){
   snakeLive=window.NVSnake.createLiveBoard({
     root,
     onRoll:()=>{
-      if(!onlineMode||!myTurn) return;
+      if(!onlineMode||spectating||!myTurn) return;
       send({t:"roll",commandId:"roll-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)});
     }
   });
@@ -25,8 +25,17 @@ function updateSnakeBoard(s){
   const board=ensureSnakeBoard();
   if(!board) return;
   const seq=++snakeSnapSeq;
-  Promise.resolve(board.update(s&&s.snake?s.snake:null,{youId:s&&s.youId||myId||""})).then(()=>{
-    /* ignore stale animation completions */
+  const note=$("snakeSpectateNote");
+  if(note){
+    note.classList.toggle("hidden",!spectating);
+    if(spectating) note.textContent="โหมด Spectator — ดูกระดานได้อย่างเดียว ไม่สามารถทอยได้";
+  }
+  Promise.resolve(
+    board.update(s&&s.snake?s.snake:null,{
+      youId:s&&s.youId||myId||"",
+      spectator:!!spectating
+    })
+  ).then(()=>{
     void seq;
   });
 }
@@ -307,12 +316,12 @@ function applySpectatorUi(){
   document.body.classList.add("spectating");
   const note=$("roomNote");
   if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
-  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","renameRoomBtn"].forEach(id=>{
+  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","renameRoomBtn","snakeLeave"].forEach(id=>{
     const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
   });
 }
 function show(n){
-  ["gate","start","play","pick","wheelGame","over"].forEach(s=>$(s).classList.toggle("hidden",s!==n));
+  ["gate","start","play","pick","wheelGame","snakeGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
   const inRoom=n!=="gate";
   const lobby=n==="start";
   const side=document.querySelector(".side");
@@ -2623,7 +2632,7 @@ function leaveCurrentRoom(){
   send({t:"leave"});
 }
 function openQuitGameModal(){
-  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="over";
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="over";
   if(!onlineMode||!inGame) return;
   const modal=$("quitGameModal");
   if(modal) modal.classList.remove("hidden");
@@ -2727,14 +2736,20 @@ function hostLocks(){
   ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{
     const el=$(id);
     if(!el) return;
-    el.classList.toggle("hidden",!host);
+    // Spectators use quit (unwatch); hide host abort buttons.
+    const showLeave=spectating?false:host;
+    el.classList.toggle("hidden",!showLeave);
     el.textContent="กลับห้อง";
   });
-  const canRenameRoom=host&&lobby;
+  if($("quitGameBtn")){
+    const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="over";
+    $("quitGameBtn").classList.toggle("hidden",!(onlineMode&&inGame));
+  }
+  const canRenameRoom=host&&lobby&&!spectating;
   if($("renameRoomBtn")) $("renameRoomBtn").classList.toggle("hidden",!canRenameRoom);
-  if($("settingsGearBtn")) $("settingsGearBtn").classList.toggle("hidden",!(host&&lobby));
+  if($("settingsGearBtn")) $("settingsGearBtn").classList.toggle("hidden",!(host&&lobby&&!spectating));
   if(!canRenameRoom) closeRenameRoom();
-  if(!(host&&lobby)) closeSettingsModal();
+  if(!(host&&lobby)||spectating) closeSettingsModal();
 }
 function paintRoom(s){
   const code=s.code||"";
@@ -2755,7 +2770,11 @@ function paintRoom(s){
   }
   if($("roomCount")) $("roomCount").textContent=count+"/"+max;
   if($("lobbyPlayerCount")) $("lobbyPlayerCount").textContent=count+"/"+max+" Players";
-  if($("roomNote")) $("roomNote").textContent=priv?"":"ห้องนี้อยู่ในล็อบบี้ออนไลน์";
+  if($("roomNote")){
+    $("roomNote").textContent=spectating
+      ?"โหมด Spectator — ดูได้อย่างเดียว"
+      :(priv?"":"ห้องนี้อยู่ในล็อบบี้ออนไลน์");
+  }
   if($("roomTitleText")) $("roomTitleText").textContent=title;
   if($("settingsRoomTitle")) $("settingsRoomTitle").textContent=title;
   document.title=(code?code+" · ":"")+"NUMVERSE";
@@ -2873,8 +2892,13 @@ function applySnap(s){
     renderPlayers();
   }else if(s.phase==="snake"){
     show("snakeGame");
-    if($("snakeMode")) $("snakeMode").textContent="ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6);
+    if($("snakeMode")){
+      $("snakeMode").textContent=spectating
+        ?"กำลังชม · งูและบันได · ถึง 100 ชนะ"
+        :"ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6);
+    }
     updateSnakeBoard(s);
+    if(spectating) applySpectatorUi();
     renderPlayers();
   }else if(s.phase==="wheel"){
     show("wheelGame");
