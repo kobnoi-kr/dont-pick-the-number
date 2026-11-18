@@ -1415,7 +1415,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       return true;
     }
     const kind = String((body && body.kind) || "").trim();
-    if (kind !== "frame" && kind !== "effect") {
+    if (kind !== "frame" && kind !== "effect" && kind !== "title") {
       sendJson(res, 400, { error: "invalid_kind" });
       return true;
     }
@@ -1427,9 +1427,14 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     const description = String((body && body.description) || "").trim().slice(0, 255) || null;
     let cssClass = String((body && body.cssClass) || "").trim().slice(0, 64);
     const colorRaw = String((body && body.color) || "").trim();
-    const color = /^#[0-9a-fA-F]{6}$/.test(colorRaw) ? colorRaw.toLowerCase() : null;
+    const color = /^#[0-9a-fA-F]{6}$/.test(colorRaw)
+      ? colorRaw.toLowerCase()
+      : kind === "title"
+        ? "#a78bfa"
+        : null;
     let shopPrice = null;
-    if (body && body.shopPrice != null && body.shopPrice !== "") {
+    // Custom titles are gift-only (not sold in Shop).
+    if (kind !== "title" && body && body.shopPrice != null && body.shopPrice !== "") {
       const n = Number(body.shopPrice);
       if (!Number.isFinite(n) || n < 0 || n > 1000000 || Math.floor(n) !== n) {
         sendJson(res, 400, { error: "invalid_shop_price" });
@@ -1457,6 +1462,12 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         return true;
       }
     }
+    if (kind === "title") {
+      if (id.startsWith("title.level.") || isRankingTitleId(id) || id === "title.rookie") {
+        sendJson(res, 400, { error: "protected_title_id" });
+        return true;
+      }
+    }
     if (!cssClass) {
       cssClass = id.replace(/\./g, "-");
     }
@@ -1465,7 +1476,10 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 409, { error: "cosmetic_exists" });
       return true;
     }
-    const imageRes = resolveCosmeticImageUrl(body && body.imageUrl, id);
+    const imageRes =
+      kind === "title"
+        ? { ok: true, url: null, clear: false }
+        : resolveCosmeticImageUrl(body && body.imageUrl, id);
     if (!imageRes.ok) {
       sendJson(res, 400, { error: imageRes.error || "invalid_image" });
       return true;
@@ -1479,16 +1493,17 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         ? !!body.useSystemEffect
         : true;
     const tier = normalizeTier(body && body.tier);
-    const meta = applyImageMeta(
-      Object.assign({}, color ? { color } : {}, {
-        adminCreated: true,
-        useSystemColor,
-        useSystemEffect,
-        tier
-      }),
-      imageRes,
-      id
-    );
+    const metaBase = Object.assign({}, color ? { color } : {}, {
+      adminCreated: true,
+      useSystemColor: kind === "title" ? true : useSystemColor,
+      useSystemEffect: kind === "title" ? true : useSystemEffect,
+      tier: kind === "title" ? undefined : tier
+    });
+    if (kind === "title") delete metaBase.tier;
+    const meta =
+      kind === "title"
+        ? metaBase
+        : applyImageMeta(metaBase, imageRes, id);
     const created = await prisma.cosmetic.create({
       data: {
         id,
@@ -1496,7 +1511,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         name,
         description,
         shopPrice,
-        cssClass: useSystemEffect ? cssClass : cssClass || id.replace(/\./g, "-"),
+        cssClass: kind === "title" ? cssClass : useSystemEffect ? cssClass : cssClass || id.replace(/\./g, "-"),
         meta
       }
     });

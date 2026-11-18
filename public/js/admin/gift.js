@@ -55,7 +55,7 @@ export async function renderGift(root, { user }) {
     return;
   }
   // กันมือใหม่ซ้ำ + ยศ Ranking ต้องได้จากแต้มสูงสุดเท่านั้น (Gift มอบไม่ได้)
-  const items = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
+  let items = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
     if (it.id === "title.rookie") return false;
     if (RANKING_TITLE_IDS.has(it.id)) return false;
     return true;
@@ -70,6 +70,8 @@ export async function renderGift(root, { user }) {
   let owned = [];
   let equipped = { titleId: null, frameId: null, effectId: null };
   let ownedLoading = false;
+  let createMsg = "";
+  let createMsgOk = false;
 
   function levelOf(it) {
     const n = it && it.meta && Number(it.meta.level);
@@ -157,6 +159,30 @@ export async function renderGift(root, { user }) {
       <div class="gift-mode-tabs" id="giftMode">
         <button type="button" class="btn sm${mode === "gift" ? "" : " ghost"}" data-mode="gift">มอบของ</button>
         <button type="button" class="btn sm${mode === "revoke" ? "" : " ghost"}" data-mode="revoke">ดึงของกลับ</button>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <h3 style="margin-top:0">สร้างยศตกแต่งใหม่</h3>
+        <p class="tiny muted" style="margin:0 0 10px">สร้างยศสำหรับ Gift — ไม่ขายใน Shop · ไม่ทับยศเลเวล / Ranking</p>
+        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+          <label>ชื่อยศ
+            <input class="input" id="titleCreateName" maxlength="64" placeholder="เช่น Elite Patron">
+          </label>
+          <label>สี (hex)
+            <input class="input" id="titleCreateColor" maxlength="7" value="#a78bfa" placeholder="#a78bfa">
+          </label>
+          <label>คำอธิบาย
+            <input class="input" id="titleCreateDesc" maxlength="255" placeholder="สั้นๆ (ไม่บังคับ)">
+          </label>
+          <label>ID (ว่างได้)
+            <input class="input" id="titleCreateId" maxlength="64" placeholder="title.elite.patron">
+          </label>
+        </div>
+        <div id="titleCreatePreview" style="margin-top:10px"></div>
+        <div class="row-actions" style="margin-top:12px">
+          <button type="button" class="btn sm" id="titleCreateBtn">สร้างยศ</button>
+          <p class="msg" id="titleCreateMsg" style="margin:0">${esc(createMsg)}</p>
+        </div>
       </div>
 
       <div class="gift-layout">
@@ -292,6 +318,83 @@ export async function renderGift(root, { user }) {
     function setMsg(text, ok) {
       msg.textContent = text || "";
       msg.classList.toggle("ok", !!ok);
+    }
+
+    const createMsgEl = root.querySelector("#titleCreateMsg");
+    if (createMsgEl) {
+      createMsgEl.textContent = createMsg || "";
+      createMsgEl.classList.toggle("ok", !!createMsgOk);
+    }
+
+    function paintTitleCreatePreview() {
+      const box = root.querySelector("#titleCreatePreview");
+      const nameEl = root.querySelector("#titleCreateName");
+      const colorEl = root.querySelector("#titleCreateColor");
+      if (!box) return;
+      const name = ((nameEl && nameEl.value) || "ชื่อยศ").trim().slice(0, 64) || "ชื่อยศ";
+      let color = ((colorEl && colorEl.value) || "#a78bfa").trim();
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = "#a78bfa";
+      box.innerHTML = `<span class="dec-title-pill" style="--title-color:${esc(color)};border-color:${esc(
+        color
+      )};color:${esc(color)}">${esc(name)}</span>`;
+    }
+    paintTitleCreatePreview();
+    const nameInput = root.querySelector("#titleCreateName");
+    const colorInput = root.querySelector("#titleCreateColor");
+    if (nameInput) nameInput.oninput = paintTitleCreatePreview;
+    if (colorInput) colorInput.oninput = paintTitleCreatePreview;
+
+    const createBtn = root.querySelector("#titleCreateBtn");
+    if (createBtn) {
+      createBtn.onclick = async () => {
+        const name = (root.querySelector("#titleCreateName").value || "").trim();
+        const color = (root.querySelector("#titleCreateColor").value || "").trim();
+        const description = (root.querySelector("#titleCreateDesc").value || "").trim();
+        const id = (root.querySelector("#titleCreateId").value || "").trim();
+        if (!name) {
+          createMsg = "ใส่ชื่อยศก่อน";
+          createMsgOk = false;
+          paint();
+          return;
+        }
+        createBtn.disabled = true;
+        const body = {
+          kind: "title",
+          name,
+          color: color || "#a78bfa",
+          description: description || undefined,
+          id: id || undefined
+        };
+        const { res, data } = await api("/api/v1/admin/cosmetics", {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+        createBtn.disabled = false;
+        if (!res.ok) {
+          const err = (data && data.error) || "";
+          createMsg =
+            err === "cosmetic_exists"
+              ? "ID ซ้ำ — เปลี่ยนชื่อหรือใส่ ID ใหม่"
+              : err === "protected_title_id"
+                ? "ID นี้สงวนไว้สำหรับยศเลเวล / Ranking"
+                : err === "invalid_id"
+                  ? "ID ไม่ถูกต้อง"
+                  : "สร้างยศไม่สำเร็จ";
+          createMsgOk = false;
+          paint();
+          return;
+        }
+        const item = data && data.item;
+        if (item) {
+          items = [item].concat(items.filter((x) => x.id !== item.id));
+          selectedCosmeticId = item.id;
+          kindFilter = "title";
+          mode = "gift";
+        }
+        createMsg = "สร้างยศแล้ว: " + ((item && item.name) || name);
+        createMsgOk = true;
+        paint();
+      };
     }
 
     root.querySelectorAll("#giftMode [data-mode]").forEach((btn) => {
