@@ -91,7 +91,7 @@ export async function renderGames(root, { user }) {
         หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น ป้าย <b>Beta</b> และ <b>Coming Soon</b>
         — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิด ตั้งชื่อ และทำเครื่องหมายสถานะ
       </p>
-      <div class="content-grid" id="gCat" style="margin-top:14px">
+      <div class="game-admin-grid" id="gCat">
         ${GAMES.map((g) => {
           const row = catalog[g.id] || {};
           const name = (row.name && String(row.name).trim()) || g.defaultName;
