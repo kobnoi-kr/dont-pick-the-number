@@ -1076,6 +1076,75 @@ async function handleAdminApi(req, res, pathname) {
     return true;
   }
 
+  // —— Shop pts grant (test / support) ——
+  if (pathname === "/api/v1/admin/shop-pts/grant" && method(req) === "POST") {
+    const gate = await requireAdmin(req, res);
+    if (!gate) return true;
+    if (
+      !userHasPermission(gate.user, "cosmetics.gift") &&
+      !userHasPermission(gate.user, "settings.manage") &&
+      !userHasPermission(gate.user, "users.ban")
+    ) {
+      sendJson(res, 403, { error: "permission_denied" });
+      return true;
+    }
+    const body = await readJsonBody(req).catch(() => null);
+    const amount = Math.floor(Number(body && body.amount) || 0);
+    if (amount < 1 || amount > 1_000_000) {
+      sendJson(res, 400, { error: "invalid_amount" });
+      return true;
+    }
+    let target = null;
+    if (body && body.self) {
+      target = await prisma.user.findUnique({ where: { id: gate.user.id } });
+    } else {
+      const q = String((body && (body.q || body.username || body.userId)) || "")
+        .trim()
+        .slice(0, 64);
+      if (!q) {
+        sendJson(res, 400, { error: "invalid_user" });
+        return true;
+      }
+      target = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: q },
+            { username: { equals: q, mode: "insensitive" } },
+            { displayName: { equals: q, mode: "insensitive" } }
+          ]
+        }
+      });
+    }
+    if (!target) {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    const { awardShopPts } = require("../dashboard/shop-pts");
+    const result = await awardShopPts(prisma, target.id, amount, {
+      reason: "admin_grant",
+      adminId: gate.user.id
+    });
+    await writeAdminLog(prisma, {
+      adminId: gate.user.id,
+      action: "shop_pts.grant",
+      targetId: target.id,
+      metadata: { amount, balance: result && result.balance },
+      ipAddress: ip
+    });
+    sendJson(res, 200, {
+      ok: true,
+      gain: amount,
+      balance: result && result.balance,
+      user: {
+        id: target.id,
+        username: target.username,
+        displayName: target.displayName,
+        shopPts: result && result.balance
+      }
+    });
+    return true;
+  }
+
   // —— Settings ——
   if (pathname === "/api/v1/admin/settings") {
     if (method(req) === "GET") {
@@ -1083,6 +1152,10 @@ async function handleAdminApi(req, res, pathname) {
       if (!auth) return true;
       const rows = await prisma.systemSetting.findMany();
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      if (!settings.shop_pts) {
+        const { normalizeShopPtsConfig } = require("../dashboard/shop-pts");
+        settings.shop_pts = normalizeShopPtsConfig(null);
+      }
       sendJson(res, 200, { settings });
       return true;
     }
@@ -1110,13 +1183,18 @@ async function handleAdminApi(req, res, pathname) {
         "activity_log_enabled",
         "activity_log_retention_days",
         "game_history_retention_days",
-        "db_size_limit_mb"
+        "db_size_limit_mb",
+        "shop_pts"
       ];
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(body.settings, key)) {
           let value = body.settings[key];
           if (key === "maintenance_enabled") value = !!value;
           if (key === "maintenance_message") value = String(value || "").slice(0, 2000);
+          if (key === "shop_pts") {
+            const { normalizeShopPtsConfig } = require("../dashboard/shop-pts");
+            value = normalizeShopPtsConfig(value);
+          }
           if (key === "max_rooms_display") {
             value = Math.min(200, Math.max(1, Number(value) || 50));
           }

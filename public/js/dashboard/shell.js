@@ -55,8 +55,9 @@ export function paintUser(user) {
   const adminNav = document.getElementById("adminNavBtn");
   if (sideName) sideName.textContent = name;
   if (sideStatus) {
-    // Show DB role under the display name (not a static "สมาชิก").
-    sideStatus.textContent = roleLabel(user);
+    // Show DB role + shop pts under the display name.
+    const pts = user ? ` · ${Number(user.shopPts) || 0} pts` : "";
+    sideStatus.textContent = roleLabel(user) + pts;
   }
   if (sideAvatar) {
     if (user && user.avatarUrl) {

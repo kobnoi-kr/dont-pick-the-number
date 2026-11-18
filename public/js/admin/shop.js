@@ -2,7 +2,21 @@ import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
 const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์" };
+const TIER_OPTS = [
+  { value: "common", label: "Common" },
+  { value: "uncommon", label: "Uncommon" },
+  { value: "rare", label: "Rare" },
+  { value: "epic", label: "Epic" },
+  { value: "legendary", label: "Legendary" }
+];
 const MAX_IMAGE_BYTES = 1_400_000;
+
+function itemTier(item) {
+  if (!item) return "common";
+  if (item.tier) return String(item.tier);
+  if (item.meta && item.meta.tier) return String(item.meta.tier);
+  return "common";
+}
 
 const PRESET_CSS = {
   frame: [
@@ -111,18 +125,33 @@ export async function renderShopAdmin(root, { user }) {
   let msg = "";
   let msgOk = false;
   let pendingImage = "";
+  let ptsCfg = { enabled: true, baseWin: 25, perHumanOpponent: 15, maxBonusHumans: 11 };
 
   async function load() {
-    const { res, data } = await api("/api/v1/admin/cosmetics/shop", { method: "GET" });
-    if (!res.ok) {
+    const [shopRes, settingsRes] = await Promise.all([
+      api("/api/v1/admin/cosmetics/shop", { method: "GET" }),
+      api("/api/v1/admin/settings", { method: "GET" })
+    ]);
+    if (!shopRes.res.ok) {
       listed = [];
       catalog = [];
       msg = "โหลดแคตตาล็อกไม่ได้";
       msgOk = false;
       return;
     }
-    listed = Array.isArray(data.listed) ? data.listed : [];
-    catalog = Array.isArray(data.catalog) ? data.catalog : [];
+    listed = Array.isArray(shopRes.data.listed) ? shopRes.data.listed : [];
+    catalog = Array.isArray(shopRes.data.catalog) ? shopRes.data.catalog : [];
+    if (settingsRes.res.ok && settingsRes.data && settingsRes.data.settings) {
+      const raw = settingsRes.data.settings.shop_pts;
+      if (raw && typeof raw === "object") {
+        ptsCfg = {
+          enabled: raw.enabled !== false,
+          baseWin: Number(raw.baseWin) || 25,
+          perHumanOpponent: Number(raw.perHumanOpponent) || 15,
+          maxBonusHumans: Number(raw.maxBonusHumans) || 11
+        };
+      }
+    }
   }
 
   function setMsg(text, ok) {
@@ -159,6 +188,43 @@ export async function renderShopAdmin(root, { user }) {
       </section>
 
       <div class="card">
+        <h3 style="margin-top:0">ตั้งค่ารางวัล pts</h3>
+        <p class="tiny muted" style="margin:0 0 10px">ชนะเกมได้ pts · ไม่นับบอท · สูตร = base + (ผู้เล่นจริงในล็อบบี้ − 1) × โบนัส</p>
+        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+          <label class="shop-flag" style="align-items:center">
+            <input type="checkbox" id="ptsEnabled" ${ptsCfg.enabled ? "checked" : ""}>
+            เปิดระบบ Shop / ให้ pts
+          </label>
+          <label>pts พื้นฐานเมื่อชนะ
+            <input class="input" id="ptsBase" type="number" min="0" max="100000" step="1" value="${ptsCfg.baseWin}">
+          </label>
+          <label>pts ต่อผู้เล่นจริงเพิ่ม
+            <input class="input" id="ptsPer" type="number" min="0" max="100000" step="1" value="${ptsCfg.perHumanOpponent}">
+          </label>
+          <label>โบนัสสูงสุด (คน)
+            <input class="input" id="ptsMaxHumans" type="number" min="0" max="32" step="1" value="${ptsCfg.maxBonusHumans}">
+          </label>
+        </div>
+        <div class="row-actions" style="margin-top:12px">
+          <button type="button" class="btn sm" id="ptsSaveBtn">บันทึกตั้งค่า pts</button>
+        </div>
+        <hr style="border:0;border-top:1px solid var(--nv-border);margin:16px 0">
+        <h4 style="margin:0 0 8px">เติม pts (ทดสอบ)</h4>
+        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+          <label>username / displayName / id
+            <input class="input" id="ptsGrantUser" placeholder="เช่น Kim">
+          </label>
+          <label>จำนวน pts
+            <input class="input" id="ptsGrantAmount" type="number" min="1" max="1000000" step="1" value="500">
+          </label>
+        </div>
+        <div class="row-actions" style="margin-top:10px">
+          <button type="button" class="btn ghost sm" id="ptsGrantBtn">เติม pts</button>
+          <button type="button" class="btn ghost sm" id="ptsGrantSelfBtn">เติมให้ตัวเอง 500</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
         <h3 style="margin-top:0">สร้างกรอบ / เอฟเฟกต์ใหม่</h3>
         <form id="shopCreateForm" class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
           <label>ประเภท
@@ -169,6 +235,11 @@ export async function renderShopAdmin(root, { user }) {
           </label>
           <label>ชื่อ
             <input class="input" id="shopName" name="name" maxlength="64" required placeholder="เช่น กรอบมุก">
+          </label>
+          <label>Tier
+            <select class="input" id="shopTier" name="tier">
+              ${TIER_OPTS.map((t) => `<option value="${t.value}">${t.label}</option>`).join("")}
+            </select>
           </label>
           <label>ราคา Shop (pts)
             <input class="input" id="shopPrice" name="shopPrice" type="number" min="0" max="1000000" step="1" value="100" required>
@@ -219,7 +290,7 @@ export async function renderShopAdmin(root, { user }) {
                 .map(
                   (it) => `<div class="dec-item shop-item" data-id="${esc(it.id)}">
                   ${thumb(it)}
-                  <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
+                  <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)} · ${esc(itemTier(it))}</span>
                   <b>${esc(it.name)}</b>
                   <span class="tiny muted">${esc(it.id)}</span>
                   ${itemImage(it) ? `<span class="tiny muted">มีรูป/GIF</span>` : ""}
@@ -227,6 +298,14 @@ export async function renderShopAdmin(root, { user }) {
                     <input class="input" data-price-input type="number" min="0" max="1000000" step="1" value="${
                       it.shopPrice != null ? it.shopPrice : 0
                     }" style="width:96px">
+                  </label>
+                  <label class="tiny" style="display:block;margin-top:6px">Tier
+                    <select class="input" data-tier>
+                      ${TIER_OPTS.map(
+                        (t) =>
+                          `<option value="${t.value}"${itemTier(it) === t.value ? " selected" : ""}>${t.label}</option>`
+                      ).join("")}
+                    </select>
                   </label>
                   ${flagTogglesHtml(it)}
                   <label class="tiny" style="display:block;margin-top:8px">เปลี่ยนรูป/GIF
@@ -258,11 +337,19 @@ export async function renderShopAdmin(root, { user }) {
                 .map(
                   (it) => `<div class="dec-item shop-item" data-id="${esc(it.id)}">
                   ${thumb(it)}
-                  <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
+                  <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)} · ${esc(itemTier(it))}</span>
                   <b>${esc(it.name)}</b>
                   <span class="tiny muted">${esc(it.description || it.id)}</span>
                   <label class="tiny" style="display:flex;gap:6px;align-items:center;margin-top:6px">ราคา
                     <input class="input" data-price-input type="number" min="0" max="1000000" step="1" value="100" style="width:96px">
+                  </label>
+                  <label class="tiny" style="display:block;margin-top:6px">Tier
+                    <select class="input" data-tier>
+                      ${TIER_OPTS.map(
+                        (t) =>
+                          `<option value="${t.value}"${itemTier(it) === t.value ? " selected" : ""}>${t.label}</option>`
+                      ).join("")}
+                    </select>
                   </label>
                   ${flagTogglesHtml(it)}
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
@@ -298,6 +385,70 @@ export async function renderShopAdmin(root, { user }) {
       paint();
       setMsg("รีเฟรชแล้ว", true);
     };
+
+    const ptsSave = root.querySelector("#ptsSaveBtn");
+    if (ptsSave) {
+      ptsSave.onclick = async () => {
+        const payload = {
+          enabled: !!(root.querySelector("#ptsEnabled") && root.querySelector("#ptsEnabled").checked),
+          baseWin: Number(root.querySelector("#ptsBase") && root.querySelector("#ptsBase").value),
+          perHumanOpponent: Number(root.querySelector("#ptsPer") && root.querySelector("#ptsPer").value),
+          maxBonusHumans: Number(
+            root.querySelector("#ptsMaxHumans") && root.querySelector("#ptsMaxHumans").value
+          )
+        };
+        const { res } = await api("/api/v1/admin/settings", {
+          method: "PATCH",
+          body: JSON.stringify({ settings: { shop_pts: payload } })
+        });
+        if (!res.ok) {
+          setMsg("บันทึกตั้งค่า pts ไม่สำเร็จ", false);
+          return;
+        }
+        ptsCfg = payload;
+        setMsg("บันทึกตั้งค่า pts แล้ว", true);
+      };
+    }
+
+    async function grantPts(body) {
+      const { res, data } = await api("/api/v1/admin/shop-pts/grant", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        setMsg(((data && data.error) || "เติม pts ไม่สำเร็จ") + "", false);
+        return;
+      }
+      setMsg(
+        "เติม +" +
+          (data.gain || 0) +
+          " pts ให้ " +
+          ((data.user && (data.user.displayName || data.user.username)) || "ผู้ใช้") +
+          " (คงเหลือ " +
+          (data.balance != null ? data.balance : "?") +
+          ")",
+        true
+      );
+    }
+
+    const grantBtn = root.querySelector("#ptsGrantBtn");
+    if (grantBtn) {
+      grantBtn.onclick = async () => {
+        const q = (root.querySelector("#ptsGrantUser") && root.querySelector("#ptsGrantUser").value) || "";
+        const amount = Number(root.querySelector("#ptsGrantAmount") && root.querySelector("#ptsGrantAmount").value);
+        if (!String(q).trim()) {
+          setMsg("ใส่ username / ชื่อ / id ก่อน", false);
+          return;
+        }
+        await grantPts({ q: String(q).trim(), amount });
+      };
+    }
+    const grantSelf = root.querySelector("#ptsGrantSelfBtn");
+    if (grantSelf) {
+      grantSelf.onclick = async () => {
+        await grantPts({ self: true, amount: 500 });
+      };
+    }
 
     root.querySelector("#shopClearImage").onclick = () => {
       pendingImage = "";
@@ -340,6 +491,7 @@ export async function renderShopAdmin(root, { user }) {
       }
       const useSystemColor = !!(root.querySelector("#shopUseColor") && root.querySelector("#shopUseColor").checked);
       const useSystemEffect = !!(root.querySelector("#shopUseEffect") && root.querySelector("#shopUseEffect").checked);
+      const tier = (root.querySelector("#shopTier") && root.querySelector("#shopTier").value) || "common";
       const body = {
         kind,
         name,
@@ -350,7 +502,8 @@ export async function renderShopAdmin(root, { user }) {
         id: id || undefined,
         imageUrl: pendingImage || undefined,
         useSystemColor,
-        useSystemEffect
+        useSystemEffect,
+        tier
       };
       const { res, data } = await api("/api/v1/admin/cosmetics", {
         method: "POST",
@@ -394,9 +547,11 @@ export async function renderShopAdmin(root, { user }) {
     }
 
     function readFlags(card) {
+      const tierEl = card && card.querySelector("[data-tier]");
       return {
         useSystemColor: !!(card && card.querySelector("[data-flag-color]") && card.querySelector("[data-flag-color]").checked),
-        useSystemEffect: !!(card && card.querySelector("[data-flag-effect]") && card.querySelector("[data-flag-effect]").checked)
+        useSystemEffect: !!(card && card.querySelector("[data-flag-effect]") && card.querySelector("[data-flag-effect]").checked),
+        tier: (tierEl && tierEl.value) || "common"
       };
     }
 

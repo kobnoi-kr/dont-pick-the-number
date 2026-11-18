@@ -83,7 +83,7 @@ export async function renderRooms(root, { openCreate, user } = {}) {
     <section class="page-head">
       <div>
         <h2 style="margin:0">My Rooms</h2>
-        <p class="muted" style="margin:6px 0 0">สร้างห้อง เชิญเพื่อน หรือเข้าด้วยรหัส</p>
+        <p class="muted" style="margin:6px 0 0">ห้องเล่นบอร์ดเกม — สร้าง เชิญเพื่อน หรือเข้าด้วยรหัส</p>
       </div>
       <button type="button" class="btn" id="roomsCreate">สร้างห้อง</button>
     </section>

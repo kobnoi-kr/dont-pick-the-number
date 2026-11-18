@@ -79,6 +79,7 @@ function publicUser(user) {
     age: user.age == null ? null : user.age,
     level: user.level == null ? 1 : user.level,
     exp: user.exp == null ? 0 : user.exp,
+    shopPts: user.shopPts == null ? 0 : user.shopPts,
     accountType: user.accountType,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt,

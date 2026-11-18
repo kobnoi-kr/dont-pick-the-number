@@ -52,8 +52,8 @@ function openCreateModal(opts = {}) {
   const hint = document.getElementById("crHint");
   if (hint) {
     hint.textContent = lockCat
-      ? "ตั้งชื่อห้อง แล้วเข้าล็อบบี้"
-      : "เลือกเกม ตั้งชื่อห้อง แล้วเข้าล็อบบี้";
+      ? "ตั้งชื่อห้องบอร์ดเกม แล้วเข้าล็อบบี้"
+      : "เลือกเกมกระดาน ตั้งชื่อห้อง แล้วเข้าล็อบบี้";
   }
 }
 function closeCreateModal() {

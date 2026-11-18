@@ -127,6 +127,33 @@ async function persistFinishedGame(room, scoreOf) {
       } catch (expErr) {
         console.warn("[persistFinishedGame] awardExp", expErr && expErr.message ? expErr.message : expErr);
       }
+
+      if (gp.won) {
+        try {
+          const {
+            loadShopPtsConfig,
+            computeWinShopPts,
+            awardShopPts,
+            countHumanPlayers
+          } = require("./shop-pts");
+          const shopCfg = await loadShopPtsConfig(prisma);
+          const humans = countHumanPlayers(room);
+          const ptsGain = computeWinShopPts(shopCfg, humans);
+          if (ptsGain > 0) {
+            await awardShopPts(prisma, gp.userId, ptsGain, {
+              humans,
+              gameId: game.id,
+              roomCode: room.code,
+              mode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret"
+            });
+          }
+        } catch (ptsErr) {
+          console.warn(
+            "[persistFinishedGame] awardShopPts",
+            ptsErr && ptsErr.message ? ptsErr.message : ptsErr
+          );
+        }
+      }
     }
 
     // Activity: only when a match reached winTarget (over.reset).

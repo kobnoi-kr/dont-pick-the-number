@@ -43,7 +43,8 @@ function catOf(n) {
     type === "admin_reply" ||
     type === "ranking_reward" ||
     type === "level_up" ||
-    type === "system_grant"
+    type === "system_grant" ||
+    type === "shop_pts"
   ) {
     return "other";
   }
@@ -57,6 +58,7 @@ function notifMeta(n) {
   if (type === "system_grant") return { label: "จากระบบ", cls: "notif-admin", icon: "S", detail: true };
   if (type === "ranking_reward") return { label: "รางวัล", cls: "notif-admin notif-reward", icon: "★", detail: true };
   if (type === "level_up") return { label: "Level up", cls: "notif-admin notif-reward", icon: "↑", detail: true };
+  if (type === "shop_pts") return { label: "Shop pts", cls: "notif-admin notif-reward", icon: "P", detail: true };
   if (type === "announcement") {
     if (kind === "warning") return { label: "เตือน", cls: "notif-warning", icon: "!", detail: true };
     if (kind === "danger") return { label: "ถึงคุณ", cls: "notif-danger", icon: "!", detail: true };
@@ -113,11 +115,13 @@ function openNotifDetail(n, meta) {
     "";
   if (body) {
     body.textContent = String(full || "ไม่มีรายละเอียด");
-    if (n.type === "ranking_reward") {
+    if (n.type === "ranking_reward" || n.type === "shop_pts") {
       const link = document.createElement("a");
       link.className = "btn sm";
-      link.href = (n.payload && n.payload.href) || "/app#decorate";
-      link.textContent = "ไปที่ตกแต่ง";
+      link.href =
+        (n.payload && n.payload.href) ||
+        (n.type === "shop_pts" ? "/app#shop" : "/app#decorate");
+      link.textContent = n.type === "shop_pts" ? "ไปที่ Shop" : "ไปที่ตกแต่ง";
       link.style.marginTop = "14px";
       link.style.display = "inline-flex";
       link.onclick = () => modal.classList.add("hidden");

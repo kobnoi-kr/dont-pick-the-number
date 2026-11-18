@@ -265,12 +265,22 @@ export async function renderDecorate(root, { user } = {}) {
             ? "ยศเลเวล"
             : item.source === "ranking_weekly" || item.source === "ranking_monthly"
               ? "Ranking"
-              : item.source === "starter"
-                ? "เริ่มต้น"
-                : item.source || "";
+              : item.source === "shop"
+                ? "Shop"
+                : item.source === "starter"
+                  ? "เริ่มต้น"
+                  : item.source || "";
+        const tier = (item.tier || (item.meta && item.meta.tier) || "").toLowerCase();
+        const tierPill =
+          (item.kind === "frame" || item.kind === "effect") && tier
+            ? `<span class="shop-tier-pill tier-${esc(tier)}">${esc(
+                item.tierLabel || tier
+              )}</span>`
+            : "";
         return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}">
           <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
+          ${tierPill}
           <b>${esc(item.name)}</b>
           <span class="tiny muted">${esc(srcLabel)}</span>
           <span class="dec-wear">${isOn ? "สวมอยู่" : "สวมใส่"}</span>

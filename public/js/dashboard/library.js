@@ -67,7 +67,7 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode } = {}) {
     <section class="page-head">
       <div>
         <h2 style="margin:0">Game Library</h2>
-        <p class="muted" style="margin:6px 0 0">เลือกเกม แล้วสร้างห้อง</p>
+        <p class="muted" style="margin:6px 0 0">จุดรวมบอร์ดเกม — เลือกเกมกระดานแล้วสร้างห้อง</p>
       </div>
     </section>
     <div class="lib-toolbar">

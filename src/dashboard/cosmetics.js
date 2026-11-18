@@ -86,6 +86,41 @@ function isAdminCreatedCosmetic(c) {
 
 const PROTECTED_COSMETIC_IDS = new Set(["frame.basic", "effect.none"]);
 
+const TIER_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
+const TIER_LABEL = {
+  common: "Common",
+  uncommon: "Uncommon",
+  rare: "Rare",
+  epic: "Epic",
+  legendary: "Legendary"
+};
+const DEFAULT_TIER_PRICE = {
+  common: 50,
+  uncommon: 120,
+  rare: 280,
+  epic: 550,
+  legendary: 1000
+};
+
+function normalizeTier(raw) {
+  const t = String(raw || "")
+    .trim()
+    .toLowerCase();
+  return TIER_ORDER.includes(t) ? t : "common";
+}
+
+function cosmeticTier(c) {
+  if (c && c.meta && typeof c.meta === "object" && c.meta.tier) {
+    return normalizeTier(c.meta.tier);
+  }
+  return "common";
+}
+
+function defaultShopPriceForTier(tier) {
+  const t = normalizeTier(tier);
+  return DEFAULT_TIER_PRICE[t] != null ? DEFAULT_TIER_PRICE[t] : DEFAULT_TIER_PRICE.common;
+}
+
 const RANK_TITLE_IDS = {
   weekly: ["title.weekly.1", "title.weekly.2", "title.weekly.3"],
   monthly: ["title.monthly.1", "title.monthly.2", "title.monthly.3"]
@@ -178,72 +213,72 @@ const STARTER_COSMETICS = [
     kind: "frame",
     name: "กรอบทอง",
     description: "กรอบตัวอย่าง — โทนทอง",
-    shopPrice: null,
+    shopPrice: 280,
     cssClass: "frame-gold",
-    meta: { color: "#fbbf24", sample: true }
+    meta: { color: "#fbbf24", sample: true, tier: "rare" }
   },
   {
     id: "frame.neon",
     kind: "frame",
     name: "กรอบนีออน",
     description: "กรอบตัวอย่าง — ขอบนีออนฟ้าชมพู",
-    shopPrice: null,
+    shopPrice: 550,
     cssClass: "frame-neon",
-    meta: { color: "#22d3ee", sample: true }
+    meta: { color: "#22d3ee", sample: true, tier: "epic" }
   },
   {
     id: "frame.ice",
     kind: "frame",
     name: "กรอบน้ำแข็ง",
     description: "กรอบตัวอย่าง — เย็นสดใส",
-    shopPrice: null,
+    shopPrice: 120,
     cssClass: "frame-ice",
-    meta: { color: "#93c5fd", sample: true }
+    meta: { color: "#93c5fd", sample: true, tier: "uncommon" }
   },
   {
     id: "frame.crimson",
     kind: "frame",
     name: "กรอบแดงโลหิต",
     description: "กรอบตัวอย่าง — แดงเข้ม",
-    shopPrice: null,
+    shopPrice: 1000,
     cssClass: "frame-crimson",
-    meta: { color: "#ef4444", sample: true }
+    meta: { color: "#ef4444", sample: true, tier: "legendary" }
   },
   {
     id: "effect.sparkle",
     kind: "effect",
     name: "ประกาย",
     description: "เอฟเฟกต์ตัวอย่าง — กระพริบเบาๆ",
-    shopPrice: null,
+    shopPrice: 120,
     cssClass: "effect-sparkle",
-    meta: { color: "#a78bfa", sample: true }
+    meta: { color: "#a78bfa", sample: true, tier: "uncommon" }
   },
   {
     id: "effect.pulse",
     kind: "effect",
     name: "ชีพจร",
     description: "เอฟเฟกต์ตัวอย่าง — เต้นเป็นจังหวะ",
-    shopPrice: null,
+    shopPrice: 50,
     cssClass: "effect-pulse",
-    meta: { color: "#34d399", sample: true }
+    meta: { color: "#34d399", sample: true, tier: "common" }
   },
   {
     id: "effect.ring",
     kind: "effect",
     name: "วงแหวน",
     description: "เอฟเฟกต์ตัวอย่าง — วงแสงหมุน",
-    shopPrice: null,
+    shopPrice: 280,
     cssClass: "effect-ring",
-    meta: { color: "#60a5fa", sample: true }
+    meta: { color: "#60a5fa", sample: true, tier: "rare" }
   },
   {
     id: "effect.flame",
     kind: "effect",
     name: "เปลวไฟ",
     description: "เอฟเฟกต์ตัวอย่าง — โทนไฟอุ่น",
-    shopPrice: null,
+    shopPrice: 550,
     cssClass: "effect-flame",
-    meta: { color: "#f97316", sample: true }
+    meta: { color: "#f97316", sample: true, tier: "epic" }
   }
 ];
 
@@ -258,8 +293,10 @@ function publicCosmetic(c) {
   if (imageUrl) meta.imageUrl = imageUrl;
   const useSystemColor = cosmeticUsesSystemColor(c);
   const useSystemEffect = cosmeticUsesSystemEffect(c);
+  const tier = cosmeticTier(c);
   meta.useSystemColor = useSystemColor;
   meta.useSystemEffect = useSystemEffect;
+  meta.tier = tier;
   return {
     id: c.id,
     kind: c.kind,
@@ -268,6 +305,8 @@ function publicCosmetic(c) {
     shopPrice: c.shopPrice == null ? null : c.shopPrice,
     cssClass: c.cssClass || null,
     imageUrl,
+    tier,
+    tierLabel: TIER_LABEL[tier] || tier,
     useSystemColor,
     useSystemEffect,
     adminCreated: isAdminCreatedCosmetic(c),
@@ -299,19 +338,47 @@ async function ensureCosmeticsCatalog(prisma, opts) {
   cosmeticsEnsurePromise = (async () => {
     try {
       await Promise.all(
-        STARTER_COSMETICS.map((item) =>
-          prisma.cosmetic.upsert({
+        STARTER_COSMETICS.map(async (item) => {
+          const existing = await prisma.cosmetic.findUnique({ where: { id: item.id } });
+          if (!existing) {
+            await prisma.cosmetic.create({ data: item });
+            return;
+          }
+          const prevMeta =
+            existing.meta && typeof existing.meta === "object" ? Object.assign({}, existing.meta) : {};
+          const seedMeta = item.meta && typeof item.meta === "object" ? item.meta : {};
+          // Keep admin image/toggles; seed default tier only when missing
+          if (seedMeta.tier && !prevMeta.tier) prevMeta.tier = seedMeta.tier;
+          if (seedMeta.color && !prevMeta.color) prevMeta.color = seedMeta.color;
+          if (seedMeta.sample != null && prevMeta.sample == null) prevMeta.sample = seedMeta.sample;
+          const data = {
+            kind: item.kind,
+            name: item.name,
+            description: item.description,
+            cssClass: item.cssClass,
+            meta: prevMeta
+          };
+          // Seed shop listing once for sample frame/effect (don't override admin price)
+          if (
+            existing.shopPrice == null &&
+            item.shopPrice != null &&
+            (item.kind === "frame" || item.kind === "effect") &&
+            item.id !== "frame.basic" &&
+            item.id !== "effect.none"
+          ) {
+            data.shopPrice = item.shopPrice;
+          } else if (
+            existing.shopPrice == null &&
+            seedMeta.sample &&
+            (item.kind === "frame" || item.kind === "effect")
+          ) {
+            data.shopPrice = defaultShopPriceForTier(seedMeta.tier || prevMeta.tier);
+          }
+          await prisma.cosmetic.update({
             where: { id: item.id },
-            update: {
-              kind: item.kind,
-              name: item.name,
-              description: item.description,
-              // Keep admin shopPrice / meta (image, toggles); only sync cssClass label styles
-              cssClass: item.cssClass
-            },
-            create: item
-          })
-        )
+            data
+          });
+        })
       );
       cosmeticsEnsuredAt = Date.now();
     } finally {
@@ -611,14 +678,136 @@ async function handleCosmeticsApi(req, res, pathname) {
     }
     const prisma = await getPrisma();
     await ensureCosmeticsCatalog(prisma);
+    const { loadShopPtsConfig } = require("./shop-pts");
+    const { resolveAuth } = require("../auth/middleware");
+    const ptsCfg = await loadShopPtsConfig(prisma);
     const items = await prisma.cosmetic.findMany({
-      where: { shopPrice: { not: null } },
+      where: {
+        shopPrice: { not: null },
+        kind: { in: ["frame", "effect"] }
+      },
       orderBy: [{ kind: "asc" }, { shopPrice: "asc" }]
     });
+    let shopPts = 0;
+    let ownedIds = [];
+    const soft = await resolveAuth(req);
+    if (soft && soft.user && soft.user.id) {
+      shopPts = soft.user.shopPts == null ? 0 : soft.user.shopPts;
+      const owned = await prisma.userCosmetic.findMany({
+        where: { userId: soft.user.id },
+        select: { cosmeticId: true }
+      });
+      ownedIds = owned.map((o) => o.cosmeticId);
+    }
+    const sorted = items
+      .map(publicCosmetic)
+      .sort((a, b) => {
+        const ta = TIER_ORDER.indexOf(a.tier || "common");
+        const tb = TIER_ORDER.indexOf(b.tier || "common");
+        if (ta !== tb) return ta - tb;
+        return (a.shopPrice || 0) - (b.shopPrice || 0);
+      });
     sendJson(res, 200, {
-      comingSoon: true,
-      items: items.map(publicCosmetic)
+      comingSoon: !ptsCfg.enabled,
+      enabled: !!ptsCfg.enabled,
+      rewards: ptsCfg,
+      shopPts,
+      ownedIds,
+      items: sorted
     });
+    return true;
+  }
+
+  if (pathname === "/api/v1/shop/buy") {
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    if (auth.user.accountType === "guest") {
+      sendJson(res, 403, { error: "registered_required" });
+      return true;
+    }
+    const { loadShopPtsConfig } = require("./shop-pts");
+    const ptsCfg = await loadShopPtsConfig(auth.prisma);
+    if (!ptsCfg.enabled) {
+      sendJson(res, 403, { error: "shop_disabled" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const cosmetic = await auth.prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    if (!cosmetic || cosmetic.shopPrice == null) {
+      sendJson(res, 404, { error: "not_for_sale" });
+      return true;
+    }
+    if (cosmetic.kind !== "frame" && cosmetic.kind !== "effect") {
+      sendJson(res, 400, { error: "invalid_kind" });
+      return true;
+    }
+    const price = Number(cosmetic.shopPrice);
+    if (!Number.isFinite(price) || price < 0 || Math.floor(price) !== price) {
+      sendJson(res, 400, { error: "invalid_price" });
+      return true;
+    }
+    const already = await auth.prisma.userCosmetic.findUnique({
+      where: { userId_cosmeticId: { userId: auth.user.id, cosmeticId } }
+    });
+    if (already) {
+      sendJson(res, 409, { error: "already_owned" });
+      return true;
+    }
+    try {
+      const result = await auth.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: auth.user.id },
+          select: { shopPts: true }
+        });
+        const bal = user && user.shopPts != null ? user.shopPts : 0;
+        if (bal < price) {
+          const err = new Error("insufficient_pts");
+          err.code = "insufficient_pts";
+          err.shopPts = bal;
+          throw err;
+        }
+        const updated = await tx.user.update({
+          where: { id: auth.user.id },
+          data: { shopPts: bal - price },
+          select: { shopPts: true }
+        });
+        await tx.userCosmetic.create({
+          data: {
+            userId: auth.user.id,
+            cosmeticId,
+            source: "shop"
+          }
+        });
+        return updated;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        item: publicCosmetic(cosmetic),
+        shopPts: result.shopPts,
+        spent: price
+      });
+    } catch (err) {
+      if (err && err.code === "insufficient_pts") {
+        sendJson(res, 400, { error: "insufficient_pts", shopPts: err.shopPts || 0 });
+        return true;
+      }
+      sendJson(res, 500, { error: "buy_failed" });
+    }
     return true;
   }
 
@@ -1000,6 +1189,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       body && Object.prototype.hasOwnProperty.call(body, "useSystemEffect")
         ? !!body.useSystemEffect
         : true;
+    const tier = normalizeTier(body && body.tier);
     const meta = Object.assign(
       {},
       color ? { color } : {},
@@ -1007,7 +1197,8 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       {
         adminCreated: true,
         useSystemColor,
-        useSystemEffect
+        useSystemEffect,
+        tier
       }
     );
     const created = await prisma.cosmetic.create({
@@ -1125,6 +1316,10 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     if (body && Object.prototype.hasOwnProperty.call(body, "useSystemEffect")) {
       metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
       metaPatch.useSystemEffect = !!body.useSystemEffect;
+    }
+    if (body && Object.prototype.hasOwnProperty.call(body, "tier")) {
+      metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
+      metaPatch.tier = normalizeTier(body.tier);
     }
     if (body && Object.prototype.hasOwnProperty.call(body, "cssClass")) {
       const nextCss = String(body.cssClass || "").trim().slice(0, 64);
