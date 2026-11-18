@@ -375,7 +375,11 @@ async function handleAccountProfile(req, res) {
         sendJson(res, 400, { error: "invalid_input" });
         return true;
       }
-      // Display name only — never overwrite username here (that rolled admin renames back).
+      // Display name only — never touch username (shop/admin renames must not roll back).
+      if (Object.prototype.hasOwnProperty.call(body, "username")) {
+        sendJson(res, 400, { error: "username_via_shop_only" });
+        return true;
+      }
       const data = { displayName };
       if (Object.prototype.hasOwnProperty.call(body, "avatarUrl")) {
         const av = cleanAvatarUrl(body.avatarUrl);

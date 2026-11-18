@@ -79,7 +79,7 @@ export async function renderProfile(root, { user, onSaved }) {
         <form id="profileForm" class="form-grid">
           <label>Display Name<input id="pfName" maxlength="64" value="${esc(u.displayName || "")}" required></label>
           <label>Username<input value="${esc(u.username || "")}" disabled></label>
-          <p class="tiny muted" style="margin:0">Username แยกจาก Display name — เปลี่ยนได้เฉพาะแอดมิน</p>
+          <p class="tiny muted" style="margin:0">Username แยกจาก Display name — เปลี่ยนได้ที่ <a href="#shop">Shop</a> (300 pts) และไม่ถูกเขียนทับตอนล็อกอิน</p>
           <label>เพศ
             <select id="pfGender">
               <option value="" ${!u.gender ? "selected" : ""}>—</option>

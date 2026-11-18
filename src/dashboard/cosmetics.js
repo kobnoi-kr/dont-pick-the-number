@@ -155,6 +155,8 @@ const TIER_LABEL = {
   epic: "Epic",
   legendary: "Legendary"
 };
+/** Shop service: permanent username change (profile/OAuth must never overwrite). */
+const USERNAME_CHANGE_PRICE = 300;
 const DEFAULT_TIER_PRICE = {
   common: 50,
   uncommon: 120,
@@ -856,8 +858,134 @@ async function handleCosmeticsApi(req, res, pathname) {
       rewards: ptsCfg,
       shopPts,
       ownedIds,
-      items: sorted
+      items: sorted,
+      services: [
+        {
+          id: "service.username",
+          kind: "service",
+          name: "เปลี่ยน Username",
+          description:
+            "ตั้ง username ใหม่ถาวร — ไม่ถูกเขียนทับตอนบันทึกโปรไฟล์หรือล็อกอิน OAuth",
+          shopPrice: USERNAME_CHANGE_PRICE,
+          tier: "rare",
+          tierLabel: TIER_LABEL.rare
+        }
+      ]
     });
+    return true;
+  }
+
+  if (pathname === "/api/v1/shop/username") {
+    if (method(req) !== "POST") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    if (auth.user.accountType === "guest") {
+      sendJson(res, 403, { error: "registered_required" });
+      return true;
+    }
+    const { loadShopPtsConfig } = require("./shop-pts");
+    const ptsCfg = await loadShopPtsConfig(auth.prisma);
+    if (!ptsCfg.enabled) {
+      sendJson(res, 403, { error: "shop_disabled" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const username = String((body && body.username) || "")
+      .trim()
+      .slice(0, 64);
+    if (username.length < 2 || username.length > 64 || !/^[a-zA-Z0-9._-]+$/.test(username)) {
+      sendJson(res, 400, { error: "invalid_username" });
+      return true;
+    }
+    const price = USERNAME_CHANGE_PRICE;
+    try {
+      const { publicUser } = require("../auth/users");
+      const result = await auth.prisma.$transaction(async (tx) => {
+        const me = await tx.user.findUnique({
+          where: { id: auth.user.id },
+          select: { id: true, username: true, shopPts: true, status: true }
+        });
+        if (!me || me.status === "deleted") {
+          const err = new Error("user_not_found");
+          err.code = "user_not_found";
+          throw err;
+        }
+        if (String(me.username).toLowerCase() === username.toLowerCase()) {
+          const err = new Error("same_username");
+          err.code = "same_username";
+          throw err;
+        }
+        const taken = await tx.user.findFirst({
+          where: {
+            id: { not: me.id },
+            username: { equals: username, mode: "insensitive" },
+            status: { not: "deleted" }
+          },
+          select: { id: true }
+        });
+        if (taken) {
+          const err = new Error("username_taken");
+          err.code = "username_taken";
+          throw err;
+        }
+        const bal = me.shopPts == null ? 0 : me.shopPts;
+        if (bal < price) {
+          const err = new Error("insufficient_pts");
+          err.code = "insufficient_pts";
+          err.shopPts = bal;
+          throw err;
+        }
+        const updated = await tx.user.update({
+          where: { id: me.id },
+          data: {
+            shopPts: bal - price,
+            username
+          },
+          include: { userRoles: { include: { role: true } } }
+        });
+        await tx.accountEvent.create({
+          data: {
+            userId: me.id,
+            eventType: "username_changed",
+            metadata: {
+              source: "shop",
+              spent: price,
+              before: me.username,
+              after: username
+            }
+          }
+        });
+        return { user: updated, shopPts: updated.shopPts, spent: price, before: me.username };
+      });
+      sendJson(res, 200, {
+        ok: true,
+        spent: result.spent,
+        shopPts: result.shopPts,
+        before: result.before,
+        username: result.user.username,
+        user: publicUser(result.user)
+      });
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "insufficient_pts") {
+        sendJson(res, 400, { error: "insufficient_pts", shopPts: err.shopPts || 0 });
+        return true;
+      }
+      if (code === "username_taken" || code === "same_username" || code === "user_not_found") {
+        sendJson(res, code === "user_not_found" ? 404 : 409, { error: code });
+        return true;
+      }
+      sendJson(res, 500, { error: "rename_failed" });
+    }
     return true;
   }
 

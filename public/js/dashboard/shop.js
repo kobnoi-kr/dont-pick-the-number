@@ -7,7 +7,7 @@ function esc(s) {
   );
 }
 
-const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์" };
+const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์", service: "บริการ" };
 const TIERS = [
   { id: "all", label: "ทั้งหมด" },
   { id: "common", label: "Common" },
@@ -102,11 +102,12 @@ function previewCard(item, user) {
   </div>`;
 }
 
-export async function renderShop(root, { user } = {}) {
+export async function renderShop(root, { user, onSaved } = {}) {
   const guest = !user || user.accountType === "guest";
   let kindFilter = "all";
   let tierFilter = "all";
   let items = [];
+  let services = [];
   let owned = new Set();
   let shopPts = (user && user.shopPts) || 0;
   let enabled = true;
@@ -117,7 +118,7 @@ export async function renderShop(root, { user } = {}) {
     <section class="page-head">
       <div>
         <h2 style="margin:0">Shop</h2>
-        <p class="muted" style="margin:6px 0 0">ซื้อกรอบ · เอฟเฟกต์ ด้วย pts — ได้ pts เมื่อชนะเกม (ยิ่งคนจริงในล็อบบี้เยอะ ยิ่งได้เยอะ)</p>
+        <p class="muted" style="margin:6px 0 0">ซื้อกรอบ · เอฟเฟกต์ · เปลี่ยน username ด้วย pts</p>
       </div>
       <div class="shop-balance" id="shopBalance" title="คะแนน Shop">0 pts</div>
     </section>
@@ -137,16 +138,25 @@ export async function renderShop(root, { user } = {}) {
     if (el) el.textContent = `${Number(shopPts) || 0} pts`;
   }
 
+  function catalogAll() {
+    return items.concat(services);
+  }
+
   function filtered() {
-    return items.filter((it) => {
+    return catalogAll().filter((it) => {
       if (kindFilter !== "all" && it.kind !== kindFilter) return false;
+      if (it.kind === "service") return true;
       if (tierFilter !== "all" && (it.tier || "common") !== tierFilter) return false;
       return true;
     });
   }
 
   function selectedItem() {
-    return items.find((x) => x.id === selectedId) || filtered()[0] || null;
+    return catalogAll().find((x) => x.id === selectedId) || filtered()[0] || null;
+  }
+
+  function serviceThumb() {
+    return `<div class="dec-card-thumb shop-service-thumb" style="--dec-accent:#60a5fa"><div class="dec-av-core"><span class="dec-av-letter">@</span></div></div>`;
   }
 
   function paint() {
@@ -180,6 +190,7 @@ export async function renderShop(root, { user } = {}) {
               <button type="button" class="shop-tab${kindFilter === "all" ? " on" : ""}" data-kind="all">ทั้งหมด</button>
               <button type="button" class="shop-tab${kindFilter === "frame" ? " on" : ""}" data-kind="frame">กรอบ</button>
               <button type="button" class="shop-tab${kindFilter === "effect" ? " on" : ""}" data-kind="effect">เอฟเฟกต์</button>
+              <button type="button" class="shop-tab${kindFilter === "service" ? " on" : ""}" data-kind="service">บริการ</button>
             </div>
             <div class="shop-tier-tabs" role="tablist" aria-label="Tier">
               ${TIERS.map(
@@ -194,14 +205,20 @@ export async function renderShop(root, { user } = {}) {
             list.length
               ? `<div class="shop-grid">${list
                   .map((it) => {
-                    const isOwned = owned.has(it.id);
+                    const isService = it.kind === "service";
+                    const isOwned = !isService && owned.has(it.id);
                     const on = sel && sel.id === it.id;
+                    const letter = ((user && (user.displayName || user.username)) || "N").slice(0, 1);
                     return `<button type="button" class="shop-card tier-${esc(it.tier || "common")}${
                       on ? " on" : ""
                     }${isOwned ? " owned" : ""}" data-pick="${esc(it.id)}">
-                      <div class="shop-card-thumb">${thumb(it, ((user && (user.displayName || user.username)) || "N").slice(0, 1))}</div>
+                      ${
+                        isService
+                          ? serviceThumb()
+                          : `<div class="shop-card-thumb">${thumb(it, letter)}</div>`
+                      }
                       <span class="shop-tier-pill tier-${esc(it.tier || "common")}">${esc(
-                        it.tierLabel || it.tier || "Common"
+                        isService ? "บริการ" : it.tierLabel || it.tier || "Common"
                       )}</span>
                       <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
                       <b>${esc(it.name)}</b>
@@ -223,8 +240,27 @@ export async function renderShop(root, { user } = {}) {
         <div class="card shop-preview-card">
           <h3 style="margin-top:0">พรีวิว</h3>
           ${
-            sel
-              ? `${previewCard(sel, user)}
+            sel && sel.kind === "service" && sel.id === "service.username"
+              ? `<div class="shop-preview-meta">
+                   <span class="shop-tier-pill tier-rare">บริการ</span>
+                   <b>${esc(sel.name)}</b>
+                   <p class="muted tiny" style="margin:6px 0 0">${esc(sel.description || "")}</p>
+                   <p class="tiny muted" style="margin:8px 0 0">ตอนนี้: <b>@${esc((user && user.username) || "—")}</b></p>
+                   <p class="shop-preview-price">${sel.shopPrice != null ? sel.shopPrice + " pts" : "—"}</p>
+                   ${
+                     guest
+                       ? `<p class="tiny muted">เข้าสู่ระบบด้วยบัญชีจริงเพื่อใช้บริการ</p>`
+                       : `<label class="tiny" style="display:block;margin-top:10px">Username ใหม่
+                            <input class="input" id="shopUsernameInput" maxlength="64" placeholder="เช่น kim_01" value="">
+                          </label>
+                          <p class="tiny muted" style="margin:6px 0 0">ใช้ a–z, 0–9, . _ - · ยาว 2–64 ตัว · เปลี่ยนแล้วไม่โรลแบค</p>
+                          <div class="shop-preview-actions" style="margin-top:12px">
+                            <button type="button" class="btn" id="shopRenameBtn">จ่าย ${sel.shopPrice} pts แล้วเปลี่ยน</button>
+                          </div>`
+                   }
+                 </div>`
+              : sel
+                ? `${previewCard(sel, user)}
                  <div class="shop-preview-meta">
                    <span class="shop-tier-pill tier-${esc(sel.tier || "common")}">${esc(
                      sel.tierLabel || sel.tier || "Common"
@@ -245,7 +281,7 @@ export async function renderShop(root, { user } = {}) {
                            }</button>`
                    }
                  </div>`
-              : `<p class="empty">เลือกสินค้าเพื่อดูพรีวิว</p>`
+                : `<p class="empty">เลือกสินค้าเพื่อดูพรีวิว</p>`
           }
         </div>
       </div>
@@ -305,6 +341,65 @@ export async function renderShop(root, { user } = {}) {
         paint();
       };
     }
+
+    const renameBtn = body.querySelector("#shopRenameBtn");
+    if (renameBtn && sel) {
+      renameBtn.onclick = async () => {
+        const input = body.querySelector("#shopUsernameInput");
+        const next = String((input && input.value) || "").trim();
+        if (!/^[a-zA-Z0-9._-]{2,64}$/.test(next)) {
+          setMsg("Username ใช้ได้แค่ a–z 0–9 . _ - และยาว 2–64 ตัว", false);
+          return;
+        }
+        if (!confirm(`จ่าย ${sel.shopPrice} pts เพื่อเปลี่ยนเป็น @${next}?`)) return;
+        renameBtn.disabled = true;
+        const { res, data } = await api("/api/v1/shop/username", {
+          method: "POST",
+          body: JSON.stringify({ username: next })
+        });
+        if (!res.ok) {
+          const err = (data && data.error) || "";
+          setMsg(
+            err === "insufficient_pts"
+              ? "pts ไม่พอ"
+              : err === "username_taken"
+                ? "Username นี้มีคนใช้แล้ว"
+                : err === "same_username"
+                  ? "เป็น username เดิมอยู่แล้ว"
+                  : err === "invalid_username"
+                    ? "Username ไม่ถูกต้อง"
+                    : err === "shop_disabled"
+                      ? "Shop ปิดอยู่"
+                      : "เปลี่ยนไม่สำเร็จ",
+            false
+          );
+          renameBtn.disabled = false;
+          return;
+        }
+        shopPts = data.shopPts != null ? data.shopPts : shopPts - (sel.shopPrice || 0);
+        if (data.user) {
+          if (typeof onSaved === "function") onSaved(data.user);
+          else {
+            Object.assign(user || {}, data.user);
+            try {
+              paintUser(user);
+            } catch (_) {}
+          }
+          if (user) {
+            user.username = data.user.username;
+            user.shopPts = shopPts;
+          }
+        } else if (user) {
+          user.username = data.username || next;
+          user.shopPts = shopPts;
+          try {
+            paintUser(user);
+          } catch (_) {}
+        }
+        setMsg("เปลี่ยน username เป็น @" + (data.username || next) + " แล้ว (ถาวร)", true);
+        paint();
+      };
+    }
   }
 
   const { res, data } = await api("/api/v1/shop/catalog", { method: "GET" });
@@ -314,10 +409,12 @@ export async function renderShop(root, { user } = {}) {
   }
   enabled = data.enabled !== false && !data.comingSoon;
   items = Array.isArray(data.items) ? data.items : [];
+  services = Array.isArray(data.services) ? data.services : [];
   owned = new Set(Array.isArray(data.ownedIds) ? data.ownedIds : []);
   shopPts = data.shopPts != null ? data.shopPts : shopPts;
   if (user) user.shopPts = shopPts;
   rewards = data.rewards || null;
-  if (items[0]) selectedId = items[0].id;
+  const first = catalogAll()[0];
+  if (first) selectedId = first.id;
   paint();
 }

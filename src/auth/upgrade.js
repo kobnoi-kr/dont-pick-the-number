@@ -78,6 +78,7 @@ async function linkProviderToUser(prisma, {
           !user.avatarUrl && metadata && metadata.avatarUrl
             ? metadata.avatarUrl
             : undefined,
+        // Never overwrite username on link/login — shop/admin renames must stick.
         displayName:
           metadata && metadata.displayName && user.accountType === "guest"
             ? String(metadata.displayName).slice(0, 64)
