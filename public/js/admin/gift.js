@@ -2,6 +2,7 @@ import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
+const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.level.1", "title.rookie"]);
 
 function itemColor(item) {
   if (!item) return "#94a3b8";
@@ -45,24 +46,65 @@ export async function renderGift(root, { user }) {
     root.innerHTML = `<div class="empty">โหลดแคตตาล็อกไม่ได้</div>`;
     return;
   }
-  const items = Array.isArray(cat.data && cat.data.items) ? cat.data.items : [];
+  // กันมือใหม่ซ้ำฝั่ง UI ด้วย (เหลือแค่ยศเลเวล)
+  const items = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
+    if (it.id === "title.rookie") return false;
+    return true;
+  });
 
+  let mode = "gift"; // gift | revoke
   let selectedUser = null;
   let selectedCosmeticId = "";
   let kindFilter = "all";
+  let owned = [];
+  let equipped = { titleId: null, frameId: null, effectId: null };
+  let ownedLoading = false;
+
+  async function loadOwned() {
+    owned = [];
+    equipped = { titleId: null, frameId: null, effectId: null };
+    if (!selectedUser) return;
+    ownedLoading = true;
+    paint();
+    const { res, data } = await api(
+      "/api/v1/admin/cosmetics/owned?userId=" + encodeURIComponent(selectedUser.id),
+      { method: "GET" }
+    );
+    ownedLoading = false;
+    if (res.ok && data) {
+      owned = Array.isArray(data.owned) ? data.owned : [];
+      equipped = data.equipped || equipped;
+    }
+    paint();
+  }
 
   function paint() {
-    const filtered =
+    const catalogFiltered =
       kindFilter === "all" ? items : items.filter((it) => it.kind === kindFilter);
-    const selected = items.find((it) => it.id === selectedCosmeticId) || null;
+    const ownedFiltered =
+      kindFilter === "all" ? owned : owned.filter((it) => it.kind === kindFilter);
+    const list = mode === "gift" ? catalogFiltered : ownedFiltered;
+    const selected =
+      mode === "gift"
+        ? items.find((it) => it.id === selectedCosmeticId) || null
+        : owned.find((it) => it.id === selectedCosmeticId) || null;
+    const canAct =
+      selectedUser &&
+      selected &&
+      (mode === "gift" || !PROTECTED_IDS.has(selected.id));
 
     root.innerHTML = `
       <section class="page-head">
         <div>
           <h2 style="margin:0">Gift</h2>
-          <p class="muted" style="margin:6px 0 0">มอบยศ · กรอบ · เอฟเฟกต์ ให้ผู้เล่นแบบ manual เวลา auto มีปัญหา</p>
+          <p class="muted" style="margin:6px 0 0">มอบหรือดึงยศ · กรอบ · เอฟเฟกต์ แบบ manual</p>
         </div>
       </section>
+
+      <div class="gift-mode-tabs" id="giftMode">
+        <button type="button" class="btn sm${mode === "gift" ? "" : " ghost"}" data-mode="gift">มอบของ</button>
+        <button type="button" class="btn sm${mode === "revoke" ? "" : " ghost"}" data-mode="revoke">ดึงของกลับ</button>
+      </div>
 
       <div class="gift-layout">
         <div class="card">
@@ -85,7 +127,7 @@ export async function renderGift(root, { user }) {
         </div>
 
         <div class="card">
-          <h3 style="margin-top:0">2) เลือกของ</h3>
+          <h3 style="margin-top:0">${mode === "gift" ? "2) เลือกของที่จะมอบ" : "2) เลือกของในคลังผู้เล่น"}</h3>
           <div class="gift-kind-tabs" id="giftKinds">
             ${["all", "title", "frame", "effect"]
               .map((k) => {
@@ -96,29 +138,46 @@ export async function renderGift(root, { user }) {
           </div>
           <div class="gift-item-grid" id="giftItems">
             ${
-              filtered.length
-                ? filtered
-                    .map((it) => {
-                      const on = selectedCosmeticId === it.id;
-                      return `<button type="button" class="gift-item-card${on ? " on" : ""}" data-id="${esc(it.id)}">
-                        <div class="gift-item-thumb">${thumb(it)}</div>
-                        <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
-                        <b>${esc(it.name)}</b>
-                        <span class="tiny muted">${esc(it.description || it.id)}</span>
-                      </button>`;
-                    })
-                    .join("")
-                : `<div class="empty">ไม่มีของในหมวดนี้</div>`
+              mode === "revoke" && !selectedUser
+                ? `<div class="empty">เลือกผู้เล่นก่อนเพื่อดูคลัง</div>`
+                : ownedLoading
+                  ? `<div class="loading">Loading…</div>`
+                  : list.length
+                    ? list
+                        .map((it) => {
+                          const on = selectedCosmeticId === it.id;
+                          const isEq =
+                            (equipped.titleId && equipped.titleId === it.id) ||
+                            (equipped.frameId && equipped.frameId === it.id) ||
+                            (equipped.effectId && equipped.effectId === it.id);
+                          const locked = mode === "revoke" && PROTECTED_IDS.has(it.id);
+                          return `<button type="button" class="gift-item-card${on ? " on" : ""}${
+                            locked ? " locked" : ""
+                          }" data-id="${esc(it.id)}" ${locked ? "disabled" : ""}>
+                            <div class="gift-item-thumb">${thumb(it)}</div>
+                            <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
+                            <b>${esc(it.name)}</b>
+                            <span class="tiny muted">${esc(
+                              mode === "revoke"
+                                ? (it.source || "") + (isEq ? " · สวมอยู่" : "") + (locked ? " · ล็อก" : "")
+                                : it.description || it.id
+                            )}</span>
+                          </button>`;
+                        })
+                        .join("")
+                    : `<div class="empty">${
+                        mode === "revoke" ? "ผู้เล่นยังไม่มีของในคลัง" : "ไม่มีของในหมวดนี้"
+                      }</div>`
             }
           </div>
         </div>
       </div>
 
       <div class="card" style="margin-top:14px">
-        <h3 style="margin-top:0">3) ส่งมอบ</h3>
+        <h3 style="margin-top:0">${mode === "gift" ? "3) ส่งมอบ" : "3) ดึงของกลับ"}</h3>
         <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
           <div>
-            <div class="tiny muted">ผู้รับ</div>
+            <div class="tiny muted">ผู้เล่น</div>
             <b>${
               selectedUser
                 ? esc((selectedUser.displayName || selectedUser.username) + " @" + selectedUser.username)
@@ -131,14 +190,22 @@ export async function renderGift(root, { user }) {
           </div>
         </div>
         <label style="display:block;margin-top:12px">หมายเหตุถึงผู้เล่น (ถ้ามี)
-          <input class="input" id="giftNote" maxlength="200" placeholder="เช่น ชดเชยยศ Weekly ที่ระบบพลาด">
+          <input class="input" id="giftNote" maxlength="200" placeholder="${
+            mode === "gift" ? "เช่น ชดเชยยศ Weekly ที่ระบบพลาด" : "เช่น ดึงของที่ให้ผิดคน"
+          }">
         </label>
-        <label class="check-row" style="margin-top:10px">
-          <input type="checkbox" id="giftAutoEquip">
-          <span>สวมให้อัตโนมัติหลังมอบ</span>
-        </label>
+        ${
+          mode === "gift"
+            ? `<label class="check-row" style="margin-top:10px">
+                 <input type="checkbox" id="giftAutoEquip">
+                 <span>สวมให้อัตโนมัติหลังมอบ</span>
+               </label>`
+            : `<p class="tiny muted" style="margin:10px 0 0">ของเริ่มต้น (กรอบเรียบ / ไม่มีเอฟเฟกต์ / ยศเลเวล 1) ดึงไม่ได้</p>`
+        }
         <div class="row-actions" style="margin-top:14px">
-          <button type="button" class="btn" id="giftSend" ${selectedUser && selected ? "" : "disabled"}>มอบของ</button>
+          <button type="button" class="btn${mode === "revoke" ? " danger" : ""}" id="giftSend" ${
+            canAct ? "" : "disabled"
+          }>${mode === "gift" ? "มอบของ" : "ดึงของกลับ"}</button>
           <p class="msg" id="giftMsg" style="margin:0"></p>
         </div>
       </div>
@@ -149,6 +216,15 @@ export async function renderGift(root, { user }) {
       msg.textContent = text || "";
       msg.classList.toggle("ok", !!ok);
     }
+
+    root.querySelectorAll("#giftMode [data-mode]").forEach((btn) => {
+      btn.onclick = () => {
+        mode = btn.getAttribute("data-mode") || "gift";
+        selectedCosmeticId = "";
+        if (mode === "revoke" && selectedUser) loadOwned();
+        else paint();
+      };
+    });
 
     root.querySelector("#giftSearch").onclick = async () => {
       const q = root.querySelector("#giftQ").value.trim();
@@ -172,7 +248,9 @@ export async function renderGift(root, { user }) {
       box.innerHTML = users
         .slice(0, 12)
         .map(
-          (u) => `<button type="button" class="gift-user-card${selectedUser && selectedUser.id === u.id ? " on" : ""}" data-uid="${esc(u.id)}">
+          (u) => `<button type="button" class="gift-user-card${
+            selectedUser && selectedUser.id === u.id ? " on" : ""
+          }" data-uid="${esc(u.id)}">
             <b>${esc(u.displayName || u.username)}</b>
             <span class="tiny muted">@${esc(u.username)}</span>
             <span class="tiny">${esc(u.status || "")}</span>
@@ -183,7 +261,9 @@ export async function renderGift(root, { user }) {
         btn.onclick = () => {
           const id = btn.getAttribute("data-uid");
           selectedUser = users.find((u) => u.id === id) || null;
-          paint();
+          selectedCosmeticId = "";
+          if (mode === "revoke") loadOwned();
+          else paint();
         };
       });
     };
@@ -197,6 +277,7 @@ export async function renderGift(root, { user }) {
 
     root.querySelectorAll("#giftItems [data-id]").forEach((btn) => {
       btn.onclick = () => {
+        if (btn.disabled) return;
         selectedCosmeticId = btn.getAttribute("data-id") || "";
         paint();
       };
@@ -206,28 +287,57 @@ export async function renderGift(root, { user }) {
     if (sendBtn) {
       sendBtn.onclick = async () => {
         if (!selectedUser || !selectedCosmeticId) return;
+        if (mode === "revoke" && PROTECTED_IDS.has(selectedCosmeticId)) {
+          setMsg("ของเริ่มต้นดึงไม่ได้", false);
+          return;
+        }
         sendBtn.disabled = true;
-        setMsg("กำลังมอบ…", true);
+        setMsg(mode === "gift" ? "กำลังมอบ…" : "กำลังดึงกลับ…", true);
         const note = root.querySelector("#giftNote").value.trim();
-        const autoEquip = root.querySelector("#giftAutoEquip").checked;
-        const r = await api("/api/v1/admin/cosmetics/gift", {
+        if (mode === "gift") {
+          const autoEquip = root.querySelector("#giftAutoEquip").checked;
+          const r = await api("/api/v1/admin/cosmetics/gift", {
+            method: "POST",
+            body: JSON.stringify({
+              userId: selectedUser.id,
+              cosmeticId: selectedCosmeticId,
+              autoEquip,
+              note
+            })
+          });
+          sendBtn.disabled = false;
+          if (!r.res.ok) {
+            setMsg((r.data && r.data.error) || "มอบไม่สำเร็จ", false);
+            return;
+          }
+          const name = r.data && r.data.cosmetic ? r.data.cosmetic.name : "ของ";
+          const already = r.data && r.data.alreadyOwned ? " (มีอยู่แล้ว — ยืนยันให้)" : "";
+          const eq = r.data && r.data.equipped ? " · สวมให้แล้ว" : "";
+          setMsg("มอบ「" + name + "」ให้ @" + selectedUser.username + " แล้ว" + already + eq, true);
+          return;
+        }
+
+        const r = await api("/api/v1/admin/cosmetics/revoke", {
           method: "POST",
           body: JSON.stringify({
             userId: selectedUser.id,
             cosmeticId: selectedCosmeticId,
-            autoEquip,
             note
           })
         });
         sendBtn.disabled = false;
         if (!r.res.ok) {
-          setMsg((r.data && r.data.error) || "มอบไม่สำเร็จ", false);
+          const err = (r.data && r.data.error) || "ดึงไม่สำเร็จ";
+          setMsg(
+            err === "protected_cosmetic" ? "ของเริ่มต้นดึงไม่ได้" : err === "not_owned" ? "ผู้เล่นไม่มีของนี้" : err,
+            false
+          );
           return;
         }
         const name = r.data && r.data.cosmetic ? r.data.cosmetic.name : "ของ";
-        const owned = r.data && r.data.alreadyOwned ? " (มีอยู่แล้ว — ยืนยันให้)" : "";
-        const eq = r.data && r.data.equipped ? " · สวมให้แล้ว" : "";
-        setMsg("มอบ「" + name + "」ให้ @" + selectedUser.username + " แล้ว" + owned + eq, true);
+        selectedCosmeticId = "";
+        setMsg("ดึง「" + name + "」จาก @" + selectedUser.username + " แล้ว", true);
+        await loadOwned();
       };
     }
   }

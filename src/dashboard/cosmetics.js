@@ -521,7 +521,66 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     const items = await prisma.cosmetic.findMany({
       orderBy: [{ kind: "asc" }, { name: "asc" }]
     });
-    sendJson(res, 200, { items: items.map(publicCosmetic) });
+    // Hide legacy title.rookie so Gift ไม่โชว์มือใหม่ซ้ำกับยศเลเวล 1
+    sendJson(res, 200, {
+      items: items.filter((c) => c.id !== "title.rookie").map(publicCosmetic)
+    });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/cosmetics/owned" && method(req) === "GET") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!userHasPermission(auth.user, "cosmetics.gift") && !userHasPermission(auth.user, "users.ban")) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    const url = new URL(req.url || "/", "http://localhost");
+    const userId = String(url.searchParams.get("userId") || "").trim();
+    if (!userId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        status: true,
+        equippedTitleId: true,
+        equippedFrameId: true,
+        equippedEffectId: true
+      }
+    });
+    if (!target || target.status === "deleted") {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    const owned = await prisma.userCosmetic.findMany({
+      where: { userId },
+      include: { cosmetic: true },
+      orderBy: { acquiredAt: "desc" }
+    });
+    sendJson(res, 200, {
+      user: {
+        id: target.id,
+        username: target.username,
+        displayName: target.displayName
+      },
+      equipped: {
+        titleId: target.equippedTitleId || null,
+        frameId: target.equippedFrameId || null,
+        effectId: target.equippedEffectId || null
+      },
+      owned: owned
+        .filter((row) => row.cosmetic && row.cosmetic.id !== "title.rookie")
+        .map((row) => ({
+          ...publicCosmetic(row.cosmetic),
+          source: row.source,
+          acquiredAt: row.acquiredAt
+        }))
+    });
     return true;
   }
 
@@ -629,6 +688,117 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         displayName: target.displayName
       },
       ...result
+    });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/cosmetics/revoke" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!userHasPermission(auth.user, "cosmetics.gift") && !userHasPermission(auth.user, "users.ban")) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    // กันดึงของเริ่มต้นที่จำเป็น
+    const protectedIds = new Set(["frame.basic", "effect.none", "title.level.1"]);
+    if (protectedIds.has(cosmeticId) || cosmeticId === "title.rookie") {
+      sendJson(res, 400, { error: "protected_cosmetic" });
+      return true;
+    }
+    const target = await resolveGiftTarget(prisma, body || {});
+    if (!target || target.status === "deleted") {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    const owned = await prisma.userCosmetic.findUnique({
+      where: { userId_cosmeticId: { userId: target.id, cosmeticId } },
+      include: { cosmetic: true }
+    });
+    if (!owned || !owned.cosmetic) {
+      sendJson(res, 404, { error: "not_owned" });
+      return true;
+    }
+    const cosmetic = owned.cosmetic;
+    await prisma.userCosmetic.delete({
+      where: { userId_cosmeticId: { userId: target.id, cosmeticId } }
+    });
+
+    const fallTitle = levelTitleCosmeticId(1);
+    const data = {};
+    if (target.equippedTitleId === cosmeticId) data.equippedTitleId = fallTitle;
+    if (target.equippedFrameId === cosmeticId) data.equippedFrameId = "frame.basic";
+    if (target.equippedEffectId === cosmeticId) data.equippedEffectId = "effect.none";
+    if (Object.keys(data).length) {
+      await ensureLevelOneTitleCosmetic(prisma);
+      await grantCosmetic(prisma, target.id, fallTitle, "level");
+      await grantCosmetic(prisma, target.id, "frame.basic", "starter");
+      await grantCosmetic(prisma, target.id, "effect.none", "starter");
+      await prisma.user.update({ where: { id: target.id }, data });
+    }
+
+    const kindLabel = KIND_TH[cosmetic.kind] || cosmetic.kind;
+    const note = String((body && body.note) || "").trim().slice(0, 200);
+    const title = "แอดมินดึงของกลับ";
+    const bodyText = `แอดมินดึง ${kindLabel}「${cosmetic.name}」ออกจากคลังของคุณแล้ว`;
+    await prisma.notification.create({
+      data: {
+        userId: target.id,
+        type: "system_grant",
+        title,
+        body: bodyText,
+        payload: {
+          kind: "admin_revoke",
+          fullBody: bodyText + (note ? "\n\nข้อความจากแอดมิน: " + note : ""),
+          cosmeticId: cosmetic.id,
+          cosmeticKind: cosmetic.kind,
+          cosmeticName: cosmetic.name,
+          note: note || null,
+          href: "/app#decorate"
+        }
+      }
+    });
+    const gameApi = getGameApi();
+    if (gameApi && typeof gameApi.notifyUser === "function") {
+      try {
+        gameApi.notifyUser(target.id, { type: "system_grant" });
+      } catch {
+        /* ignore */
+      }
+    }
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.revoke",
+      targetId: target.id,
+      metadata: {
+        cosmeticId: cosmetic.id,
+        kind: cosmetic.kind,
+        name: cosmetic.name,
+        note: note || null,
+        unequipped: Object.keys(data).length > 0
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, {
+      ok: true,
+      user: {
+        id: target.id,
+        username: target.username,
+        displayName: target.displayName
+      },
+      cosmetic: publicCosmetic(cosmetic),
+      unequipped: Object.keys(data).length > 0
     });
     return true;
   }
