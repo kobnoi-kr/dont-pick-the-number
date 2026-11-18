@@ -95,6 +95,11 @@ body.snake-play #snakeLeave {
   margin-top: 8px;
 }
 
+/* Auto control lives in the side panel */
+body.snake-play #autoSnake {
+  display: none !important;
+}
+
 body.snake-play .roombar.in-game {
   margin-bottom: 4px;
 }
@@ -443,11 +448,20 @@ body.snake-play #snakeGame .sl-board-frame {
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.4),
     inset 0 -3px 6px rgba(0, 0, 0, 0.2);
-  display: grid;
-  place-items: center;
-  font-size: clamp(0.7rem, 1.35vw, 0.95rem);
-  font-weight: 900;
-  color: #101018;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.sl-token-face.sl-token-blank {
+  /* Colored pawn with no letter */
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.9) 0 16%, transparent 18%),
+    radial-gradient(circle at 50% 45%, var(--token), color-mix(in srgb, var(--token) 65%, #111));
+}
+
+img.sl-token-face {
+  background: #1a1030;
 }
 
 .sl-token-glow {
@@ -647,12 +661,25 @@ body.snake-play #snakeGame .sl-board-frame {
   box-shadow: none;
 }
 
-.sl-btn.secondary {
+.sl-btn.secondary,
+.sl-btn.sl-btn-ghost {
   background: transparent;
   border: 1px solid var(--sl-border);
   color: var(--sl-text);
   font-weight: 600;
   box-shadow: none;
+  margin-top: 8px;
+}
+
+.sl-btn.sl-btn-ghost.is-on {
+  background: linear-gradient(180deg, #34d399, #059669);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(5, 150, 105, 0.35);
+}
+
+.sl-btn.sl-btn-ghost.hidden {
+  display: none;
 }
 
 .sl-log {

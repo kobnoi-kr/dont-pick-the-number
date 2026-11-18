@@ -120,9 +120,7 @@ function ensureTokens(pub) {
     el.className = "sl-token";
     el.dataset.userId = p.userId;
     el.style.setProperty("--token", TOKEN_COLORS[i % TOKEN_COLORS.length]);
-    el.innerHTML = `<span class="sl-token-glow"></span><span class="sl-token-face">${String(
-      (p.username || "?")[0]
-    ).toUpperCase()}</span>`;
+    el.innerHTML = `<span class="sl-token-glow"></span><span class="sl-token-face sl-token-blank" aria-hidden="true"></span>`;
     el.title = p.username;
     els.tokens.appendChild(el);
     tokenEls.set(p.userId, el);

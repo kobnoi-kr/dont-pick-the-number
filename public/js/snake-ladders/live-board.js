@@ -20,11 +20,20 @@ function tokenOffset(index, total) {
 }
 
 /**
- * @param {{root: HTMLElement, onRoll?: () => void}} opts
+ * @param {{
+ *   root: HTMLElement,
+ *   onRoll?: () => void,
+ *   onToggleAuto?: () => void,
+ *   onSnakeHit?: () => void,
+ *   onYourTurn?: () => void
+ * }} opts
  */
 export function createLiveBoard(opts) {
   const root = opts.root;
   const onRoll = typeof opts.onRoll === "function" ? opts.onRoll : null;
+  const onToggleAuto = typeof opts.onToggleAuto === "function" ? opts.onToggleAuto : null;
+  const onSnakeHit = typeof opts.onSnakeHit === "function" ? opts.onSnakeHit : null;
+  const onYourTurn = typeof opts.onYourTurn === "function" ? opts.onYourTurn : null;
   root.innerHTML = `
     <div class="sl-live">
       <div class="sl-stage">
@@ -47,6 +56,7 @@ export function createLiveBoard(opts) {
         <div class="sl-dice-block">
           <div class="sl-dice" data-el="dice">${diceFaceHtml(null)}</div>
           <button type="button" class="sl-btn" data-el="roll">ทอยลูกเต๋า</button>
+          <button type="button" class="sl-btn sl-btn-ghost" data-el="auto">เล่นอัตโนมัติ</button>
         </div>
         <div class="sl-banner" data-el="banner" role="status"></div>
         <p class="sl-wait" data-el="wait">รอกระดานจากเซิร์ฟเวอร์…</p>
@@ -62,6 +72,7 @@ export function createLiveBoard(opts) {
     players: root.querySelector('[data-el="players"]'),
     dice: root.querySelector('[data-el="dice"]'),
     roll: root.querySelector('[data-el="roll"]'),
+    auto: root.querySelector('[data-el="auto"]'),
     status: root.querySelector('[data-el="status"]'),
     turn: root.querySelector('[data-el="turn"]'),
     log: root.querySelector('[data-el="log"]'),
@@ -72,16 +83,32 @@ export function createLiveBoard(opts) {
   /** @type {Map<string, HTMLElement>} */
   const tokenEls = new Map();
   let builtFor = "";
+  let tokenSig = "";
   let lastMoveKey = "";
   let lastSession = "";
+  let lastTurnSoundKey = "";
   let youId = "";
   let spectator = false;
+  let autoPlay = false;
   let animating = false;
 
+  function escAttr(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
   els.roll.addEventListener("click", () => {
-    if (spectator || animating || els.roll.disabled) return;
+    if (spectator || animating || autoPlay || els.roll.disabled) return;
     if (onRoll) onRoll();
   });
+  if (els.auto) {
+    els.auto.addEventListener("click", () => {
+      if (spectator || !onToggleAuto) return;
+      onToggleAuto();
+    });
+  }
 
   function log(msg) {
     const line = document.createElement("div");
@@ -123,15 +150,24 @@ export function createLiveBoard(opts) {
   }
 
   function ensureTokens(players) {
+    const list = players || [];
+    const sig = list
+      .map((p) => `${p.userId}:${p.avatar || ""}:${p.turnOrder}`)
+      .join("|");
+    if (sig === tokenSig && tokenEls.size === list.length) return;
+    tokenSig = sig;
     els.tokens.innerHTML = "";
     tokenEls.clear();
-    (players || []).forEach((p, i) => {
+    list.forEach((p, i) => {
       const el = document.createElement("div");
       el.className = "sl-token";
       el.style.setProperty("--token", TOKEN_COLORS[i % TOKEN_COLORS.length]);
-      el.innerHTML = `<span class="sl-token-glow"></span><span class="sl-token-face">${String(
-        (p.username || "?")[0]
-      ).toUpperCase()}</span>`;
+      const av = p.avatar ? String(p.avatar) : "";
+      el.innerHTML = av
+        ? `<span class="sl-token-glow"></span><img class="sl-token-face" src="${escAttr(
+            av
+          )}" alt="" referrerpolicy="no-referrer" draggable="false">`
+        : `<span class="sl-token-glow"></span><span class="sl-token-face sl-token-blank" aria-hidden="true"></span>`;
       el.title = p.username || p.userId;
       els.tokens.appendChild(el);
       tokenEls.set(p.userId, el);
@@ -222,16 +258,27 @@ export function createLiveBoard(opts) {
     const can =
       !spectator &&
       !animating &&
+      !autoPlay &&
       state.status === "playing" &&
       active &&
       active.userId === youId;
     els.roll.disabled = !can;
     if (spectator) els.roll.textContent = "ชมอย่างเดียว";
+    else if (autoPlay && state.status === "playing") els.roll.textContent = "ออโต้กำลังทอย…";
     else if (can) els.roll.textContent = "ทอยลูกเต๋า";
     else if (animating) els.roll.textContent = "กำลังเดิน…";
     else if (state.status === "finished") els.roll.textContent = "จบเกม";
     else if (active) els.roll.textContent = `รอ ${active.username}`;
     else els.roll.textContent = "ทอยลูกเต๋า";
+
+    if (els.auto) {
+      const showAuto = !spectator && state.status === "playing";
+      els.auto.classList.toggle("hidden", !showAuto);
+      els.auto.classList.toggle("is-on", autoPlay);
+      els.auto.setAttribute("aria-pressed", autoPlay ? "true" : "false");
+      els.auto.textContent = autoPlay ? "ปิดออโต้" : "เล่นอัตโนมัติ";
+      els.auto.disabled = !showAuto;
+    }
   }
 
   function escapeHtml(s) {
@@ -293,6 +340,7 @@ export function createLiveBoard(opts) {
     for (const step of move.steps) {
       lightCell(step.cell, step.kind);
       placeTokens(state, { userId, cell: step.cell });
+      if (step.kind === "snake" && onSnakeHit) onSnakeHit();
       await sleep(step.kind === "step" ? 170 : 460);
     }
     await sleep(320);
@@ -308,7 +356,9 @@ export function createLiveBoard(opts) {
   async function update(state, meta) {
     youId = (meta && meta.youId) || youId || "";
     spectator = !!(meta && meta.spectator);
+    autoPlay = !!(meta && meta.auto);
     root.classList.toggle("is-spectator", spectator);
+    root.classList.toggle("is-auto", autoPlay);
 
     if (!state) {
       els.wait.classList.add("is-visible");
@@ -325,13 +375,14 @@ export function createLiveBoard(opts) {
     if (session && session !== lastSession) {
       lastSession = session;
       lastMoveKey = "";
+      lastTurnSoundKey = "";
       els.log.innerHTML = "";
       if (spectator) log("เริ่มชมแมตช์");
     }
 
     const key = `${state.boardSize}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
     if (key !== builtFor) buildBoard(state);
-    if (tokenEls.size !== (state.players || []).length) ensureTokens(state.players);
+    ensureTokens(state.players);
 
     const moveKey = state.lastMove
       ? `${state.version}:${state.lastDice}:${state.lastMove.from}:${state.lastMove.final}:${state.lastMoverId || ""}`
@@ -368,11 +419,27 @@ export function createLiveBoard(opts) {
 
     placeTokens(state, null);
     renderPanel(state);
+
+    // Your-turn cue: only the active seat hears it
+    const active = (state.players || []).find((p) => p.turnOrder === state.currentTurn);
+    const turnSoundKey = `${state.sessionId || ""}:${state.turnNumber || 0}:${state.currentTurn}`;
+    if (
+      state.status === "playing" &&
+      active &&
+      active.userId === youId &&
+      !spectator &&
+      turnSoundKey !== lastTurnSoundKey
+    ) {
+      lastTurnSoundKey = turnSoundKey;
+      if (onYourTurn) onYourTurn();
+    }
   }
 
   function destroy() {
     root.innerHTML = "";
     tokenEls.clear();
+    tokenSig = "";
+    lastTurnSoundKey = "";
   }
 
   return { update, destroy, root };

@@ -874,10 +874,10 @@ function armTurnTimer(room) {
   const player = turnPlayer(room);
   if (!player || !canTakeTurn(player)) return;
   const autoNow = !!(player.auto || player.bot);
-  // Snake: bots/auto always tick; humans only if turnSec > 0
+  // Snake: bots/auto always tick (delay lets board walk anim finish); humans only if turnSec > 0
   const sec = autoNow
     ? room.phase === "snake"
-      ? 0.55
+      ? 1.7
       : 0.4
     : Number.isInteger(room.turnSec) && room.turnSec > 0
       ? room.turnSec
@@ -1175,7 +1175,9 @@ function releaseSocket(ws, notify) {
   if (room.phase === "lobby") broadcast(room);
   else {
     if (room.phase === "play" && skipToConnected(room)) armTurnTimer(room);
-    else if ((room.phase === "play" || room.phase === "pick") && player.auto) armTurnTimer(room);
+    else if ((room.phase === "play" || room.phase === "pick" || room.phase === "snake") && player.auto) {
+      armTurnTimer(room);
+    }
     broadcast(room);
   }
   if (!hasHumanOnline(room)) scheduleDelete(room);
@@ -1576,7 +1578,9 @@ function onAuto(ws, msg) {
   if (!ctx) return;
   if (isBot(ctx.player)) return;
   const room = ctx.room;
-  if (room.phase !== "play" && room.phase !== "pick") return fail(ws, "เปิดออโต้ได้ตอนกำลังเล่นเท่านั้น");
+  if (room.phase !== "play" && room.phase !== "pick" && room.phase !== "snake") {
+    return fail(ws, "เปิดออโต้ได้ตอนกำลังเล่นเท่านั้น");
+  }
   ctx.player.auto = !!msg.on;
   if (ctx.player.auto && yourTurn(room, ctx.player)) armTurnTimer(room);
   broadcast(room);

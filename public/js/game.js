@@ -5,6 +5,7 @@ let gameMin=1, gameMax=99, secrets=[], secretAll=[], secretTotal=1, winTarget=3,
 let players=[], scores={}, order=[], alive=[], roundOrder=[], turn=0, nextOrder=[], spinning=false, rot=0, spinTimer=0;
 let lastWinners=[]; // offline: champion names; online uses playerMeta.champion
 let gameCat="secret", wheelMin=1, wheelMax=99, wheelOrder=[], picks={}, pickEach=1, pickCursor=0, pickFrom=1;
+let roomMaxPlayers=12;
 let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
 let snakeLive=null;
 let snakeSnapSeq=0;
@@ -15,9 +16,15 @@ function ensureSnakeBoard(){
   snakeLive=window.NVSnake.createLiveBoard({
     root,
     onRoll:()=>{
-      if(!onlineMode||spectating||!myTurn) return;
+      if(!onlineMode||spectating||myAuto||!myTurn) return;
       send({t:"roll",commandId:"roll-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)});
-    }
+    },
+    onToggleAuto:()=>{
+      if(!onlineMode||spectating||netPhase!=="snake") return;
+      send({t:"auto",on:!myAuto});
+    },
+    onSnakeHit:()=>playClip(SNAKE_HIT_SOUND),
+    onYourTurn:()=>playClip(YOUR_TURN_SOUND)
   });
   return snakeLive;
 }
@@ -33,7 +40,8 @@ function updateSnakeBoard(s){
   Promise.resolve(
     board.update(s&&s.snake?s.snake:null,{
       youId:s&&s.youId||myId||"",
-      spectator:!!spectating
+      spectator:!!spectating,
+      auto:!!myAuto
     })
   ).then(()=>{
     void seq;
@@ -46,6 +54,8 @@ const BOMB_SOUND="/audio/roblox-death-sound_1.mp3";
 const COOLDOWN_SOUND="/audio/beep.mp3";
 const WIN_SOUND="/audio/roblox-old-winning-sound-effect.mp3";
 const ROOM_CHAT_SOUND="/audio/snapchat-message.mp3";
+const SNAKE_HIT_SOUND="/audio/gunshot-meme.mp3";
+const YOUR_TURN_SOUND="/audio/correct-gameshow.mp3";
 const ROOM_CHAT_MS=6000;
 const roomChatBubbles=new Map(); /* pid -> { body, until, timer } */
 const VOL_STORE="dpn-volume";
@@ -57,6 +67,9 @@ bgAudio.preload="auto";
 bgAudio.loop=true;
 bgAudio.playsInline=true;
 bgAudio.src=BG_SRC;
+let spinSoundTimer=0;
+let spinDoneTimer=0;
+let audioKeepAliveTimer=0;
 let masterVol=0.4;
 try{
   const raw=localStorage.getItem(VOL_STORE);
@@ -129,9 +142,32 @@ function warmClips(){
     loadClip(POP_SOUND),
     loadClip(BOMB_SOUND),
     loadClip(COOLDOWN_SOUND),
-    loadClip(WIN_SOUND)
+    loadClip(WIN_SOUND),
+    loadClip(SNAKE_HIT_SOUND),
+    loadClip(YOUR_TURN_SOUND),
+    loadClip(ROOM_CHAT_SOUND)
   ]);
   return audioWarm;
+}
+function keepAudioAlive(){
+  if(masterVol<=0) return;
+  const ctx=ensureAudio();
+  if(ctx&&ctx.state==="suspended") ctx.resume().catch(()=>{});
+  wireBackground();
+  if(bgAudio.paused){
+    bgAudio.play().catch(()=>{});
+  }
+}
+function clearSpinTimers(){
+  if(spinSoundTimer){ clearTimeout(spinSoundTimer); spinSoundTimer=0; }
+  if(spinDoneTimer){ clearTimeout(spinDoneTimer); spinDoneTimer=0; }
+}
+function armSpinSoundWatch(ms){
+  if(spinSoundTimer) clearTimeout(spinSoundTimer);
+  spinSoundTimer=setTimeout(()=>{
+    spinSoundTimer=0;
+    stopSpinSound();
+  }, Math.max(0, Number(ms)||0));
 }
 function applyVolume(){
   if(masterGain&&audioCtx){
@@ -235,6 +271,7 @@ function playSpinSound(){
   }).catch(()=>{});
 }
 function stopSpinSound(){
+  if(spinSoundTimer){ clearTimeout(spinSoundTimer); spinSoundTimer=0; }
   if(!spinNode) return;
   try{ spinNode.onended=null; spinNode.stop(); }catch(e){}
   spinNode=null;
@@ -316,7 +353,7 @@ function applySpectatorUi(){
   document.body.classList.add("spectating");
   const note=$("roomNote");
   if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
-  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","renameRoomBtn","snakeLeave"].forEach(id=>{
+  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave"].forEach(id=>{
     const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
   });
 }
@@ -325,13 +362,14 @@ function show(n){
   const inRoom=n!=="gate";
   const lobby=n==="start";
   const snakePlay=n==="snakeGame";
+  const inGame=inRoom&&!lobby;
   document.body.classList.toggle("snake-play", snakePlay);
+  document.body.classList.toggle("in-game", inGame);
   const side=document.querySelector(".side");
   // Snake board needs width — player list lives in the snake panel.
   if(side) side.classList.toggle("hidden",!inRoom||lobby||snakePlay);
   // In-game: slim status bar + power quit. Lobby has its own leave.
   const bar=$("roombar");
-  const inGame=inRoom&&!lobby;
   if(bar){
     bar.classList.toggle("hidden",!inRoom||lobby);
     bar.classList.toggle("in-game", inGame);
@@ -933,7 +971,8 @@ function renderLobbyGrid(){
   const grid=$("lobbyGrid");
   if(!grid) return;
   grid.textContent="";
-  const maxSlots=12;
+  // Use room cap from server (snake=6, others=12) — do not hardcode 12
+  const maxSlots=Math.max(2, Math.min(30, Number(roomMaxPlayers)||12));
   const ranked=order.length===players.length&&players.length>0;
   const list=ranked?order:players;
   for(let i=0;i<maxSlots;i++){
@@ -1199,11 +1238,15 @@ function renderPlayers(){
   paintRoomChatBar();
 }
 function paintAutoButtons(){
-  const show=onlineMode&&(netPhase==="play"||netPhase==="pick");
-  ["autoPlay","autoPick"].forEach(id=>{
+  const show=onlineMode&&(netPhase==="play"||netPhase==="pick"||netPhase==="snake")&&!spectating;
+  [
+    ["autoPlay","play"],
+    ["autoPick","pick"],
+    ["autoSnake","snake"]
+  ].forEach(([id, phase])=>{
     const el=$(id);
     if(!el) return;
-    el.classList.toggle("hidden",!show||(id==="autoPlay"?netPhase!=="play":netPhase!=="pick"));
+    el.classList.toggle("hidden",!show||netPhase!==phase);
     el.classList.toggle("auto-on",!!myAuto);
     el.setAttribute("aria-pressed",myAuto?"true":"false");
     el.textContent=myAuto?"ปิดออโต้":"เล่นอัตโนมัติ";
@@ -2759,6 +2802,7 @@ function paintRoom(s){
   roomVisibility=priv?"private":"public";
   const count=(s.players||[]).filter(p=>p.connected).length;
   const max=s.maxPlayers||12;
+  roomMaxPlayers=max;
   const title=s.roomLabel||s.title||(priv?"ห้องส่วนตัว":"ห้องสาธารณะ");
   if($("roomCode")) $("roomCode").textContent=code;
   if($("lobbyCode")) $("lobbyCode").textContent=code;
@@ -3001,6 +3045,7 @@ function onSnap(s){
 }
 function startOrderAnim(spin, done){
   cancelAnimationFrame(orderAnim);
+  clearSpinTimers();
   const spinKey=spin.id;
   spinning=true;
   renderPlayers();
@@ -3009,20 +3054,21 @@ function startOrderAnim(spin, done){
   const from=Number.isFinite(spin.from)?spin.from:rot;
   const target=spin.rot||0;
   const {dur, elapsed}=spinProgress({dur:spin.dur, left:spin.left!=null?spin.left:spinLeftNow()});
+  const remain=Math.max(0, (dur||0)-elapsed);
   const canvas=$("wheel");
   if(canvas) canvas.style.transition="none";
-  if(dur&&elapsed<400) playSpinSound();
+  if(dur&&elapsed<400){
+    playSpinSound();
+    armSpinSoundWatch(remain+80);
+  }
+  const wallStart=Date.now()-elapsed;
   const t0=performance.now()-elapsed;
-  function frame(now){
-    if(animId!==spinKey) return;
-    const t=dur?Math.min(1,(now-t0)/dur):1;
-    const eased=1-Math.pow(1-t,3);
-    rot=from+(target-from)*eased;
-    if(canvas) canvas.style.transform="rotate("+rot+"deg)";
-    if(t<1){
-      orderAnim=requestAnimationFrame(frame);
-      return;
-    }
+  let finished=false;
+  function finish(){
+    if(finished||animId!==spinKey) return;
+    finished=true;
+    clearSpinTimers();
+    cancelAnimationFrame(orderAnim);
     stopSpinSound();
     spinning=false;
     rot=target;
@@ -3035,14 +3081,31 @@ function startOrderAnim(spin, done){
     done();
     setTimeout(()=>{ if(!spinning) closeSpinModal(); }, 2400);
   }
+  function frame(now){
+    if(animId!==spinKey||finished) return;
+    const wallT=dur?Math.min(1,(Date.now()-wallStart)/dur):1;
+    const t=dur?Math.min(1, Math.max((now-t0)/dur, wallT)):1;
+    const eased=1-Math.pow(1-t,3);
+    rot=from+(target-from)*eased;
+    if(canvas) canvas.style.transform="rotate("+rot+"deg)";
+    if(t<1){
+      orderAnim=requestAnimationFrame(frame);
+      return;
+    }
+    finish();
+  }
+  // Wall-clock backup so spin/sound still ends when the tab is backgrounded
+  spinDoneTimer=setTimeout(finish, remain+60);
   orderAnim=requestAnimationFrame(frame);
 }
 function startNumAnim(spin, done){
   const gen=++animGen;
   const spinKey=spin.id;
+  clearSpinTimers();
   const from=Number.isFinite(spin.from)?spin.from:wheelRot;
   const target=Number.isFinite(spin.target)?spin.target:from;
   const {dur, elapsed}=spinProgress({dur:spin.dur, left:spin.left!=null?spin.left:spinLeftNow()});
+  const remain=Math.max(0, (dur||0)-elapsed);
   wheelSpinning=true;
   $("doSpin").disabled=true;
   $("doSpin").textContent="กำลังหมุน…";
@@ -3051,20 +3114,18 @@ function startNumAnim(spin, done){
   $("wheelResult").classList.remove("bad");
   $("wheelResult").textContent="กำลังหมุน…";
   renderPlayers();
-  if(dur&&elapsed<400) playSpinSound();
+  if(dur&&elapsed<400){
+    playSpinSound();
+    armSpinSoundWatch(remain+80);
+  }
+  const wallStart=Date.now()-elapsed;
   const t0=performance.now()-elapsed;
-  function frame(now){
-    if(gen!==animGen||animId!==spinKey) return;
-    const t=dur?Math.min(1,(now-t0)/dur):1;
-    const eased=1-Math.pow(1-t,2);
-    wheelRot=from+(target-from)*eased;
-    applyWheelRot();
-    const showN=numberAt(wheelRot);
-    if($("numRead").textContent!==String(showN)) $("numRead").textContent=String(showN);
-    if(t<1){
-      wheelAnim=requestAnimationFrame(frame);
-      return;
-    }
+  let finished=false;
+  function finish(){
+    if(finished||gen!==animGen||animId!==spinKey) return;
+    finished=true;
+    clearSpinTimers();
+    cancelAnimationFrame(wheelAnim);
     stopSpinSound();
     wheelSpinning=false;
     wheelRot=target;
@@ -3083,16 +3144,44 @@ function startNumAnim(spin, done){
     }
     done();
   }
+  function frame(now){
+    if(gen!==animGen||animId!==spinKey||finished) return;
+    const wallT=dur?Math.min(1,(Date.now()-wallStart)/dur):1;
+    const t=dur?Math.min(1, Math.max((now-t0)/dur, wallT)):1;
+    const eased=1-Math.pow(1-t,2);
+    wheelRot=from+(target-from)*eased;
+    applyWheelRot();
+    const showN=numberAt(wheelRot);
+    if($("numRead").textContent!==String(showN)) $("numRead").textContent=String(showN);
+    if(t<1){
+      wheelAnim=requestAnimationFrame(frame);
+      return;
+    }
+    finish();
+  }
+  spinDoneTimer=setTimeout(finish, remain+60);
   wheelAnim=requestAnimationFrame(frame);
 }
 function resumeLiveSpin(){
+  keepAudioAlive();
   if(document.hidden||!animId||!liveSpin) return;
   const spin={...liveSpin, left:spinLeftNow()};
   rememberSpin(spin);
   if(spin.kind==="order") startOrderAnim(spin, ()=>finishLiveSpin());
   else startNumAnim(spin, ()=>finishLiveSpin());
 }
-document.addEventListener("visibilitychange", resumeLiveSpin);
+document.addEventListener("visibilitychange", ()=>{
+  keepAudioAlive();
+  if(!document.hidden) resumeLiveSpin();
+});
+// Keep AudioContext + BGM alive while the tab is backgrounded
+if(!audioKeepAliveTimer){
+  audioKeepAliveTimer=setInterval(()=>{
+    if(masterVol<=0) return;
+    if(netPhase==="gate") return;
+    keepAudioAlive();
+  }, 2000);
+}
 function renderLobby(msg){
   const list=$("roomList");
   if(!list) return;
@@ -3331,13 +3420,16 @@ async function bootOnline(){
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   setInterval(paintTurnClock, 250);
   function toggleAuto(){
-    if(!onlineMode||(netPhase!=="play"&&netPhase!=="pick")) return;
+    if(!onlineMode||spectating) return;
+    if(netPhase!=="play"&&netPhase!=="pick"&&netPhase!=="snake") return;
     send({t:"auto",on:!myAuto});
   }
   const autoPlay=$("autoPlay");
   const autoPick=$("autoPick");
+  const autoSnake=$("autoSnake");
   if(autoPlay) autoPlay.onclick=toggleAuto;
   if(autoPick) autoPick.onclick=toggleAuto;
+  if(autoSnake) autoSnake.onclick=toggleAuto;
   const addBot=$("addBot");
   if(addBot) addBot.onclick=()=>{ if(isHost()&&netPhase==="lobby") send({t:"addBot"}); };
   // keep profile name synced for registered players

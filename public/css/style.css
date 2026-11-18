@@ -877,10 +877,11 @@ img.auth-avatar.on{display:block;object-fit:cover}
   .dial canvas,.numdial canvas{transition:none !important}
 }
 
-/* In-room floating chat */
+/* Lobby chat — centered bottom */
 .room-chat-bar{
   position:fixed;
   left:50%;
+  right:auto;
   bottom:calc(12px + env(safe-area-inset-bottom,0px));
   transform:translateX(-50%);
   z-index:35;
@@ -909,6 +910,7 @@ img.auth-avatar.on{display:block;object-fit:cover}
 .room-chat-hint{
   position:fixed;
   left:50%;
+  right:auto;
   bottom:calc(12px + env(safe-area-inset-bottom,0px));
   transform:translateX(-50%);
   z-index:34;
@@ -922,6 +924,26 @@ img.auth-avatar.on{display:block;object-fit:cover}
   pointer-events:none;
 }
 .room-chat-hint.hidden{display:none !important}
+
+/* In-game chat (หาเลข / วงล้อ / งู) — right side only */
+body.in-game .room-chat-bar,
+body.in-game .room-chat-hint{
+  left:auto;
+  right:calc(12px + env(safe-area-inset-right,0px));
+  transform:none;
+  width:min(320px, calc(100vw - 24px));
+}
+body.snake-play .room-chat-bar,
+body.snake-play .room-chat-hint{
+  bottom:calc(64px + env(safe-area-inset-bottom,0px));
+  width:min(280px, calc(100vw - 24px));
+}
+@media (min-width:961px){
+  body.snake-play .room-chat-bar,
+  body.snake-play .room-chat-hint{
+    width:min(250px, 28vw);
+  }
+}
 
 /* Chat bubble above avatar — max width = avatar, 6s lifetime via JS */
 .pchat-bubble{
