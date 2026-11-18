@@ -55,11 +55,17 @@ function thumbHtml(item, user) {
   }
   if (kind === "frame") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
-    return `<div class="dec-thumb-av-wrap${cls}" style="--dec-accent:${esc(color)}">${avHtml(user, letter)}</div>`;
+    return `<div class="dec-frame-shell${cls}" style="--dec-accent:${esc(color)}"><div class="dec-av-core">${avHtml(
+      user,
+      letter
+    )}</div></div>`;
   }
   if (kind === "effect") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
-    return `<div class="dec-thumb-av-wrap effect${cls}" style="--dec-accent:${esc(color)}">${avHtml(user, letter)}</div>`;
+    return `<div class="dec-effect-shell"><div class="dec-av-core${cls}" style="--dec-accent:${esc(color)}">${avHtml(
+      user,
+      letter
+    )}</div></div>`;
   }
   return `<span class="tiny">—</span>`;
 }
@@ -76,24 +82,20 @@ function previewHtml(user, eq) {
   return `
     <div class="dec-preview-card">
       <div class="dec-preview-head">
-        <div class="dec-preview-av-wrap${frameCls}${effectCls}" style="--dec-accent:${esc(itemColor(frame))}">
-          ${avHtml(user, letter)}
+        <div class="dec-frame-shell dec-preview-shell${frameCls}" style="--dec-accent:${esc(itemColor(frame))}">
+          <div class="dec-av-core${effectCls}">
+            ${avHtml(user, letter)}
+          </div>
         </div>
         <div class="dec-preview-id">
           <b class="dec-preview-name">${esc(name)}</b>
           <span class="dec-preview-user">${esc(uname)}</span>
           <div class="nv-pills dec-preview-pills">
             ${titlePillHtml(title, "dec-title-pill-md")}
-            ${frame ? `<span class="nv-pill">${esc(frame.name)}</span>` : ""}
-            ${
-              effect && effect.cssClass
-                ? `<span class="nv-pill">${esc(effect.name)}</span>`
-                : ""
-            }
           </div>
         </div>
       </div>
-      <p class="tiny muted" style="margin:12px 0 0">พรีวิวว่าคนอื่นจะเห็นโปรไฟล์คุณแบบนี้</p>
+      <p class="tiny muted" style="margin:12px 0 0">พรีวิวการ์ดโปรไฟล์ในล็อบบี้ — กรอบสี่เหลี่ยม · เอฟเฟกต์วงกลม</p>
     </div>
   `;
 }

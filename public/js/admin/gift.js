@@ -22,7 +22,14 @@ function thumb(item) {
     )};color:${esc(color)}">${esc(item.name)}</span>`;
   }
   const cls = item.cssClass ? " " + item.cssClass : "";
-  return `<div class="dec-thumb-av-wrap${cls}" style="--dec-accent:${esc(color)}"><span class="dec-av-letter">N</span></div>`;
+  if (item.kind === "frame") {
+    return `<div class="dec-frame-shell${cls}" style="--dec-accent:${esc(
+      color
+    )}"><div class="dec-av-core"><span class="dec-av-letter">N</span></div></div>`;
+  }
+  return `<div class="dec-effect-shell"><div class="dec-av-core${cls}" style="--dec-accent:${esc(
+    color
+  )}"><span class="dec-av-letter">N</span></div></div>`;
 }
 
 export async function renderGift(root, { user }) {

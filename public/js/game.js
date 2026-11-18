@@ -965,9 +965,10 @@ function renderLobbyGrid(){
       acts.appendChild(kick);
     }
     const avWrap=document.createElement("div");
-    const frameClass=meta&&meta.frameClass?(" "+meta.frameClass):"";
-    const effectClass=meta&&meta.effectClass?(" "+meta.effectClass):"";
-    avWrap.className="lobby-av-wrap"+(champ?" champion":"")+frameClass+effectClass;
+    const frameClass=meta&&meta.frameClass?String(meta.frameClass):"";
+    const effectClass=meta&&meta.effectClass?String(meta.effectClass):"";
+    // กรอบ = สี่เหลี่ยมรอบรูป · เอฟเฟกต์ = วงกลมรอบโปรไฟล์
+    avWrap.className="lobby-av-wrap"+(champ?" champion":"")+(frameClass?" "+frameClass:"");
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
     if(champ){
@@ -977,7 +978,10 @@ function renderLobbyGrid(){
       mark.textContent="✦";
       avWrap.appendChild(mark);
     }
-    avWrap.appendChild(av);
+    const avCore=document.createElement("div");
+    avCore.className="lobby-av-core"+(effectClass?" "+effectClass:"");
+    avCore.appendChild(av);
+    avWrap.appendChild(avCore);
     const pts=Math.max(0, Number(meta&&meta.score!=null?meta.score:scores[name])||0);
     if(pts>0){
       const badge=document.createElement("span");
@@ -2069,9 +2073,21 @@ async function openPlayerProfileModal(userId){
   const games=$("playerProfileGames");
   const hint=$("playerProfileHint");
   const acts=$("playerProfileActs");
-  const head=modal.querySelector(".player-profile-head");
+  const avShell=$("playerProfileAvShell");
+  const avCore=$("playerProfileAvCore");
+  function setProfileCosmetics(u){
+    const eq=(u&&u.equipped)||{};
+    const frameCls=(eq.frame&&eq.frame.cssClass)?String(eq.frame.cssClass):"";
+    const effectCls=(eq.effect&&eq.effect.cssClass)?String(eq.effect.cssClass):"";
+    if(avShell){
+      avShell.className="player-profile-av-shell"+(frameCls?" "+frameCls:"");
+    }
+    if(avCore){
+      avCore.className="player-profile-av-core"+(effectCls?" "+effectCls:"");
+    }
+  }
   function setProfileAv(src, letter){
-    if(!head) return;
+    if(!avCore) return;
     let node=$("playerProfileAv");
     if(src){
       if(!node||node.tagName!=="IMG"){
@@ -2080,7 +2096,7 @@ async function openPlayerProfileModal(userId){
         img.className="player-profile-av";
         img.alt="";
         img.referrerPolicy="no-referrer";
-        if(node) node.replaceWith(img); else head.prepend(img);
+        if(node) node.replaceWith(img); else avCore.appendChild(img);
         node=img;
       }
       node.className="player-profile-av";
@@ -2091,7 +2107,7 @@ async function openPlayerProfileModal(userId){
         div.id="playerProfileAv";
         div.className="player-profile-av ph";
         div.setAttribute("aria-hidden","true");
-        if(node) node.replaceWith(div); else head.prepend(div);
+        if(node) node.replaceWith(div); else avCore.appendChild(div);
         node=div;
       }
       node.className="player-profile-av ph";
@@ -2127,6 +2143,7 @@ async function openPlayerProfileModal(userId){
   if(games) games.textContent="—";
   if(hint) hint.textContent="";
   if(acts) acts.innerHTML="";
+  setProfileCosmetics(null);
   setProfileAv(null,"?");
   modal.classList.remove("hidden");
   let data=null;
@@ -2155,6 +2172,7 @@ async function openPlayerProfileModal(userId){
     userEl.textContent=uname?("@"+uname):"@—";
   }
   paintPills(u);
+  setProfileCosmetics(u);
   setProfileAv(u.avatarUrl||null, String(u.displayName||"?").slice(0,1).toUpperCase());
   if(tenure) tenure.textContent=formatAccountTenure(u.createdAt);
   if(st){
