@@ -2799,6 +2799,31 @@ function choosePick(n){
   if(!myTurn){ $("pickMsg").textContent="ยังไม่ถึงตาคุณ"; return; }
   send({t:"pickNum",n:n});
 }
+function paintSnakeMapSelect(s){
+  const sel=$("snakeMap");
+  const hint=$("snakeMapHint");
+  if(!sel) return;
+  const maps=Array.isArray(s&&s.snakeMaps)&&s.snakeMaps.length
+    ? s.snakeMaps
+    : [
+        {id:"classic",name:"คลาสสิก",blurb:"แมพมาตรฐาน — งู/บันไดสมดุล"},
+        {id:"jungle",name:"ป่าดงดิบ",blurb:"บันไดยาวหลายเส้น แต่มีงูดักกลางทาง"},
+        {id:"volcano",name:"ภูเขาไฟ",blurb:"งูเยอะและตกแรง — เสี่ยงสูง รางวัลสูง"},
+        {id:"skybridge",name:"สะพานฟ้า",blurb:"บันไดเยอะ เดินลื่น — แต่งูท้ายกระดานดักชัยชนะ"}
+      ];
+  const cur=String((s&&s.snakeMapId)||sel.value||"classic");
+  const focus=document.activeElement===sel;
+  if(!focus){
+    sel.innerHTML=maps.map(m=>{
+      const sn=m.snakeCount!=null?` · งู ${m.snakeCount}`:"";
+      const ld=m.ladderCount!=null?` · บันได ${m.ladderCount}`:"";
+      return `<option value="${escHtml(m.id)}">${escHtml(m.name)}${escHtml(sn+ld)}</option>`;
+    }).join("");
+    sel.value=maps.some(m=>m.id===cur)?cur:(maps[0]&&maps[0].id)||"classic";
+  }
+  const picked=maps.find(m=>m.id===sel.value)||maps[0];
+  if(hint) hint.textContent=(picked&&picked.blurb)||"";
+}
 function syncSetup(s){
   applyCat(s.cat||"secret");
   const custom=s.rangeMode==="custom";
@@ -2823,11 +2848,12 @@ function syncSetup(s){
     x.setAttribute("aria-pressed",on?"true":"false");
   }
   $("rangeLabel").textContent=s.min+"–"+s.max;
+  paintSnakeMapSelect(s);
 }
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes"].forEach(id=>{
       for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
     });
@@ -2838,7 +2864,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -3011,9 +3037,10 @@ function applySnap(s){
   }else if(s.phase==="snake"){
     show("snakeGame");
     if($("snakeMode")){
+      const mapName=(s.snake&&s.snake.mapName)||"";
       $("snakeMode").textContent=spectating
-        ?"กำลังชม · งูและบันได · ถึง 100 ชนะ"
-        :"ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6);
+        ?"กำลังชม · งูและบันได"+(mapName?" · "+mapName:"")+" · ถึง 100 ชนะ"
+        :"ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6)+(mapName?" · แมพ "+mapName:"");
     }
     updateSnakeBoard(s);
     if(spectating) applySpectatorUi();
@@ -3354,7 +3381,19 @@ function pushNums(){
     if(min!=null) patch.min=min;
     if(max!=null) patch.max=max;
   }
+  const mapEl=$("snakeMap");
+  if(mapEl&&mapEl.value) patch.snakeMapId=String(mapEl.value);
   send({t:"setup",patch});
+}
+function pushSnakeMap(){
+  if(applying||!isHost()||netPhase!=="lobby") return;
+  const mapEl=$("snakeMap");
+  if(!mapEl||!mapEl.value) return;
+  const hint=$("snakeMapHint");
+  const opt=mapEl.options[mapEl.selectedIndex];
+  // blurb lives in option title? refresh from known list via empty sync paint
+  if(hint&&opt) hint.textContent="";
+  send({t:"setup",patch:{snakeMapId:String(mapEl.value)}});
 }
 function connect(){
   if(sock&&(sock.readyState===0||sock.readyState===1)) return;
@@ -3495,6 +3534,7 @@ async function bootOnline(){
   if(saved&&$("myName")) $("myName").value=saved;
   if($("myName")) $("myName").addEventListener("change",typedName);
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
+  if($("snakeMap")) $("snakeMap").addEventListener("change",pushSnakeMap);
   setInterval(paintTurnClock, 250);
   function toggleAuto(){
     if(!onlineMode||spectating) return;

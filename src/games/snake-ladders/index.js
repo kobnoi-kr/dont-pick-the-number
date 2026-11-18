@@ -1,6 +1,7 @@
 "use strict";
 
 const config = require("./config/default-board");
+const maps = require("./config/maps");
 const board = require("./engine/board");
 const dice = require("./engine/dice");
 const movement = require("./engine/movement");
@@ -10,6 +11,7 @@ const engine = require("./engine/game-engine");
 
 module.exports = {
   ...config,
+  ...maps,
   ...board,
   ...dice,
   ...movement,

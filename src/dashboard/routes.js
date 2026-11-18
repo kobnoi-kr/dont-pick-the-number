@@ -52,8 +52,10 @@ const GAME_CATALOG = [
     categoryLabel: "กระดาน",
     maxPlayers: 6,
     description: "ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ใครถึงช่อง 100 ก่อนชนะ",
-    howTo: "ผลัดกันทอยลูกเต๋า 1–6 เดินตามกระดาน เจอบันไดขึ้น เจองูลง ต้องทอยได้พอดีถึง 100",
-    popular: true
+    howTo:
+      "โฮสต์เลือกแมพได้หลายแบบ (งู/บันไดคนละตำแหน่ง) แล้วผลัดกันทอยลูกเต๋า 1–6 เจอบันไดขึ้น เจองูลง ต้องทอยพอดีถึง 100 — เปิดเล่นอัตโนมัติได้ สูงสุด 6 คน",
+    popular: true,
+    beta: true
   }
 ];
 
@@ -176,8 +178,16 @@ async function handleDashboardApi(req, res, pathname) {
       return flags[g.id].enabled !== false;
     }).map((g) => {
       const override = flags && flags[g.id];
-      if (override && override.name) return Object.assign({}, g, { name: override.name });
-      return g;
+      const out = Object.assign({}, g);
+      if (override && override.name) out.name = override.name;
+      if (override && Object.prototype.hasOwnProperty.call(override, "beta")) {
+        out.beta = !!override.beta;
+      } else if (typeof g.beta === "boolean") {
+        out.beta = g.beta;
+      } else {
+        out.beta = false;
+      }
+      return out;
     });
     sendJson(res, 200, { games });
     return true;

@@ -32,8 +32,9 @@ const FALLBACK = [
     categoryLabel: "กระดาน",
     maxPlayers: 6,
     description: "ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ใครถึงช่อง 100 ก่อนชนะ",
-    howTo: "ผลัดกันทอยลูกเต๋า เดินตามกระดาน เจอบันไดขึ้น เจองูลง ต้องทอยพอดีถึง 100",
-    popular: true
+    howTo: "ผลัดกันทอยลูกเต๋า เดินตามกระดาน เจอบันไดขึ้น เจองูลง ต้องทอยพอดีถึง 100 — เปิดเล่นอัตโนมัติได้ สูงสุด 6 คน",
+    popular: true,
+    beta: true
   }
 ];
 
@@ -82,7 +83,10 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
         <div class="lib-body">
           <div class="lib-top">
             <h3>${esc(g.name)}</h3>
-            ${g.id === lastMode ? `<span class="pill busy">เล่นล่าสุด</span>` : ""}
+            <div class="lib-pills">
+              ${g.beta ? `<span class="pill warn">Beta</span>` : ""}
+              ${g.id === lastMode ? `<span class="pill busy">เล่นล่าสุด</span>` : ""}
+            </div>
           </div>
           <p class="muted">${esc(g.description)}</p>
           <div class="tiny">ผู้เล่นสูงสุด ${g.maxPlayers || 12}</div>
@@ -109,7 +113,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
         if (!g) return;
         detail.classList.remove("hidden");
         detail.innerHTML = `
-          <h2 style="margin-top:0">${esc(g.name)}</h2>
+          <h2 style="margin-top:0">${esc(g.name)}${g.beta ? ` <span class="pill warn">Beta</span>` : ""}</h2>
           <p class="muted">${esc(g.description)}</p>
           <h3>วิธีเล่น</h3>
           <p>${esc(g.howTo)}</p>

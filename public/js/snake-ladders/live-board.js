@@ -49,6 +49,7 @@ export function createLiveBoard(opts) {
       <aside class="sl-panel">
         <div class="sl-panel-title">งูและบันได</div>
         <div class="sl-meta">
+          <div>แมพ: <strong data-el="map">—</strong></div>
           <div>สถานะ: <strong data-el="status">—</strong></div>
           <div>ตา: <strong data-el="turn">—</strong></div>
         </div>
@@ -73,6 +74,7 @@ export function createLiveBoard(opts) {
     dice: root.querySelector('[data-el="dice"]'),
     roll: root.querySelector('[data-el="roll"]'),
     auto: root.querySelector('[data-el="auto"]'),
+    map: root.querySelector('[data-el="map"]'),
     status: root.querySelector('[data-el="status"]'),
     turn: root.querySelector('[data-el="turn"]'),
     log: root.querySelector('[data-el="log"]'),
@@ -221,6 +223,7 @@ export function createLiveBoard(opts) {
   }
 
   function renderPanel(state) {
+    if (els.map) els.map.textContent = state.mapName || state.mapId || "—";
     els.status.textContent = spectator
       ? (state.status || "—") + " · ชม"
       : state.status || "—";
@@ -235,12 +238,29 @@ export function createLiveBoard(opts) {
       .sort((a, b) => a.turnOrder - b.turnOrder)
       .forEach((p) => {
         const li = document.createElement("li");
+        const isAuto = !!(p.auto && !p.bot);
         li.className =
-          "sl-player" + (active && active.userId === p.userId ? " is-turn" : "");
+          "sl-player" +
+          (active && active.userId === p.userId ? " is-turn" : "") +
+          (isAuto ? " is-auto" : "");
+        if (p.userId) li.dataset.pid = p.userId;
         const posLabel = p.position > 0 ? `ช่อง ${p.position}` : "เริ่ม";
+        const color = TOKEN_COLORS[p.turnOrder % TOKEN_COLORS.length];
+        const av = p.avatar
+          ? `<img class="sl-player-av" src="${escAttr(p.avatar)}" alt="" referrerpolicy="no-referrer" width="28" height="28">`
+          : `<span class="sl-player-av sl-player-av-ph" style="--token:${color}" aria-hidden="true"></span>`;
+        const autoTag = isAuto
+          ? `<span class="pavatar-auto-tag" title="เล่นอัตโนมัติ">AUTO</span>`
+          : "";
+        const tags = [];
+        if (p.userId === youId) tags.push("คุณ");
+        if (p.bot) tags.push("บอท");
+        else if (isAuto) tags.push("ออโต้");
         li.innerHTML = `
-          <span class="sl-player-dot" style="background:${TOKEN_COLORS[p.turnOrder % TOKEN_COLORS.length]}"></span>
-          <span class="sl-player-name">${escapeHtml(p.username)}</span>
+          <span class="sl-player-av-wrap${isAuto ? " is-auto" : ""}">${av}${autoTag}</span>
+          <span class="sl-player-name">${escapeHtml(p.username)}${
+            tags.length ? ` · ${escapeHtml(tags.join(" · "))}` : ""
+          }</span>
           <span class="sl-player-pos">${posLabel}</span>
         `;
         els.players.appendChild(li);

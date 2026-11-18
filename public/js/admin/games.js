@@ -55,19 +55,20 @@ export async function renderGames(root, { user }) {
     <div class="card">
       <h2>จัดการเกมในคลัง</h2>
       <p class="muted" style="margin-top:0">
-        หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> และชื่อที่ผู้เล่นเห็น
-        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิดและตั้งชื่อแสดงผล
+        หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น และป้าย <b>Beta</b>
+        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิด ตั้งชื่อ และทำเครื่องหมายทดลอง
       </p>
       <div class="content-grid" id="gCat" style="margin-top:14px">
         ${GAMES.map((g) => {
           const row = catalog[g.id] || {};
           const name = (row.name && String(row.name).trim()) || g.defaultName;
           const on = row.enabled !== false;
+          const beta = !!row.beta || (row.beta == null && g.id === "snake");
           return `<div class="card nested game-admin-card">
             <div class="row-between" style="align-items:flex-start">
               <div>
                 <div class="tiny">รหัสเกม: <code>${esc(g.id)}</code></div>
-                <h3 style="margin:4px 0 2px">${esc(g.defaultName)}</h3>
+                <h3 style="margin:4px 0 2px">${esc(g.defaultName)}${beta ? ` <span class="pill warn">Beta</span>` : ""}</h3>
                 <div class="tiny">${esc(g.en)}</div>
               </div>
               <label class="switch-row" title="เปิด = โชว์ในคลังเกม">
@@ -76,6 +77,10 @@ export async function renderGames(root, { user }) {
               </label>
             </div>
             <p class="tiny" style="margin:10px 0 8px">${esc(g.blurb)}</p>
+            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Beta ใน Game Library">
+              <input type="checkbox" data-id="${g.id}" data-field="beta" ${beta ? "checked" : ""} ${canManage ? "" : "disabled"}/>
+              <span>เกม Beta</span>
+            </label>
             <label class="field">
               <span>ชื่อที่แสดงให้ผู้เล่น</span>
               <div class="toolbar" style="margin-top:6px">
@@ -150,9 +155,14 @@ export async function renderGames(root, { user }) {
       const next = {};
       for (const g of GAMES) {
         const en = root.querySelector(`input[data-id="${g.id}"][data-field="enabled"]`);
+        const beta = root.querySelector(`input[data-id="${g.id}"][data-field="beta"]`);
         const nameEl = root.querySelector(`input[data-id="${g.id}"][data-field="name"]`);
         const name = ((nameEl && nameEl.value) || "").trim() || g.defaultName;
-        next[g.id] = { enabled: !!(en && en.checked), name };
+        next[g.id] = {
+          enabled: !!(en && en.checked),
+          beta: !!(beta && beta.checked),
+          name
+        };
       }
       const r = await api("/api/v1/admin/games/catalog", {
         method: "PATCH",

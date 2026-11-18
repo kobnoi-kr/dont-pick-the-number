@@ -501,7 +501,8 @@ function blankRoom(code, visibility, host) {
     spectators: [],
     startedAt: null,
     _persisted: false,
-    snake: null
+    snake: null,
+    snakeMapId: snakeBridge.DEFAULT_MAP_ID || "classic"
   };
 }
 function applyRoomSetup(room, setup) {
@@ -513,6 +514,9 @@ function applyRoomSetup(room, setup) {
     } else {
       room.cat = nextCat;
     }
+  }
+  if (setup.snakeMapId != null) {
+    room.snakeMapId = snakeBridge.normalizeMapId(setup.snakeMapId);
   }
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
@@ -577,6 +581,8 @@ function snap(room, player, opts) {
     pointAll: room.pointAll,
     maxPlayers: roomMaxPlayers(room),
     spectatorCount: Array.isArray(room.spectators) ? room.spectators.length : 0,
+    snakeMapId: snakeBridge.normalizeMapId(room.snakeMapId || snakeBridge.DEFAULT_MAP_ID),
+    snakeMaps: snakeBridge.listMaps(),
     snake: snakeBridge.snapSnake(room),
     players: room.players.map((item) => ({
       id: item.id,
@@ -1255,6 +1261,9 @@ function onSetup(ws, msg) {
   if (pickEach != null) room.pickEach = pickEach;
   if (turnSec != null) room.turnSec = turnSec;
   if (typeof patch.pointAll === "boolean") room.pointAll = patch.pointAll;
+  if (patch.snakeMapId != null) {
+    room.snakeMapId = snakeBridge.normalizeMapId(patch.snakeMapId);
+  }
   broadcast(room, { lobby: false });
 }
 function onSpinOrder(ws) {

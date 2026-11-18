@@ -29,6 +29,8 @@ function publicState(state) {
     winnerId: state.winnerId,
     turnNumber: state.turnNumber,
     version: state.version,
+    mapId: state.mapId || null,
+    mapName: state.mapName || null,
     boardSize: state.board.boardSize,
     ladders: state.board.ladders,
     snakes: state.board.snakes
@@ -59,7 +61,8 @@ function createGame(opts) {
     ids.add(p.userId);
   }
 
-  const board = createBoard(opts && opts.boardConfig);
+  const boardConfig = (opts && opts.boardConfig) || null;
+  const board = createBoard(boardConfig);
   const players = playersIn.map((p, i) => ({
     userId: String(p.userId),
     username: String(p.username || p.userId),
@@ -85,6 +88,8 @@ function createGame(opts) {
     winnerId: null,
     turnNumber: 0,
     version: 1,
+    mapId: (boardConfig && boardConfig.mapId) || null,
+    mapName: (boardConfig && boardConfig.mapName) || null,
     board
   };
 }

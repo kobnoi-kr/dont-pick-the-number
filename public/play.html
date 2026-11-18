@@ -287,7 +287,16 @@
         </div>
       </div>
       <div id="snakeOnly" class="hidden">
-        <p class="hint">งูและบันได · ผู้เล่น 2–6 คน · ทอยลูกเต๋าถึงช่อง 100 · ไม่ต้องตั้งช่วงตัวเลข</p>
+        <p class="hint">งูและบันได · ผู้เล่น 2–6 คน · ทอยลูกเต๋าถึงช่อง 100 · เลือกแมพแล้วงู/บันไดจะอยู่คนละตำแหน่ง</p>
+        <div class="row count-row" style="align-items:flex-start">
+          <label for="snakeMap">แมพกระดาน</label>
+          <div style="flex:1;min-width:0">
+            <select id="snakeMap" class="input" aria-label="เลือกแมพงูและบันได">
+              <option value="classic">คลาสสิก</option>
+            </select>
+            <p class="tiny muted" id="snakeMapHint" style="margin:6px 0 0">แมพมาตรฐาน — งู/บันไดสมดุล</p>
+          </div>
+        </div>
       </div>
       <button class="btn" type="submit">บันทึกการตั้งค่า</button>
     </form>

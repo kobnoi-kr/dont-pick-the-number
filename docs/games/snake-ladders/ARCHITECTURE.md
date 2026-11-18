@@ -56,9 +56,22 @@ Catalog id `snake`, capacity 2–6 via `roomMaxPlayers(room)`.
 
 - Spectators receive `snap(..., { spectator: true })` with full `snake` public state
 - Client: `show("snakeGame")`, roll locked, banner, quit → `unwatch`
-- Polish: dice pulse, win banner, waiting copy, CSS scoped for `/play`
+- Polish: dice pulse, footstep glow, win banner, viewport-fit board
+- Auto: reuses room `player.auto` + `t:"auto"`; panel shows avatar + `AUTO` tag
+- Tokens: profile `avatar` images (no letter glyphs)
+- Lobby seats follow `maxPlayers` (6 for snake)
+
+## Catalog / Beta
+
+- Admin `game_catalog` setting: `{ enabled, name, beta }`
+- Public `/api/v1/games/catalog` returns `beta` for Game Library pills
+
+## Maps
+
+- `config/maps.js` — named layouts (`classic`, `jungle`, `volcano`, `skybridge`)
+- Room field `snakeMapId` patched via `t:"setup"`; `startSnake` passes `boardConfigForMap`
+- Snap includes `snakeMapId` + `snakeMaps` list for lobby picker
 
 ## Guardrails
 
-- No auth / schema / shared API contract changes without approval
 - Prefer additive files over broad refactors of `server.js` / `game.js`

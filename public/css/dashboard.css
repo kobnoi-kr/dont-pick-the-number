@@ -1450,6 +1450,7 @@ body.nav-open .sidebar .nav {
 .lib-body { min-width: 0; flex: 1; }
 .lib-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .lib-top h3 { margin: 0; font-size: 1.05rem; }
+.lib-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .lib-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
 .room-card-list,

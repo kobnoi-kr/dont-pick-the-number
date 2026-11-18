@@ -537,7 +537,7 @@ img.sl-token-face {
 
 .sl-player {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 32px 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 8px;
@@ -552,12 +552,53 @@ img.sl-token-face {
   box-shadow: 0 0 0 1px rgba(45, 212, 168, 0.2);
 }
 
-.sl-player-dot {
-  width: 22px;
-  height: 22px;
+.sl-player.is-auto .sl-player-name {
+  color: #fcd34d;
+}
+
+.sl-player-av-wrap {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.sl-player-av {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
+  object-fit: cover;
   border: 2px solid #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  display: block;
+  background: #1a1030;
+}
+
+.sl-player-av-ph {
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85) 0 16%, transparent 18%),
+    radial-gradient(circle at 50% 45%, var(--token, #5b9cf5), #111);
+}
+
+.sl-player-av-wrap .pavatar-auto-tag {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #111827;
+  background: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
 }
 
 .sl-player-name {

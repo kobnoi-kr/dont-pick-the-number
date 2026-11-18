@@ -12,7 +12,11 @@ const {
   publicState,
   currentPlayer,
   MIN_PLAYERS,
-  MAX_PLAYERS
+  MAX_PLAYERS,
+  listMaps,
+  normalizeMapId,
+  boardConfigForMap,
+  DEFAULT_MAP_ID
 } = require("./index");
 
 function isSnakeCat(cat) {
@@ -45,9 +49,12 @@ function startSnake(room) {
     err.code = "invalid_player_count";
     throw err;
   }
+  const mapId = normalizeMapId(room.snakeMapId || DEFAULT_MAP_ID);
+  room.snakeMapId = mapId;
   let state = createGame({
     roomId: room.code,
     sessionId: "sn-" + room.code + "-" + Date.now(),
+    boardConfig: boardConfigForMap(mapId),
     players: ordered.map((p) => ({
       userId: String(p.id),
       username: String(p.name),
@@ -71,7 +78,23 @@ function clearSnake(room) {
 
 function snapSnake(room) {
   if (!room || !room.snake) return null;
-  return publicState(room.snake);
+  const pub = publicState(room.snake);
+  if (!pub) return null;
+  // Merge live room cosmetics / auto flags onto snake seats
+  const byId = new Map((room.players || []).map((p) => [String(p.id), p]));
+  pub.players = (pub.players || []).map((p) => {
+    const rp = byId.get(String(p.userId));
+    if (!rp) return p;
+    return Object.assign({}, p, {
+      avatar: rp.avatarUrl || p.avatar || null,
+      auto: !!(rp.auto || rp.bot),
+      bot: !!rp.bot
+    });
+  });
+  if (!pub.mapId) {
+    pub.mapId = normalizeMapId(room.snakeMapId || DEFAULT_MAP_ID);
+  }
+  return pub;
 }
 
 function snakeYourTurn(room, player) {
@@ -108,6 +131,10 @@ function normalizeCat(cat) {
 module.exports = {
   MIN_PLAYERS,
   MAX_PLAYERS,
+  DEFAULT_MAP_ID,
+  listMaps,
+  normalizeMapId,
+  boardConfigForMap,
   isSnakeCat,
   isSnakeRoom,
   roomCap,
