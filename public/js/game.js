@@ -324,8 +324,11 @@ function show(n){
   ["gate","start","play","pick","wheelGame","snakeGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
   const inRoom=n!=="gate";
   const lobby=n==="start";
+  const snakePlay=n==="snakeGame";
+  document.body.classList.toggle("snake-play", snakePlay);
   const side=document.querySelector(".side");
-  if(side) side.classList.toggle("hidden",!inRoom||lobby);
+  // Snake board needs width — player list lives in the snake panel.
+  if(side) side.classList.toggle("hidden",!inRoom||lobby||snakePlay);
   // In-game: slim status bar + power quit. Lobby has its own leave.
   const bar=$("roombar");
   const inGame=inRoom&&!lobby;

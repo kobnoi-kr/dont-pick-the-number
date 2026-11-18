@@ -41,13 +41,16 @@ export function createLiveBoard(opts) {
   const onRoll = typeof opts.onRoll === "function" ? opts.onRoll : null;
   root.innerHTML = `
     <div class="sl-live">
-      <div class="sl-board-wrap">
-        <div class="sl-board" data-el="board"></div>
-        <svg class="sl-paths" data-el="paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div class="sl-tokens" data-el="tokens" aria-hidden="true"></div>
+      <div class="sl-stage">
+        <div class="sl-board-wrap">
+          <div class="sl-board-frame">
+            <div class="sl-board" data-el="board"></div>
+            <svg class="sl-paths" data-el="paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="sl-tokens" data-el="tokens" aria-hidden="true"></div>
+          </div>
+        </div>
       </div>
       <aside class="sl-panel">
-        <h2>กระดาน</h2>
         <div class="sl-meta">
           <div>สถานะ: <strong data-el="status">—</strong></div>
           <div>ตา: <strong data-el="turn">—</strong></div>
@@ -112,10 +115,18 @@ export function createLiveBoard(opts) {
       if (g) {
         div.style.gridRow = String(g.side - g.row);
         div.style.gridColumn = String(g.col + 1);
+        div.classList.add((g.row + g.col) % 2 === 0 ? "is-light" : "is-dark");
       }
       if (ladderStarts.has(cell)) div.classList.add("is-ladder-start");
       if (snakeStarts.has(cell)) div.classList.add("is-snake-start");
-      if (cell === size) div.classList.add("is-goal");
+      if (cell === 1) {
+        div.classList.add("is-start");
+        div.innerHTML = `<span class="sl-cell-num">1</span><span class="sl-cell-tag">START</span>`;
+      }
+      if (cell === size) {
+        div.classList.add("is-goal");
+        div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WIN</span>`;
+      }
       els.board.appendChild(div);
     }
     const parts = [];
@@ -123,22 +134,26 @@ export function createLiveBoard(opts) {
       const a = cellCenterPercent(lad.start, size);
       const b = cellCenterPercent(lad.end, size);
       if (!a || !b) continue;
+      const mx = (a.x + b.x) / 2 + (a.x < b.x ? -3 : 3);
+      const my = (a.y + b.y) / 2;
       parts.push(
-        `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#3ecf8e" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>`,
-        `<circle cx="${a.x}" cy="${a.y}" r="1.4" fill="#3ecf8e"/>`,
-        `<circle cx="${b.x}" cy="${b.y}" r="1.4" fill="#3ecf8e"/>`
+        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#8b5a2b" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>`,
+        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#d4a574" stroke-width="1.1" stroke-linecap="round" opacity="0.95"/>`,
+        `<circle cx="${a.x}" cy="${a.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`,
+        `<circle cx="${b.x}" cy="${b.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`
       );
     }
     for (const sn of state.snakes || []) {
       const a = cellCenterPercent(sn.start, size);
       const b = cellCenterPercent(sn.end, size);
       if (!a || !b) continue;
-      const mx = (a.x + b.x) / 2 + (a.x < b.x ? 6 : -6);
+      const mx = (a.x + b.x) / 2 + (a.x < b.x ? 7 : -7);
       const my = (a.y + b.y) / 2;
       parts.push(
-        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#f07178" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>`,
-        `<circle cx="${a.x}" cy="${a.y}" r="1.4" fill="#f07178"/>`,
-        `<circle cx="${b.x}" cy="${b.y}" r="1.4" fill="#f07178"/>`
+        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#e11d48" stroke-width="2.8" stroke-linecap="round" opacity="0.95"/>`,
+        `<circle cx="${a.x}" cy="${a.y}" r="2.1" fill="#be123c"/>`,
+        `<circle cx="${a.x}" cy="${a.y}" r="0.55" fill="#fff" opacity="0.9"/>`,
+        `<circle cx="${b.x}" cy="${b.y}" r="1.5" fill="#9f1239"/>`
       );
     }
     els.paths.innerHTML = parts.join("");

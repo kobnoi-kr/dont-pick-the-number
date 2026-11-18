@@ -57,8 +57,6 @@ function buildBoard(board) {
     div.className = "sl-cell";
     div.dataset.cell = String(cell);
     div.textContent = String(cell);
-    const g = cellCenterPercent(cell, size);
-    // Use CSS grid via style from cell geometry
     const side = Math.round(Math.sqrt(size));
     const idx = cell - 1;
     const rowFromBottom = Math.floor(idx / side);
@@ -66,10 +64,17 @@ function buildBoard(board) {
     const col = rowFromBottom % 2 === 0 ? colInRow : side - 1 - colInRow;
     div.style.gridRow = String(side - rowFromBottom);
     div.style.gridColumn = String(col + 1);
+    div.classList.add((rowFromBottom + col) % 2 === 0 ? "is-light" : "is-dark");
     if (ladderStarts.has(cell)) div.classList.add("is-ladder-start");
     if (snakeStarts.has(cell)) div.classList.add("is-snake-start");
-    if (cell === size) div.classList.add("is-goal");
-    void g;
+    if (cell === 1) {
+      div.classList.add("is-start");
+      div.innerHTML = `<span class="sl-cell-num">1</span><span class="sl-cell-tag">START</span>`;
+    }
+    if (cell === size) {
+      div.classList.add("is-goal");
+      div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WIN</span>`;
+    }
     els.board.appendChild(div);
   }
 
@@ -78,28 +83,31 @@ function buildBoard(board) {
 
 function drawPaths(board) {
   const size = board.boardSize;
-  // SVG viewBox is 0..100 — cell centers are already percent coords
   const parts = [];
   for (const lad of board.ladders) {
     const a = cellCenterPercent(lad.start, size);
     const b = cellCenterPercent(lad.end, size);
     if (!a || !b) continue;
+    const mx = (a.x + b.x) / 2 + (a.x < b.x ? -3 : 3);
+    const my = (a.y + b.y) / 2;
     parts.push(
-      `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#3ecf8e" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>`,
-      `<circle cx="${a.x}" cy="${a.y}" r="1.4" fill="#3ecf8e"/>`,
-      `<circle cx="${b.x}" cy="${b.y}" r="1.4" fill="#3ecf8e"/>`
+      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#8b5a2b" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>`,
+      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#d4a574" stroke-width="1.1" stroke-linecap="round" opacity="0.95"/>`,
+      `<circle cx="${a.x}" cy="${a.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`,
+      `<circle cx="${b.x}" cy="${b.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`
     );
   }
   for (const sn of board.snakes) {
     const a = cellCenterPercent(sn.start, size);
     const b = cellCenterPercent(sn.end, size);
     if (!a || !b) continue;
-    const mx = (a.x + b.x) / 2 + (a.x < b.x ? 6 : -6);
+    const mx = (a.x + b.x) / 2 + (a.x < b.x ? 7 : -7);
     const my = (a.y + b.y) / 2;
     parts.push(
-      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#f07178" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>`,
-      `<circle cx="${a.x}" cy="${a.y}" r="1.4" fill="#f07178"/>`,
-      `<circle cx="${b.x}" cy="${b.y}" r="1.4" fill="#f07178"/>`
+      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#e11d48" stroke-width="2.8" stroke-linecap="round" opacity="0.95"/>`,
+      `<circle cx="${a.x}" cy="${a.y}" r="2.1" fill="#be123c"/>`,
+      `<circle cx="${a.x}" cy="${a.y}" r="0.55" fill="#fff" opacity="0.9"/>`,
+      `<circle cx="${b.x}" cy="${b.y}" r="1.5" fill="#9f1239"/>`
     );
   }
   els.paths.innerHTML = parts.join("");
