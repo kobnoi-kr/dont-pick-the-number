@@ -2949,18 +2949,17 @@ function choosePick(n){
   if(!myTurn){ $("pickMsg").textContent="ยังไม่ถึงตาคุณ"; return; }
   send({t:"pickNum",n:n});
 }
+let _snakeMapsCache=[];
 function paintSnakeMapSelect(s){
   const sel=$("snakeMap");
   const hint=$("snakeMapHint");
   if(!sel) return;
   const maps=Array.isArray(s&&s.snakeMaps)&&s.snakeMaps.length
     ? s.snakeMaps
-    : [
-        {id:"classic",name:"คลาสสิก",blurb:"แมพมาตรฐาน — งู/บันไดสมดุล"},
-        {id:"jungle",name:"ป่าดงดิบ",blurb:"บันไดยาวหลายเส้น แต่มีงูดักกลางทาง"},
-        {id:"volcano",name:"ภูเขาไฟ",blurb:"งูเยอะและตกแรง — เสี่ยงสูง รางวัลสูง"},
-        {id:"skybridge",name:"สะพานฟ้า",blurb:"บันไดเยอะ เดินลื่น — แต่งูท้ายกระดานดักชัยชนะ"}
-      ];
+    : (_snakeMapsCache.length?_snakeMapsCache:[
+        {id:"classic",name:"คลาสสิก",blurb:"แมพมาตรฐาน — งู/บันไดสมดุล"}
+      ]);
+  if(Array.isArray(s&&s.snakeMaps)&&s.snakeMaps.length) _snakeMapsCache=s.snakeMaps;
   const cur=String((s&&s.snakeMapId)||sel.value||"classic");
   const focus=document.activeElement===sel;
   if(!focus){
@@ -2973,6 +2972,16 @@ function paintSnakeMapSelect(s){
   }
   const picked=maps.find(m=>m.id===sel.value)||maps[0];
   if(hint) hint.textContent=(picked&&picked.blurb)||"";
+  paintSnakeMapPreviewBox(picked);
+}
+function paintSnakeMapPreviewBox(map){
+  const host=$("snakeMapPreview");
+  if(!host) return;
+  if(window.NVSnake&&typeof window.NVSnake.paintSnakeMapPreview==="function"){
+    window.NVSnake.paintSnakeMapPreview(host, map||null);
+    return;
+  }
+  host.innerHTML=`<p class="tiny muted" style="margin:0">กำลังโหลดตัวอย่าง…</p>`;
 }
 function syncSetup(s){
   applyCat(s.cat||"secret");
@@ -3545,11 +3554,12 @@ function pushSnakeMap(){
   if(applying||!isHost()||netPhase!=="lobby") return;
   const mapEl=$("snakeMap");
   if(!mapEl||!mapEl.value) return;
+  const id=String(mapEl.value);
+  const picked=(_snakeMapsCache||[]).find(m=>m.id===id)||{id};
+  paintSnakeMapPreviewBox(picked);
   const hint=$("snakeMapHint");
-  const opt=mapEl.options[mapEl.selectedIndex];
-  // blurb lives in option title? refresh from known list via empty sync paint
-  if(hint&&opt) hint.textContent="";
-  send({t:"setup",patch:{snakeMapId:String(mapEl.value)}});
+  if(hint&&picked&&picked.blurb) hint.textContent=picked.blurb;
+  send({t:"setup",patch:{snakeMapId:id}});
 }
 function connect(){
   if(sock&&(sock.readyState===0||sock.readyState===1)) return;

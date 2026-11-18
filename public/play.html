@@ -300,6 +300,7 @@
             <p class="tiny muted" id="snakeMapHint" style="margin:6px 0 0">แมพมาตรฐาน — งู/บันไดสมดุล</p>
           </div>
         </div>
+        <div id="snakeMapPreview" class="sl-map-preview" aria-label="ตัวอย่างกระดาน"></div>
       </div>
       <button class="btn" type="submit">บันทึกการตั้งค่า</button>
     </form>
@@ -453,7 +454,8 @@
     clearBanNotice();
     loadAnnouncementToasts().catch(() => {});
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js");
-    window.NVSnake = { createLiveBoard };
+    const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
+    window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     const s = document.createElement("script");
     s.src = "/js/game.js";
     document.body.appendChild(s);

@@ -249,6 +249,53 @@ body.snake-play #snakeGame .sl-board-frame {
   }
 }
 
+/* —— Lobby settings mini map preview —— */
+.sl-map-preview {
+  width: min(100%, 220px);
+  margin: 12px auto 4px;
+}
+.sl-map-preview-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 8px;
+  border-radius: 14px;
+  transform: none;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 2px var(--sl-frame-ring),
+    inset 0 0 0 5px var(--sl-frame-inner);
+}
+.sl-map-preview-board {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+}
+.sl-map-preview-board .sl-cell {
+  padding: 1px 2px;
+  font-size: 0.42rem;
+  line-height: 1;
+  border-width: 0.5px;
+}
+.sl-map-preview-board .sl-cell-tag {
+  display: none;
+}
+.sl-map-preview-board .sl-cell.is-ladder-start::after,
+.sl-map-preview-board .sl-cell.is-snake-start::after {
+  inset: 1px;
+  border-radius: 2px;
+}
+.sl-map-preview-paths {
+  inset: 8px;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+}
+.sl-map-preview-caption {
+  margin: 6px 0 0;
+  text-align: center;
+}
+
 /* —— Board —— */
 .sl-board-wrap {
   position: relative;
@@ -814,6 +861,7 @@ img.sl-token-face {
 /* Jungle: moss & leaf */
 .snake-root[data-map="jungle"],
 .sl-live[data-map="jungle"],
+.sl-map-preview[data-map="jungle"],
 body[data-snake-map="jungle"] {
   --sl-cell-a: #e7f2d8;
   --sl-cell-a-hi: #f4fbea;
@@ -851,6 +899,7 @@ body[data-snake-map="jungle"] {
 /* Volcano: ash & lava */
 .snake-root[data-map="volcano"],
 .sl-live[data-map="volcano"],
+.sl-map-preview[data-map="volcano"],
 body[data-snake-map="volcano"] {
   --sl-cell-a: #f3e2d0;
   --sl-cell-a-hi: #fbf0e4;
@@ -888,6 +937,7 @@ body[data-snake-map="volcano"] {
 /* Sky Bridge: cloud & sky */
 .snake-root[data-map="skybridge"],
 .sl-live[data-map="skybridge"],
+.sl-map-preview[data-map="skybridge"],
 body[data-snake-map="skybridge"] {
   --sl-cell-a: #eef6ff;
   --sl-cell-a-hi: #f8fbff;

@@ -101,7 +101,10 @@ function listMaps() {
     blurb: m.blurb,
     boardSize: m.boardSize,
     ladderCount: (m.ladders || []).length,
-    snakeCount: (m.snakes || []).length
+    snakeCount: (m.snakes || []).length,
+    // Layout for lobby mini-preview (same positions as live board)
+    ladders: (m.ladders || []).map((x) => ({ start: x.start, end: x.end })),
+    snakes: (m.snakes || []).map((x) => ({ start: x.start, end: x.end }))
   }));
 }
 
