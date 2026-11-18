@@ -50,11 +50,11 @@ export function paintSnakeMapPreview(host, map) {
 
   host.dataset.map = mapId;
   host.innerHTML = `
-    <div class="sl-map-preview-frame sl-board-frame">
-      <div class="sl-board sl-map-preview-board" style="grid-template-columns:repeat(${side},1fr);grid-template-rows:repeat(${side},1fr)">
+    <div class="sl-map-preview-frame">
+      <div class="sl-map-preview-board" style="grid-template-columns:repeat(${side},1fr);grid-template-rows:repeat(${side},1fr)">
         ${cells.join("")}
       </div>
-      <svg class="sl-paths sl-map-preview-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${renderBoardPaths(
+      <svg class="sl-map-preview-paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${renderBoardPaths(
         map.ladders,
         map.snakes,
         size
