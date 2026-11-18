@@ -5,18 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>เข้าสู่ระบบ — NUMVERSE</title>
 <link rel="icon" href="/images/n-logo.png" type="image/png">
+<link rel="preload" as="image" href="/images/n-logo.png">
+<style>
+html,body{background:#070b14}
+.nv-boot{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;margin:0;padding:24px;background:linear-gradient(180deg,#0c1220 0%,#070b14 100%);color:#e8eefc}
+.nv-boot.is-done{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .38s ease,visibility .38s ease}
+.nv-boot-inner{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
+.nv-boot-logo{width:min(96px,28vw);height:auto;display:block;border-radius:18px}
+.nv-boot-word{margin:0;font:700 1.05rem/1.2 system-ui,sans-serif;letter-spacing:.14em}
+.nv-boot-bar{width:min(120px,36vw);height:3px;border-radius:999px;background:rgba(148,163,184,.18);overflow:hidden}
+.nv-boot-bar>span{display:block;height:100%;width:40%;border-radius:inherit;background:#6b88ff;animation:nv-boot-slide 1.1s ease-in-out infinite}
+.nv-boot-label{margin:0;font:500 .78rem/1.3 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(186,198,220,.72)}
+@keyframes nv-boot-slide{0%{transform:translateX(-120%)}100%{transform:translateX(280%)}}
+</style>
 <link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="/css/auth-pages.css">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
     <div class="nv-boot-inner">
-      <img class="nv-boot-logo" src="/images/numverse.png" alt="NUMVERSE" width="220" height="124" decoding="async" fetchpriority="high">
+      <img class="nv-boot-logo" src="/images/n-logo.png" alt="NUMVERSE" width="96" height="96" decoding="sync" fetchpriority="high">
+      <p class="nv-boot-word">NUMVERSE</p>
       <div class="nv-boot-bar" aria-hidden="true"><span></span></div>
       <p class="nv-boot-label">Loading</p>
     </div>
   </div>
-  <script src="/js/boot-splash.js" defer></script>
+  <script src="/js/boot-splash.js"></script>
 <div class="wrap">
   <div class="brand"><img src="/images/numverse.png" alt="NUMVERSE" width="240" height="135"></div>
   <div class="panel">

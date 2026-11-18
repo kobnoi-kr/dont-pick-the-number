@@ -2,10 +2,28 @@
   var el = document.getElementById("nvBoot");
   if (!el) return;
 
-  var MIN_MS = 420;
-  var MAX_MS = 10000;
+  var MIN_MS = 700;
+  var MAX_MS = 12000;
   var started = Date.now();
+  var pageReady = document.readyState === "complete";
+  var logoReady = false;
   var done = false;
+
+  var logo = el.querySelector(".nv-boot-logo");
+  function markLogoReady() {
+    logoReady = true;
+    tryHide();
+  }
+  if (logo) {
+    if (logo.complete && logo.naturalWidth > 0) {
+      logoReady = true;
+    } else {
+      logo.addEventListener("load", markLogoReady, { once: true });
+      logo.addEventListener("error", markLogoReady, { once: true });
+    }
+  } else {
+    logoReady = true;
+  }
 
   function hide() {
     if (done) return;
@@ -20,10 +38,19 @@
     }, wait);
   }
 
+  function tryHide() {
+    if (pageReady && logoReady) hide();
+  }
+
+  function onPageReady() {
+    pageReady = true;
+    tryHide();
+  }
+
   if (document.readyState === "complete") {
-    hide();
+    onPageReady();
   } else {
-    window.addEventListener("load", hide, { once: true });
+    window.addEventListener("load", onPageReady, { once: true });
   }
 
   window.addEventListener(
