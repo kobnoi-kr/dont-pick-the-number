@@ -78,12 +78,13 @@ const FALLBACK = [
 ];
 
 function thumbFor(id) {
+  if (id === "secret") return "🔢";
   if (id === "wheel") return "🎡";
   if (id === "snake") return "🐍";
   if (id === "imposter") return "🕵️";
   if (id === "race2048") return "🏁";
   if (id === "cardmemory") return "🃏";
-  return "🔢";
+  return "🎮";
 }
 
 function rememberLastGame(id) {
