@@ -23,7 +23,7 @@ function thumb(item) {
   }
   const cls = item.cssClass ? " " + item.cssClass : "";
   if (item.kind === "frame") {
-    return `<div class="dec-frame-shell${cls}" style="--dec-accent:${esc(
+    return `<div class="dec-card-thumb${cls}" style="--dec-accent:${esc(
       color
     )}"><div class="dec-av-core"><span class="dec-av-letter">N</span></div></div>`;
   }

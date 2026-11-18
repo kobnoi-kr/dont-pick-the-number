@@ -2790,9 +2790,21 @@ body.modal-open {
   background: rgba(107, 136, 255, 0.28);
   color: #fff;
 }
-/* กรอบ = สี่เหลี่ยม · เอฟเฟกต์ = วงกลม */
-.dec-frame-shell,
-.dec-effect-shell {
+/* กรอบ = การ์ดสี่เหลี่ยม · เอฟเฟกต์ = วงกลมโปรไฟล์ */
+.dec-card-thumb {
+  width: 64px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  border: 1px solid var(--nv-border);
+  background: var(--nv-bg-2);
+  padding: 8px 6px;
+  box-sizing: border-box;
+}
+.dec-effect-shell,
+.dec-preview-av {
   width: 56px;
   height: 56px;
   display: grid;
@@ -2800,13 +2812,9 @@ body.modal-open {
   flex: 0 0 auto;
   position: relative;
   box-sizing: border-box;
-  border-radius: 12px;
+  border-radius: 50%;
 }
-.dec-preview-shell {
-  width: 76px;
-  height: 76px;
-  border-radius: 14px;
-}
+.dec-preview-av { width: 72px; height: 72px; }
 .dec-av-core {
   width: 100%;
   height: 100%;
@@ -2818,34 +2826,39 @@ body.modal-open {
   border: 2px solid rgba(255, 255, 255, 0.14);
   box-sizing: border-box;
 }
-.dec-frame-shell.frame-gold,
-.dec-preview-shell.frame-gold {
-  padding: 4px;
-  background: linear-gradient(145deg, #fbbf24, #b45309);
-  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.45), 0 0 14px rgba(251, 191, 36, 0.35);
+.dec-card-thumb .dec-av-core {
+  width: 40px;
+  height: 40px;
 }
-.dec-frame-shell.frame-neon,
-.dec-preview-shell.frame-neon {
-  padding: 4px;
-  background: linear-gradient(135deg, #22d3ee, #ec4899);
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 14px rgba(236, 72, 153, 0.3);
+.dec-card-thumb.frame-gold,
+.dec-profile-card.frame-gold {
+  border-color: rgba(251, 191, 36, 0.7);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 0 14px rgba(251, 191, 36, 0.28);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.14), transparent 50%), var(--nv-bg-2);
 }
-.dec-frame-shell.frame-ice,
-.dec-preview-shell.frame-ice {
-  padding: 4px;
-  background: linear-gradient(145deg, #e0f2fe, #60a5fa);
-  box-shadow: 0 0 0 1px rgba(147, 197, 253, 0.5), 0 0 14px rgba(186, 230, 253, 0.4);
+.dec-card-thumb.frame-neon,
+.dec-profile-card.frame-neon {
+  border-color: rgba(34, 211, 238, 0.65);
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.28), 0 0 14px rgba(34, 211, 238, 0.25);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.14), rgba(236, 72, 153, 0.1)), var(--nv-bg-2);
 }
-.dec-frame-shell.frame-crimson,
-.dec-preview-shell.frame-crimson {
-  padding: 4px;
-  background: linear-gradient(145deg, #f87171, #7f1d1d);
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 0 14px rgba(220, 38, 38, 0.35);
+.dec-card-thumb.frame-ice,
+.dec-profile-card.frame-ice {
+  border-color: rgba(147, 197, 253, 0.7);
+  box-shadow: 0 0 0 1px rgba(186, 230, 253, 0.35), 0 0 14px rgba(147, 197, 253, 0.28);
+  background: linear-gradient(180deg, rgba(186, 230, 253, 0.14), transparent 50%), var(--nv-bg-2);
 }
-.dec-frame-shell[class*="frame-"] .dec-av-core,
-.dec-preview-shell[class*="frame-"] .dec-av-core {
-  background: rgba(10, 14, 28, 0.92);
-  border-color: transparent;
+.dec-card-thumb.frame-crimson,
+.dec-profile-card.frame-crimson {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.3), 0 0 14px rgba(239, 68, 68, 0.25);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.14), transparent 50%), var(--nv-bg-2);
+}
+.dec-profile-card {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--nv-border);
+  background: var(--nv-bg-2);
 }
 .dec-av-core.effect-sparkle {
   animation: decSparkle 2.2s ease-in-out infinite;

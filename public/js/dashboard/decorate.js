@@ -55,10 +55,10 @@ function thumbHtml(item, user) {
   }
   if (kind === "frame") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
-    return `<div class="dec-frame-shell${cls}" style="--dec-accent:${esc(color)}"><div class="dec-av-core">${avHtml(
-      user,
-      letter
-    )}</div></div>`;
+    // กรอบ = การ์ดสี่เหลี่ยม (ไม่ใช่รอบรูป)
+    return `<div class="dec-card-thumb${cls}" style="--dec-accent:${esc(color)}">
+      <div class="dec-av-core">${avHtml(user, letter)}</div>
+    </div>`;
   }
   if (kind === "effect") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
@@ -80,9 +80,9 @@ function previewHtml(user, eq) {
   const frameCls = frame && frame.cssClass ? " " + frame.cssClass : "";
   const effectCls = effect && effect.cssClass ? " " + effect.cssClass : "";
   return `
-    <div class="dec-preview-card">
+    <div class="dec-preview-card dec-profile-card${frameCls}" style="--dec-accent:${esc(itemColor(frame))}">
       <div class="dec-preview-head">
-        <div class="dec-frame-shell dec-preview-shell${frameCls}" style="--dec-accent:${esc(itemColor(frame))}">
+        <div class="dec-effect-shell dec-preview-av">
           <div class="dec-av-core${effectCls}">
             ${avHtml(user, letter)}
           </div>
@@ -95,7 +95,7 @@ function previewHtml(user, eq) {
           </div>
         </div>
       </div>
-      <p class="tiny muted" style="margin:12px 0 0">พรีวิวการ์ดโปรไฟล์ในล็อบบี้ — กรอบสี่เหลี่ยม · เอฟเฟกต์วงกลม</p>
+      <p class="tiny muted" style="margin:12px 0 0">พรีวิว — กรอบอยู่ที่การ์ด · เอฟเฟกต์อยู่ที่วงกลมโปรไฟล์</p>
     </div>
   `;
 }

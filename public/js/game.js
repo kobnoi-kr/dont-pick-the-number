@@ -905,7 +905,7 @@ function renderLobbyGrid(){
     const slot=document.createElement("div");
     if(!name){
       slot.className="lobby-slot empty";
-      slot.innerHTML=`<div class="lobby-av ph">+</div><div class="lobby-slot-name">รอผู้เล่น…</div>`;
+      slot.innerHTML=`<div class="lobby-empty-circle" aria-hidden="true"><span class="lobby-empty-plus">+</span></div><div class="lobby-slot-name">รอผู้เล่น…</div>`;
       grid.appendChild(slot);
       continue;
     }
@@ -914,7 +914,13 @@ function renderLobbyGrid(){
     const connected=!meta||meta.connected||meta.bot;
     const ready=ranked||(meta&&meta.connected);
     const champ=isChampion(name);
-    slot.className="lobby-slot"+(hostFlag?" host":"")+(connected?"":" offline")+(champ?" champion":"");
+    const frameClass=meta&&meta.frameClass?String(meta.frameClass):"";
+    // กรอบ = สไตล์การ์ดโปรไฟล์ · เอฟเฟกต์ = วงกลมรอบรูป
+    slot.className="lobby-slot"
+      +(hostFlag?" host":"")
+      +(connected?"":" offline")
+      +(champ?" champion":"")
+      +(frameClass?" "+frameClass:"");
     const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
     av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
     if(meta&&meta.avatarUrl){
@@ -965,10 +971,8 @@ function renderLobbyGrid(){
       acts.appendChild(kick);
     }
     const avWrap=document.createElement("div");
-    const frameClass=meta&&meta.frameClass?String(meta.frameClass):"";
     const effectClass=meta&&meta.effectClass?String(meta.effectClass):"";
-    // กรอบ = สี่เหลี่ยมรอบรูป · เอฟเฟกต์ = วงกลมรอบโปรไฟล์
-    avWrap.className="lobby-av-wrap"+(champ?" champion":"")+(frameClass?" "+frameClass:"");
+    avWrap.className="lobby-av-wrap"+(champ?" champion":"");
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
     if(champ){
@@ -2075,12 +2079,16 @@ async function openPlayerProfileModal(userId){
   const acts=$("playerProfileActs");
   const avShell=$("playerProfileAvShell");
   const avCore=$("playerProfileAvCore");
+  const profileCard=modal.querySelector(".player-profile-card");
   function setProfileCosmetics(u){
     const eq=(u&&u.equipped)||{};
     const frameCls=(eq.frame&&eq.frame.cssClass)?String(eq.frame.cssClass):"";
     const effectCls=(eq.effect&&eq.effect.cssClass)?String(eq.effect.cssClass):"";
+    if(profileCard){
+      profileCard.className="modal-card player-profile-card"+(frameCls?" "+frameCls:"");
+    }
     if(avShell){
-      avShell.className="player-profile-av-shell"+(frameCls?" "+frameCls:"");
+      avShell.className="player-profile-av-shell";
     }
     if(avCore){
       avCore.className="player-profile-av-core"+(effectCls?" "+effectCls:"");
