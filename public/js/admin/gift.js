@@ -3,6 +3,14 @@ import { esc, hasPerm } from "./util.js";
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
 const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.level.1", "title.rookie"]);
+const RANKING_TITLE_IDS = new Set([
+  "title.weekly.1",
+  "title.weekly.2",
+  "title.weekly.3",
+  "title.monthly.1",
+  "title.monthly.2",
+  "title.monthly.3"
+]);
 
 function itemColor(item) {
   if (!item) return "#94a3b8";
@@ -46,9 +54,10 @@ export async function renderGift(root, { user }) {
     root.innerHTML = `<div class="empty">โหลดแคตตาล็อกไม่ได้</div>`;
     return;
   }
-  // กันมือใหม่ซ้ำฝั่ง UI ด้วย (เหลือแค่ยศเลเวล)
+  // กันมือใหม่ซ้ำ + ยศ Ranking ต้องได้จากแต้มสูงสุดเท่านั้น (Gift มอบไม่ได้)
   const items = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
     if (it.id === "title.rookie") return false;
+    if (RANKING_TITLE_IDS.has(it.id)) return false;
     return true;
   });
 

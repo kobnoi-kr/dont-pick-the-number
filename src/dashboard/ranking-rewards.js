@@ -69,12 +69,12 @@ async function topUsersForWindow(prisma, since, until) {
     if (p.won) row.gamesWon += 1;
   }
   return Array.from(byUser.values())
+    .filter((row) => (row.totalPoints || 0) > 0)
     .sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
       if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
       return b.totalGames - a.totalGames;
-    })
-    .slice(0, 3);
+    });
 }
 
 async function grantPeriodRewards(prisma, period) {
@@ -87,13 +87,16 @@ async function grantPeriodRewards(prisma, period) {
   });
   if (already > 0) return { period, label: window.label, granted: 0, skipped: true };
 
-  const top = await topUsersForWindow(prisma, window.since, window.resetsAt);
+  // Only the single highest-points player earns the period title (Top 1).
+  const ranked = await topUsersForWindow(prisma, window.since, window.resetsAt);
+  const top = ranked.slice(0, titles.length);
   let granted = 0;
   for (let i = 0; i < top.length; i++) {
     const rank = i + 1;
     const cosmeticId = titles[i];
     const userId = top[i].userId;
     if (!cosmeticId || !userId) continue;
+    if ((top[i].totalPoints || 0) <= 0) continue;
     try {
       await prisma.rankingRewardGrant.create({
         data: { period, label: window.label, rank, userId, cosmeticId }

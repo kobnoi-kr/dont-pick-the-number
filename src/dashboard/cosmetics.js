@@ -184,10 +184,24 @@ function defaultShopPriceForTier(tier) {
   return DEFAULT_TIER_PRICE[t] != null ? DEFAULT_TIER_PRICE[t] : DEFAULT_TIER_PRICE.common;
 }
 
+/** Only Top 1 (highest points) is auto-granted each period. */
 const RANK_TITLE_IDS = {
-  weekly: ["title.weekly.1", "title.weekly.2", "title.weekly.3"],
-  monthly: ["title.monthly.1", "title.monthly.2", "title.monthly.3"]
+  weekly: ["title.weekly.1"],
+  monthly: ["title.monthly.1"]
 };
+
+const RANK_TITLE_ID_SET = new Set([
+  "title.weekly.1",
+  "title.weekly.2",
+  "title.weekly.3",
+  "title.monthly.1",
+  "title.monthly.2",
+  "title.monthly.3"
+]);
+
+function isRankingTitleId(id) {
+  return RANK_TITLE_ID_SET.has(String(id || ""));
+}
 
 const STARTER_COSMETICS = [
   {
@@ -221,7 +235,7 @@ const STARTER_COSMETICS = [
     id: "title.weekly.1",
     kind: "title",
     name: "Weekly Champion",
-    description: "Top 1 ประจำสัปดาห์",
+    description: "แต้มสูงสุดประจำสัปดาห์เท่านั้น",
     shopPrice: null,
     cssClass: "title-weekly-1",
     meta: { color: "#fbbf24", rank: 1, period: "weekly" }
@@ -230,25 +244,25 @@ const STARTER_COSMETICS = [
     id: "title.weekly.2",
     kind: "title",
     name: "Weekly Elite",
-    description: "Top 2 ประจำสัปดาห์",
+    description: "ยศเก่า Top 2 (ไม่แจกใหม่อีก)",
     shopPrice: null,
     cssClass: "title-weekly-2",
-    meta: { color: "#cbd5e1", rank: 2, period: "weekly" }
+    meta: { color: "#cbd5e1", rank: 2, period: "weekly", legacy: true }
   },
   {
     id: "title.weekly.3",
     kind: "title",
     name: "Weekly Contender",
-    description: "Top 3 ประจำสัปดาห์",
+    description: "ยศเก่า Top 3 (ไม่แจกใหม่อีก)",
     shopPrice: null,
     cssClass: "title-weekly-3",
-    meta: { color: "#cd7f32", rank: 3, period: "weekly" }
+    meta: { color: "#cd7f32", rank: 3, period: "weekly", legacy: true }
   },
   {
     id: "title.monthly.1",
     kind: "title",
     name: "Monthly Legend",
-    description: "Top 1 ประจำเดือน",
+    description: "แต้มสูงสุดประจำเดือนเท่านั้น",
     shopPrice: null,
     cssClass: "title-monthly-1",
     meta: { color: "#fbbf24", rank: 1, period: "monthly" }
@@ -257,19 +271,19 @@ const STARTER_COSMETICS = [
     id: "title.monthly.2",
     kind: "title",
     name: "Monthly Ace",
-    description: "Top 2 ประจำเดือน",
+    description: "ยศเก่า Top 2 (ไม่แจกใหม่อีก)",
     shopPrice: null,
     cssClass: "title-monthly-2",
-    meta: { color: "#cbd5e1", rank: 2, period: "monthly" }
+    meta: { color: "#cbd5e1", rank: 2, period: "monthly", legacy: true }
   },
   {
     id: "title.monthly.3",
     kind: "title",
     name: "Monthly Star",
-    description: "Top 3 ประจำเดือน",
+    description: "ยศเก่า Top 3 (ไม่แจกใหม่อีก)",
     shopPrice: null,
     cssClass: "title-monthly-3",
-    meta: { color: "#cd7f32", rank: 3, period: "monthly" }
+    meta: { color: "#cd7f32", rank: 3, period: "monthly", legacy: true }
   },
   {
     id: "frame.gold",
@@ -1237,6 +1251,10 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 400, { error: "invalid_input" });
       return true;
     }
+    if (isRankingTitleId(cosmeticId)) {
+      sendJson(res, 400, { error: "ranking_title_earn_only" });
+      return true;
+    }
     const target = await resolveGiftTarget(prisma, body || {});
     if (!target || target.status === "deleted") {
       sendJson(res, 404, { error: "user_not_found" });
@@ -1790,6 +1808,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
 module.exports = {
   STARTER_COSMETICS,
   RANK_TITLE_IDS,
+  isRankingTitleId,
   publicCosmetic,
   equippedBundle,
   ensureCosmeticsCatalog,
