@@ -79,41 +79,71 @@ const ROLE_DEFAULT_PERMS = {
   super_admin: PERMISSION_CATALOG.map((p) => p.name)
 };
 
-async function ensurePermissionsCatalog(prisma) {
-  if (!prisma) return PERMISSION_CATALOG.map((p) => p.name);
-  for (const p of PERMISSION_CATALOG) {
-    await prisma.permission.upsert({
-      where: { name: p.name },
-      update: { description: p.description },
-      create: { name: p.name, description: p.description }
-    });
+const PERMS_TTL_MS = 15 * 60 * 1000;
+let permsEnsuredAt = 0;
+let permsEnsurePromise = null;
+
+async function ensurePermissionsCatalog(prisma, opts) {
+  const force = !!(opts && opts.force);
+  const names = PERMISSION_CATALOG.map((p) => p.name);
+  if (!prisma) return { names, refreshed: false };
+  const now = Date.now();
+  if (!force && permsEnsuredAt && now - permsEnsuredAt < PERMS_TTL_MS) {
+    return { names, refreshed: false };
   }
+  if (!force && permsEnsurePromise) return permsEnsurePromise;
 
-  const roles = await prisma.role.findMany();
-  const perms = await prisma.permission.findMany();
-  const roleByName = Object.fromEntries(roles.map((r) => [r.name, r]));
-  const permByName = Object.fromEntries(perms.map((p) => [p.name, p]));
+  permsEnsurePromise = (async () => {
+    try {
+      // Parallel upserts — เดิมทำทีละตัวทำให้ Admin ช้ามาก
+      await Promise.all(
+        PERMISSION_CATALOG.map((p) =>
+          prisma.permission.upsert({
+            where: { name: p.name },
+            update: { description: p.description },
+            create: { name: p.name, description: p.description }
+          })
+        )
+      );
 
-  for (const [roleName, permNames] of Object.entries(ROLE_DEFAULT_PERMS)) {
-    const role = roleByName[roleName];
-    if (!role) continue;
-    for (const permName of permNames) {
-      const permission = permByName[permName];
-      if (!permission) continue;
-      await prisma.rolePermission.upsert({
-        where: {
-          roleId_permissionId: {
-            roleId: role.id,
-            permissionId: permission.id
-          }
-        },
-        update: {},
-        create: { roleId: role.id, permissionId: permission.id }
-      });
+      const [roles, perms] = await Promise.all([
+        prisma.role.findMany(),
+        prisma.permission.findMany()
+      ]);
+      const roleByName = Object.fromEntries(roles.map((r) => [r.name, r]));
+      const permByName = Object.fromEntries(perms.map((p) => [p.name, p]));
+
+      const rolePermJobs = [];
+      for (const [roleName, permNames] of Object.entries(ROLE_DEFAULT_PERMS)) {
+        const role = roleByName[roleName];
+        if (!role) continue;
+        for (const permName of permNames) {
+          const permission = permByName[permName];
+          if (!permission) continue;
+          rolePermJobs.push(
+            prisma.rolePermission.upsert({
+              where: {
+                roleId_permissionId: {
+                  roleId: role.id,
+                  permissionId: permission.id
+                }
+              },
+              update: {},
+              create: { roleId: role.id, permissionId: permission.id }
+            })
+          );
+        }
+      }
+      if (rolePermJobs.length) await Promise.all(rolePermJobs);
+
+      permsEnsuredAt = Date.now();
+      return { names, refreshed: true };
+    } finally {
+      permsEnsurePromise = null;
     }
-  }
+  })();
 
-  return PERMISSION_CATALOG.map((p) => p.name);
+  return permsEnsurePromise;
 }
 
 function enrichPermission(row) {

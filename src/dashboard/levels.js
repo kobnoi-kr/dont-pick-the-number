@@ -100,6 +100,7 @@ async function ensureLevelConfig(prisma) {
   }
   try {
     const { syncLevelTitleCosmetics } = require("./cosmetics");
+    // Cached inside sync — ไม่ upsert ยศทุกครั้งที่เปิดหน้า
     await syncLevelTitleCosmetics(prisma, value.levels);
   } catch {
     /* ignore */
@@ -304,7 +305,7 @@ async function handleAdminLevelsApi(req, res, pathname) {
     });
     try {
       const { syncLevelTitleCosmetics } = require("./cosmetics");
-      await syncLevelTitleCosmetics(prisma, config.levels);
+      await syncLevelTitleCosmetics(prisma, config.levels, { force: true });
     } catch {
       /* ignore */
     }

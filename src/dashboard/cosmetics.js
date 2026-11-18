@@ -190,21 +190,43 @@ function equippedBundle(user) {
   };
 }
 
-async function ensureCosmeticsCatalog(prisma) {
-  for (const item of STARTER_COSMETICS) {
-    await prisma.cosmetic.upsert({
-      where: { id: item.id },
-      update: {
-        kind: item.kind,
-        name: item.name,
-        description: item.description,
-        shopPrice: item.shopPrice,
-        cssClass: item.cssClass,
-        meta: item.meta
-      },
-      create: item
-    });
-  }
+const COSMETICS_TTL_MS = 15 * 60 * 1000;
+let cosmeticsEnsuredAt = 0;
+let cosmeticsEnsurePromise = null;
+let levelTitlesSyncHash = "";
+let levelTitlesSyncPromise = null;
+
+async function ensureCosmeticsCatalog(prisma, opts) {
+  const force = !!(opts && opts.force);
+  if (!prisma) return;
+  const now = Date.now();
+  if (!force && cosmeticsEnsuredAt && now - cosmeticsEnsuredAt < COSMETICS_TTL_MS) return;
+  if (!force && cosmeticsEnsurePromise) return cosmeticsEnsurePromise;
+
+  cosmeticsEnsurePromise = (async () => {
+    try {
+      await Promise.all(
+        STARTER_COSMETICS.map((item) =>
+          prisma.cosmetic.upsert({
+            where: { id: item.id },
+            update: {
+              kind: item.kind,
+              name: item.name,
+              description: item.description,
+              shopPrice: item.shopPrice,
+              cssClass: item.cssClass,
+              meta: item.meta
+            },
+            create: item
+          })
+        )
+      );
+      cosmeticsEnsuredAt = Date.now();
+    } finally {
+      cosmeticsEnsurePromise = null;
+    }
+  })();
+  return cosmeticsEnsurePromise;
 }
 
 async function grantCosmetic(prisma, userId, cosmeticId, source) {
@@ -220,43 +242,73 @@ function levelTitleCosmeticId(level) {
 }
 
 /** Upsert level-title cosmetics from Level config. Never deletes old titles. */
-async function syncLevelTitleCosmetics(prisma, levels) {
+async function syncLevelTitleCosmetics(prisma, levels, opts) {
+  const force = !!(opts && opts.force);
   const list = Array.isArray(levels) ? levels : [];
-  for (const row of list) {
-    const level = Number(row && row.level) || 0;
-    if (level < 1) continue;
-    const id = levelTitleCosmeticId(level);
-    const name = String((row && row.title) || "Level " + level).trim().slice(0, 64) || "Level " + level;
-    const color = String((row && row.color) || "#94a3b8");
-    const item = {
-      id,
-      kind: "title",
-      name,
-      description: "ยศเลเวล " + level + " (เก็บได้ถาวร)",
-      shopPrice: null,
-      cssClass: "title-level-" + level,
-      meta: { color, level, source: "level" }
-    };
-    await prisma.cosmetic.upsert({
-      where: { id },
-      update: {
-        kind: item.kind,
-        name: item.name,
-        description: item.description,
-        cssClass: item.cssClass,
-        meta: item.meta
-      },
-      create: item
-    });
-  }
+  const hash = JSON.stringify(
+    list.map((row) => [Number(row && row.level) || 0, String((row && row.title) || ""), String((row && row.color) || "")])
+  );
+  if (!force && hash && hash === levelTitlesSyncHash) return;
+  if (!force && levelTitlesSyncPromise) return levelTitlesSyncPromise;
+
+  levelTitlesSyncPromise = (async () => {
+    try {
+      const jobs = [];
+      for (const row of list) {
+        const level = Number(row && row.level) || 0;
+        if (level < 1) continue;
+        const id = levelTitleCosmeticId(level);
+        const name =
+          String((row && row.title) || "Level " + level).trim().slice(0, 64) || "Level " + level;
+        const color = String((row && row.color) || "#94a3b8");
+        const item = {
+          id,
+          kind: "title",
+          name,
+          description: "ยศเลเวล " + level + " (เก็บได้ถาวร)",
+          shopPrice: null,
+          cssClass: "title-level-" + level,
+          meta: { color, level, source: "level" }
+        };
+        jobs.push(
+          prisma.cosmetic.upsert({
+            where: { id },
+            update: {
+              kind: item.kind,
+              name: item.name,
+              description: item.description,
+              cssClass: item.cssClass,
+              meta: item.meta
+            },
+            create: item
+          })
+        );
+      }
+      if (jobs.length) await Promise.all(jobs);
+      levelTitlesSyncHash = hash;
+    } finally {
+      levelTitlesSyncPromise = null;
+    }
+  })();
+  return levelTitlesSyncPromise;
 }
 
 /** Grant every unlocked level title up to current level — keeps forever. */
 async function grantLevelTitlesUpTo(prisma, userId, level) {
   const max = Math.max(0, Number(level) || 0);
+  if (max < 1) return;
+  const owned = await prisma.userCosmetic.findMany({
+    where: { userId, cosmeticId: { startsWith: "title.level." } },
+    select: { cosmeticId: true }
+  });
+  const have = new Set(owned.map((row) => row.cosmeticId));
+  const missing = [];
   for (let lv = 1; lv <= max; lv++) {
-    await grantCosmetic(prisma, userId, levelTitleCosmeticId(lv), "level");
+    const id = levelTitleCosmeticId(lv);
+    if (!have.has(id)) missing.push(id);
   }
+  if (!missing.length) return;
+  await Promise.all(missing.map((id) => grantCosmetic(prisma, userId, id, "level")));
 }
 
 async function ensureLevelOneTitleCosmetic(prisma) {

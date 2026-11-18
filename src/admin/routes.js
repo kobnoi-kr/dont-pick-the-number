@@ -920,7 +920,7 @@ async function handleAdminApi(req, res, pathname) {
       return true;
     }
     const { ensurePermissionsCatalog, enrichPermission, GROUP_LABELS } = require("./permissions-catalog");
-    await ensurePermissionsCatalog(prisma);
+    await ensurePermissionsCatalog(prisma, { force: true });
     const roles = await prisma.role.findMany({
       include: {
         rolePermissions: { include: { permission: true } },
@@ -1453,26 +1453,31 @@ async function handleAdminApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
+    let refreshed = false;
     try {
       const { ensurePermissionsCatalog } = require("./permissions-catalog");
-      await ensurePermissionsCatalog(prisma);
+      const result = await ensurePermissionsCatalog(prisma);
+      refreshed = !!(result && result.refreshed);
     } catch {
       /* ignore */
     }
-    // Re-load roles/permissions after catalog sync so new perms appear immediately.
-    const fresh = await prisma.user.findUnique({
-      where: { id: auth.user.id },
-      include: {
-        userRoles: {
-          include: {
-            role: {
-              include: { rolePermissions: { include: { permission: true } } }
+    // Reload user only when catalog actually changed (ปกติแคช hit = เร็ว)
+    let meUser = auth.user;
+    if (refreshed) {
+      const fresh = await prisma.user.findUnique({
+        where: { id: auth.user.id },
+        include: {
+          userRoles: {
+            include: {
+              role: {
+                include: { rolePermissions: { include: { permission: true } } }
+              }
             }
           }
         }
-      }
-    });
-    const meUser = fresh || auth.user;
+      });
+      if (fresh) meUser = fresh;
+    }
     sendJson(res, 200, {
       user: publicUser(meUser),
       permissions: permissionsOf(meUser)

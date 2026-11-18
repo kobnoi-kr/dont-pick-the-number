@@ -215,7 +215,7 @@ async function boot() {
     location.href = "/login?next=/admin";
     return;
   }
-  // Prefer permissions from admin/me if available
+  // Prefer permissions from admin/me if available (cached on server now)
   const adminMe = await api("/api/v1/admin/me", { method: "GET" });
   if (adminMe.res.ok && adminMe.data && adminMe.data.user) {
     state.user = Object.assign({}, adminMe.data.user, {
@@ -226,8 +226,9 @@ async function boot() {
   }
   paintUser(state.user);
   wireShell();
-  await showView(location.hash.replace(/^#/, "") || "overview");
-  await refreshInboxBadge();
+  // โหลดหน้า + inbox พร้อมกัน ลดเวลารอ Admin
+  const view = location.hash.replace(/^#/, "") || "overview";
+  await Promise.all([showView(view), refreshInboxBadge()]);
   setInterval(() => {
     refreshInboxBadge().catch(() => {});
   }, 30000);
