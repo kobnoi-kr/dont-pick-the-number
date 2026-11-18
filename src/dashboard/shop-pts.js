@@ -32,7 +32,11 @@ async function loadShopPtsConfig(prisma) {
   if (!prisma) return normalizeShopPtsConfig(DEFAULT_SHOP_PTS);
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: "shop_pts" } });
-    return normalizeShopPtsConfig(row && row.value);
+    if (!row) {
+      // First boot: persist defaults so admin UI + player shop stay in sync (enabled).
+      return saveShopPtsConfig(prisma, DEFAULT_SHOP_PTS);
+    }
+    return normalizeShopPtsConfig(row.value);
   } catch {
     return normalizeShopPtsConfig(DEFAULT_SHOP_PTS);
   }

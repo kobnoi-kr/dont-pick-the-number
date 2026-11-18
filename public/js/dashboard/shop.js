@@ -155,9 +155,15 @@ export async function renderShop(root, { user } = {}) {
     paintBalance();
 
     if (!enabled) {
+      const isAdmin = !!(user && (user.role === "SUPER_ADMIN" || user.role === "ADMIN"));
       body.innerHTML = `<div class="card shop-soon">
         <h3 style="margin-top:0">Shop ปิดชั่วคราว</h3>
         <p class="muted" style="margin:0">แอดมินยังไม่เปิดขาย — กลับมาดูใหม่ภายหลัง</p>
+        ${
+          isAdmin
+            ? `<p class="tiny" style="margin:12px 0 0">เปิดได้ที่ <a href="/admin#shop">Admin → Shop</a> แล้วกด「เปิด Shop ตอนนี้」หรือติ๊ก「เปิดระบบ Shop / ให้ pts」แล้วบันทึก</p>`
+            : ""
+        }
       </div>`;
       return;
     }

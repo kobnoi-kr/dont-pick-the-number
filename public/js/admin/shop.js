@@ -185,7 +185,20 @@ export async function renderShopAdmin(root, { user }) {
           <h2 style="margin:0">Shop · กรอบ / เอฟเฟกต์</h2>
           <p class="muted" style="margin:6px 0 0">เพิ่มของลง Shop ได้ทั้งสไตล์ CSS และรูป/GIF — ของที่ตั้งราคาจะโชว์ในแคตตาล็อกผู้เล่น</p>
         </div>
+        <div class="status-pill ${ptsCfg.enabled ? "ok" : "warn"}" style="font-size:0.95rem;padding:6px 12px">
+          ${ptsCfg.enabled ? "Shop ผู้เล่นเปิดอยู่" : "Shop ผู้เล่นปิดอยู่"}
+        </div>
       </section>
+
+      ${
+        ptsCfg.enabled
+          ? ""
+          : `<div class="card" style="margin-bottom:14px;border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.08)">
+              <h3 style="margin-top:0">Shop ยังไม่โชว์ให้ผู้เล่น</h3>
+              <p class="muted" style="margin:0 0 12px">มีสินค้าในระบบแล้ว แต่สวิตช์เปิดขายยังปิด — กดปุ่มด้านล่างเพื่อเปิดที่ /app#shop</p>
+              <button type="button" class="btn" id="shopOpenNowBtn">เปิด Shop ตอนนี้</button>
+            </div>`
+      }
 
       <div class="card">
         <h3 style="margin-top:0">ตั้งค่ารางวัล pts</h3>
@@ -386,27 +399,46 @@ export async function renderShopAdmin(root, { user }) {
       setMsg("รีเฟรชแล้ว", true);
     };
 
+    async function savePtsConfig(payload, okText) {
+      const { res, data } = await api("/api/v1/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ settings: { shop_pts: payload } })
+      });
+      if (!res.ok) {
+        setMsg(((data && data.error) || "บันทึกตั้งค่า pts ไม่สำเร็จ") + "", false);
+        return false;
+      }
+      ptsCfg = payload;
+      msg = okText || "บันทึกตั้งค่า pts แล้ว";
+      msgOk = true;
+      paint();
+      return true;
+    }
+
+    function readPtsForm(enabledOverride) {
+      return {
+        enabled:
+          enabledOverride != null
+            ? !!enabledOverride
+            : !!(root.querySelector("#ptsEnabled") && root.querySelector("#ptsEnabled").checked),
+        baseWin: Number(root.querySelector("#ptsBase") && root.querySelector("#ptsBase").value),
+        perHumanOpponent: Number(root.querySelector("#ptsPer") && root.querySelector("#ptsPer").value),
+        maxBonusHumans: Number(
+          root.querySelector("#ptsMaxHumans") && root.querySelector("#ptsMaxHumans").value
+        )
+      };
+    }
+
     const ptsSave = root.querySelector("#ptsSaveBtn");
     if (ptsSave) {
       ptsSave.onclick = async () => {
-        const payload = {
-          enabled: !!(root.querySelector("#ptsEnabled") && root.querySelector("#ptsEnabled").checked),
-          baseWin: Number(root.querySelector("#ptsBase") && root.querySelector("#ptsBase").value),
-          perHumanOpponent: Number(root.querySelector("#ptsPer") && root.querySelector("#ptsPer").value),
-          maxBonusHumans: Number(
-            root.querySelector("#ptsMaxHumans") && root.querySelector("#ptsMaxHumans").value
-          )
-        };
-        const { res } = await api("/api/v1/admin/settings", {
-          method: "PATCH",
-          body: JSON.stringify({ settings: { shop_pts: payload } })
-        });
-        if (!res.ok) {
-          setMsg("บันทึกตั้งค่า pts ไม่สำเร็จ", false);
-          return;
-        }
-        ptsCfg = payload;
-        setMsg("บันทึกตั้งค่า pts แล้ว", true);
+        await savePtsConfig(readPtsForm(), "บันทึกตั้งค่า pts แล้ว");
+      };
+    }
+    const openNow = root.querySelector("#shopOpenNowBtn");
+    if (openNow) {
+      openNow.onclick = async () => {
+        await savePtsConfig(readPtsForm(true), "เปิด Shop แล้ว — รีเฟรช /app#shop ได้เลย");
       };
     }
 
