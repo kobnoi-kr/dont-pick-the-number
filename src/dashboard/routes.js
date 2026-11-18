@@ -237,22 +237,28 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     const user = await optionalUser(req);
-    const stats = user ? await statsForUser(user.id) : emptyStats();
     let roomsCreated = 0;
     let lastGame = null;
+    let stats = emptyStats();
     if (user && authEnabled()) {
       const prisma = await getPrisma();
-      const hosted = await prisma.game.findMany({
-        where: { metadata: { path: ["hostUserId"], equals: user.id } },
-        select: { id: true },
-        take: 500
-      }).catch(() => []);
-      roomsCreated = hosted.length;
-      const latest = await prisma.gamePlayer.findFirst({
-        where: { userId: user.id },
-        orderBy: { game: { endedAt: "desc" } },
-        include: { game: true }
-      }).catch(() => null);
+      const [statsRow, hostedCount, latest] = await Promise.all([
+        statsForUser(user.id),
+        prisma.game
+          .count({
+            where: { metadata: { path: ["hostUserId"], equals: user.id } }
+          })
+          .catch(() => 0),
+        prisma.gamePlayer
+          .findFirst({
+            where: { userId: user.id },
+            orderBy: { game: { endedAt: "desc" } },
+            include: { game: true }
+          })
+          .catch(() => null)
+      ]);
+      stats = statsRow;
+      roomsCreated = Number(hostedCount) || 0;
       if (latest && latest.game) {
         lastGame = {
           roomName: latest.game.roomName,

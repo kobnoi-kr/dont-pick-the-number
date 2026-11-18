@@ -344,26 +344,55 @@ async function ensureLevelOneTitleCosmetic(prisma) {
 }
 
 async function ensureStarterCosmetics(prisma, userId) {
-  // Level 1 title is the real starter rank — avoid a second "มือใหม่" from title.rookie.
-  await ensureLevelOneTitleCosmetic(prisma);
-  await grantCosmetic(prisma, userId, levelTitleCosmeticId(1), "level");
-  await grantCosmetic(prisma, userId, "frame.basic", "starter");
-  await grantCosmetic(prisma, userId, "effect.none", "starter");
-  try {
-    await prisma.userCosmetic.deleteMany({
-      where: { userId, cosmeticId: "title.rookie" }
-    });
-  } catch {
-    /* ignore */
-  }
+  const level1 = levelTitleCosmeticId(1);
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { equippedTitleId: true, equippedFrameId: true, equippedEffectId: true }
+    select: {
+      equippedTitleId: true,
+      equippedFrameId: true,
+      equippedEffectId: true,
+      cosmetics: {
+        where: { cosmeticId: { in: [level1, "frame.basic", "effect.none", "title.rookie"] } },
+        select: { cosmeticId: true }
+      }
+    }
   });
   if (!user) return;
+
+  const have = new Set((user.cosmetics || []).map((row) => row.cosmeticId));
+  const needsLevel1 = !have.has(level1);
+  const needsFrame = !have.has("frame.basic");
+  const needsEffect = !have.has("effect.none");
+  const hasRookie = have.has("title.rookie");
+  const needsEquipFix =
+    !user.equippedTitleId ||
+    user.equippedTitleId === "title.rookie" ||
+    !user.equippedFrameId ||
+    !user.equippedEffectId;
+
+  // Fast path: ของเริ่มต้นครบและสวมถูกต้องแล้ว
+  if (!needsLevel1 && !needsFrame && !needsEffect && !hasRookie && !needsEquipFix) return;
+
+  await ensureLevelOneTitleCosmetic(prisma);
+  const grants = [];
+  if (needsLevel1) grants.push(grantCosmetic(prisma, userId, level1, "level"));
+  if (needsFrame) grants.push(grantCosmetic(prisma, userId, "frame.basic", "starter"));
+  if (needsEffect) grants.push(grantCosmetic(prisma, userId, "effect.none", "starter"));
+  if (grants.length) await Promise.all(grants);
+
+  if (hasRookie) {
+    try {
+      await prisma.userCosmetic.deleteMany({
+        where: { userId, cosmeticId: "title.rookie" }
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   const data = {};
   if (!user.equippedTitleId || user.equippedTitleId === "title.rookie") {
-    data.equippedTitleId = levelTitleCosmeticId(1);
+    data.equippedTitleId = level1;
   }
   if (!user.equippedFrameId) data.equippedFrameId = "frame.basic";
   if (!user.equippedEffectId) data.equippedEffectId = "effect.none";
@@ -386,23 +415,24 @@ async function loadUserCosmetics(prisma, userId) {
     select: { level: true }
   });
   const level = Math.max(1, (userLite && userLite.level) || 1);
-  await grantLevelTitlesUpTo(prisma, userId, level);
-  await ensureStarterCosmetics(prisma, userId);
-  const owned = await prisma.userCosmetic.findMany({
-    where: { userId },
-    include: { cosmetic: true },
-    orderBy: { acquiredAt: "desc" }
-  });
+  await Promise.all([
+    grantLevelTitlesUpTo(prisma, userId, level),
+    ensureStarterCosmetics(prisma, userId)
+  ]);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       equippedTitle: true,
       equippedFrame: true,
-      equippedEffect: true
+      equippedEffect: true,
+      cosmetics: {
+        include: { cosmetic: true },
+        orderBy: { acquiredAt: "desc" }
+      }
     }
   });
   // Hide legacy starter title so inventory never shows duplicate มือใหม่.
-  const ownedPublic = owned
+  const ownedPublic = ((user && user.cosmetics) || [])
     .filter((row) => row.cosmetic && row.cosmetic.id !== "title.rookie")
     .map((row) => ({
       ...publicCosmetic(row.cosmetic),

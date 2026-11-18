@@ -8,7 +8,7 @@ function modeLabel(mode) {
   return mode === "wheel" ? "วงล้อ" : "หาเลข";
 }
 
-export async function renderOverview(root, { user, openCreate, openRooms }) {
+export async function renderOverview(root, { user, openCreate, openRooms, summaryData }) {
   const name = (user && (user.displayName || user.username)) || "Player";
   const guest = !user || user.accountType === "guest";
   root.innerHTML = `
@@ -61,9 +61,18 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
     location.hash = "#library";
   };
 
-  const summary = await api("/api/v1/dashboard/summary", { method: "GET" });
-  const stats = (summary.data && summary.data.stats) || {};
-  const lastGame = summary.data && summary.data.lastGame;
+  const [summaryRes, lbRes, actRes] = await Promise.all([
+    summaryData
+      ? Promise.resolve({ res: { ok: true }, data: summaryData })
+      : api("/api/v1/dashboard/summary", { method: "GET" }),
+    guest
+      ? Promise.resolve({ res: { ok: true }, data: { rows: [] } })
+      : api("/api/v1/leaderboard/weekly?sort=points&limit=3", { method: "GET" }),
+    api("/api/v1/dashboard/activity", { method: "GET" })
+  ]);
+
+  const stats = (summaryRes.data && summaryRes.data.stats) || {};
+  const lastGame = summaryRes.data && summaryRes.data.lastGame;
   root.querySelector("#ovStats").innerHTML = `
     <div class="stat"><div class="label">เกมที่เล่น</div><div class="value">${stats.totalGames || 0}</div></div>
     <div class="stat"><div class="label">ชั่วโมงเล่น</div><div class="value">${stats.playHours != null ? stats.playHours : Math.round(((stats.playTimeSec || 0) / 3600) * 10) / 10}</div></div>
@@ -139,7 +148,7 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
       if (cdWrap) cdWrap.classList.add("hidden");
       topBox.innerHTML = `<div class="empty">เข้าสู่ระบบเพื่อดู Ranking</div>`;
     } else {
-      const lb = await api("/api/v1/leaderboard/weekly?sort=points&limit=3", { method: "GET" });
+      const lb = lbRes;
       const rows = (lb.data && lb.data.rows) || [];
       if (lb.data && lb.data.resetsAt && cdWrap) {
         const resetsAtMs = new Date(lb.data.resetsAt).getTime();
@@ -179,8 +188,7 @@ export async function renderOverview(root, { user, openCreate, openRooms }) {
     }
   }
 
-  const act = await api("/api/v1/dashboard/activity", { method: "GET" });
-  const items = (act.data && act.data.items) || [];
+  const items = (actRes.data && actRes.data.items) || [];
   const box = root.querySelector("#ovActivity");
   if (!items.length) {
     box.innerHTML = `<div class="empty">ประวัติจะโชว์หลังจบเกมแรก</div>`;

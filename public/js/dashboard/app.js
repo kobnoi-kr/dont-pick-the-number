@@ -125,11 +125,14 @@ async function navigate(view) {
     openCreate: openCreateModal,
     openRooms: () => navigate("rooms"),
     favoriteMode: state.favoriteMode || localStorage.getItem("nv-last-game"),
+    summaryData: state.view === "overview" ? state.summaryData : null,
     onSaved: (user) => {
       state.user = user;
       paintUser(user);
     }
   };
+  // summary ใช้ได้รอบแรกเท่านั้น กันข้อมูลค้าง
+  if (state.view === "overview" && state.summaryData) state.summaryData = null;
   if (state.view === "overview") await renderOverview(root, ctx);
   else if (state.view === "library") await renderLibrary(root, ctx);
   else if (state.view === "rooms") await renderRooms(root, ctx);
@@ -203,6 +206,7 @@ onDashboardMessage((msg) => {
 });
 
 (async function boot() {
+  let summaryData = null;
   try {
     const data = await ensureGuest();
     state.user = data.user || data;
@@ -211,13 +215,6 @@ onDashboardMessage((msg) => {
     if (state.user && state.user.id) localStorage.setItem("dpn-token", state.user.id);
     if (state.user && (state.user.displayName || state.user.username)) {
       localStorage.setItem("dpn-name", state.user.displayName || state.user.username);
-    }
-    const summary = await api("/api/v1/dashboard/summary", { method: "GET" });
-    if (summary.data && summary.data.stats && summary.data.stats.favoriteMode) {
-      state.favoriteMode = summary.data.stats.favoriteMode;
-    }
-    if (summary.data && summary.data.user && summary.data.user.roles) {
-      state.user = Object.assign({}, state.user, { roles: summary.data.user.roles });
     }
     paintUser(state.user);
   } catch (err) {
@@ -241,19 +238,30 @@ onDashboardMessage((msg) => {
     /* ignore */
   }
 
-  const gate = await enforceMaintenanceGate({ hardBlock: true });
-  if (gate.blocked) return;
+  // โหลดขนาน: summary + maintenance + active room
+  const [summary, gate, active] = await Promise.all([
+    api("/api/v1/dashboard/summary", { method: "GET" }).catch(() => ({ res: { ok: false }, data: null })),
+    enforceMaintenanceGate({ hardBlock: true }),
+    api("/api/v1/rooms/active", { method: "GET" }).catch(() => ({ res: { ok: false }, data: null }))
+  ]);
 
-  // If still seated in a live game, bounce straight back in (scores kept server-side).
-  try {
-    const active = await api("/api/v1/rooms/active", { method: "GET" });
-    const seat = active.data && active.data.active;
-    if (seat && seat.code && seat.phase !== "over") {
-      location.replace(playUrl({ code: seat.code, name: localStorage.getItem("dpn-name") || "" }));
-      return;
+  if (summary && summary.data) {
+    summaryData = summary.data;
+    if (summary.data.stats && summary.data.stats.favoriteMode) {
+      state.favoriteMode = summary.data.stats.favoriteMode;
     }
-  } catch {
-    /* ignore */
+    if (summary.data.user && summary.data.user.roles) {
+      state.user = Object.assign({}, state.user || {}, { roles: summary.data.user.roles });
+      paintUser(state.user);
+    }
+  }
+
+  if (gate && gate.blocked) return;
+
+  const seat = active && active.data && active.data.active;
+  if (seat && seat.code && seat.phase !== "over") {
+    location.replace(playUrl({ code: seat.code, name: localStorage.getItem("dpn-name") || "" }));
+    return;
   }
 
   wireNotifications();
@@ -267,5 +275,6 @@ onDashboardMessage((msg) => {
     openCreateModal({ cat: q.get("cat") || "secret", lockCat: !!q.get("cat") });
   }
   const initial = (location.hash || "#overview").replace(/^#/, "") || "overview";
+  state.summaryData = summaryData;
   await navigate(initial);
 })();
