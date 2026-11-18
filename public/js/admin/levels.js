@@ -46,11 +46,14 @@ export async function renderLevels(root, { user }) {
           <h3 style="margin:0">ตารางเลเวล / ยศ</h3>
           ${
             canManage
-              ? `<button type="button" class="btn ghost sm" id="lvAdd">+ เพิ่มเลเวล</button>`
+              ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+                   <button type="button" class="btn ghost sm" id="lvPack100">ใช้ชุดยศ 100 ขั้น</button>
+                   <button type="button" class="btn ghost sm" id="lvAdd">+ เพิ่มเลเวล</button>
+                 </div>`
               : ""
           }
         </div>
-        <p class="tiny muted">EXP = EXP รวมที่ต้องมีถึงถึงเลเวลนั้น (เลเวลแรกต้องเป็น 0)</p>
+        <p class="tiny muted">EXP = EXP รวมถึงเลเวลนั้น (เลเวลแรก = 0) · ยศทั่วไปใช้ชื่อ + I/II/III · Lv.100 = NUMVERSE Elite</p>
         <div class="level-admin-table" id="lvRows"></div>
       </div>
 
@@ -69,7 +72,7 @@ export async function renderLevels(root, { user }) {
       .map((row, i) => {
         return `<div class="level-admin-row" data-i="${i}">
           <label>Lv
-            <input class="input" data-f="level" type="number" min="1" max="99" value="${Number(row.level) || i + 1}" ${canManage ? "" : "disabled"}>
+            <input class="input" data-f="level" type="number" min="1" max="100" value="${Number(row.level) || i + 1}" ${canManage ? "" : "disabled"}>
           </label>
           <label>EXP รวม
             <input class="input" data-f="exp" type="number" min="0" value="${Number(row.exp) || 0}" ${canManage ? "" : "disabled"}>
@@ -131,12 +134,46 @@ export async function renderLevels(root, { user }) {
         paint();
       };
     });
+    const packBtn = root.querySelector("#lvPack100");
+    if (packBtn) {
+      packBtn.onclick = async () => {
+        if (!confirm("แทนที่ตารางยศด้วยชุดมาตรฐาน 100 ขั้น (I/II/III · Lv.100 = NUMVERSE Elite)?")) return;
+        const cfgRes = await api("/api/v1/levels/config", { method: "GET" });
+        // Prefer server default via PUT of known pack from a tiny inline rebuild matching server.
+        const ROMANS = ["I", "II", "III"];
+        const BASES = [
+          "มือใหม่","ผู้ฝึกหัด","นักสำรวจ","นักแข่ง","นักกลยุทธ์","นักล่าเลข","ผู้กล้า","นักรบ","มือโปร","อัศวิน",
+          "จ้าวสนาม","นักล่าชัย","แชมป์","ผู้พิชิต","วีรบุรุษ","มาสเตอร์","ปรมาจารย์","ตำนาน","มายา","เทพเกม",
+          "จักรพรรดิ","ทวยเทพ","มหาเทพ","อวตาร","นิรันดร์","จักรวาล","มิติ","อภิมหา","สุดยอด","แกรนด์มาสเตอร์",
+          "สุดขอบฟ้า","เหนือชั้น","อมตะ"
+        ];
+        const COLORS = [
+          "#94a3b8","#64748b","#60a5fa","#3b82f6","#22d3ee","#14b8a6","#34d399","#4ade80","#a3e635","#facc15",
+          "#fbbf24","#fb923c","#f97316","#a78bfa","#8b5cf6","#c084fc","#e879f9","#f472b6","#fb7185","#f43f5e",
+          "#ef4444","#f59e0b","#eab308","#84cc16","#10b981","#06b6d4","#0ea5e9","#6366f1","#8b5cf6","#d946ef",
+          "#ec4899","#f43f5e","#e2e8f0"
+        ];
+        const expFor = (L) => (L <= 1 ? 0 : Math.round(50 * Math.pow(L - 1, 1.45)));
+        const levels = [];
+        for (let i = 0; i < BASES.length; i++) {
+          for (let r = 0; r < 3; r++) {
+            const level = i * 3 + r + 1;
+            levels.push({ level, exp: expFor(level), title: BASES[i] + " " + ROMANS[r], color: COLORS[i % COLORS.length] });
+          }
+        }
+        levels.push({ level: 100, exp: expFor(100), title: "NUMVERSE Elite", color: "#38bdf8" });
+        syncFromDom();
+        config.levels = levels;
+        void cfgRes;
+        paint();
+      };
+    }
     root.querySelector("#lvAdd").onclick = () => {
       syncFromDom();
       const last = config.levels[config.levels.length - 1] || blankRow(1, 0);
-      config.levels.push(
-        blankRow((Number(last.level) || config.levels.length) + 1, (Number(last.exp) || 0) + 100)
-      );
+      const nextLv = Math.min(100, (Number(last.level) || config.levels.length) + 1);
+      if (config.levels.length >= 100 || nextLv > 100) return;
+      config.levels.push(blankRow(nextLv, (Number(last.exp) || 0) + 100));
       paint();
     };
     root.querySelector("#lvSave").onclick = async () => {

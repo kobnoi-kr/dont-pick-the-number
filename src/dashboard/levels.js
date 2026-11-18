@@ -4,21 +4,117 @@ const { sendJson, readJsonBody } = require("../auth/http");
 const { requireAuth } = require("../auth/middleware");
 const { getPrisma, authEnabled } = require("../db");
 
+/** 33 base names × I/II/III = Lv.1–99 · Lv.100 = NUMVERSE Elite */
+const RANK_BASE_TITLES = [
+  "มือใหม่",
+  "ผู้ฝึกหัด",
+  "นักสำรวจ",
+  "นักแข่ง",
+  "นักกลยุทธ์",
+  "นักล่าเลข",
+  "ผู้กล้า",
+  "นักรบ",
+  "มือโปร",
+  "อัศวิน",
+  "จ้าวสนาม",
+  "นักล่าชัย",
+  "แชมป์",
+  "ผู้พิชิต",
+  "วีรบุรุษ",
+  "มาสเตอร์",
+  "ปรมาจารย์",
+  "ตำนาน",
+  "มายา",
+  "เทพเกม",
+  "จักรพรรดิ",
+  "ทวยเทพ",
+  "มหาเทพ",
+  "อวตาร",
+  "นิรันดร์",
+  "จักรวาล",
+  "มิติ",
+  "อภิมหา",
+  "สุดยอด",
+  "แกรนด์มาสเตอร์",
+  "สุดขอบฟ้า",
+  "เหนือชั้น",
+  "อมตะ"
+];
+
+const RANK_ROMANS = ["I", "II", "III"];
+
+const RANK_PALETTE = [
+  "#94a3b8",
+  "#64748b",
+  "#60a5fa",
+  "#3b82f6",
+  "#22d3ee",
+  "#14b8a6",
+  "#34d399",
+  "#4ade80",
+  "#a3e635",
+  "#facc15",
+  "#fbbf24",
+  "#fb923c",
+  "#f97316",
+  "#a78bfa",
+  "#8b5cf6",
+  "#c084fc",
+  "#e879f9",
+  "#f472b6",
+  "#fb7185",
+  "#f43f5e",
+  "#ef4444",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#10b981",
+  "#06b6d4",
+  "#0ea5e9",
+  "#6366f1",
+  "#8b5cf6",
+  "#d946ef",
+  "#ec4899",
+  "#f43f5e",
+  "#e2e8f0" // อมตะ — Elite keeps brand cyan separately
+];
+
+function expForLevel(level) {
+  const L = Math.max(1, Number(level) || 1);
+  if (L <= 1) return 0;
+  // Gentle curve · ~Lv.100 ≈ 42k total EXP (≈1.0–1.4k matches at current rates)
+  return Math.round(50 * Math.pow(L - 1, 1.45));
+}
+
+function buildDefaultLevels() {
+  const levels = [];
+  for (let i = 0; i < RANK_BASE_TITLES.length; i++) {
+    const base = RANK_BASE_TITLES[i];
+    const color = RANK_PALETTE[i % RANK_PALETTE.length];
+    for (let r = 0; r < RANK_ROMANS.length; r++) {
+      const level = i * 3 + r + 1;
+      levels.push({
+        level,
+        exp: expForLevel(level),
+        title: base + " " + RANK_ROMANS[r],
+        color
+      });
+    }
+  }
+  // Lv.100 — unique capstone (no Roman numeral)
+  levels.push({
+    level: 100,
+    exp: expForLevel(100),
+    title: "NUMVERSE Elite",
+    color: "#38bdf8"
+  });
+  return levels;
+}
+
 const DEFAULT_LEVEL_CONFIG = {
   expWin: 40,
   expPlay: 15,
-  levels: [
-    { level: 1, exp: 0, title: "มือใหม่", color: "#94a3b8" },
-    { level: 2, exp: 100, title: "ผู้ฝึกหัด", color: "#60a5fa" },
-    { level: 3, exp: 250, title: "นักแข่ง", color: "#34d399" },
-    { level: 4, exp: 500, title: "มือโปร", color: "#a78bfa" },
-    { level: 5, exp: 900, title: "แชมป์", color: "#fbbf24" },
-    { level: 6, exp: 1500, title: "ตำนาน", color: "#f97316" },
-    { level: 7, exp: 2400, title: "มาสเตอร์", color: "#ef4444" },
-    { level: 8, exp: 3600, title: "แกรนด์มาสเตอร์", color: "#ec4899" },
-    { level: 9, exp: 5200, title: "ตำนานสูงสุด", color: "#e879f9" },
-    { level: 10, exp: 7500, title: "NUMVERSE Elite", color: "#38bdf8" }
-  ]
+  levels: buildDefaultLevels()
 };
 
 function method(req) {
@@ -45,19 +141,21 @@ function normalizeHexColor(raw, fallback) {
 
 function normalizeLevels(rows) {
   const list = Array.isArray(rows) ? rows : [];
+  const defaults = DEFAULT_LEVEL_CONFIG.levels;
   const cleaned = list
     .map((row, i) => {
-      const level = clampInt(row && row.level, 1, 99, i + 1);
+      const level = clampInt(row && row.level, 1, 100, i + 1);
       const exp = clampInt(row && row.exp, 0, 10_000_000, i === 0 ? 0 : i * 100);
       const title = String((row && row.title) || "Level " + level)
         .trim()
         .slice(0, 32);
-      const color = normalizeHexColor(row && row.color, DEFAULT_LEVEL_CONFIG.levels[Math.min(i, 9)].color);
+      const fallbackColor = defaults[Math.min(i, defaults.length - 1)].color;
+      const color = normalizeHexColor(row && row.color, fallbackColor);
       return { level, exp, title: title || "Level " + level, color };
     })
     .sort((a, b) => a.level - b.level || a.exp - b.exp);
 
-  if (!cleaned.length) return DEFAULT_LEVEL_CONFIG.levels.map((x) => ({ ...x }));
+  if (!cleaned.length) return defaults.map((x) => ({ ...x }));
 
   // Ensure first tier starts at 0 exp and levels are unique ascending.
   const out = [];
@@ -72,7 +170,7 @@ function normalizeLevels(rows) {
   for (let i = 1; i < out.length; i++) {
     if (out[i].exp <= out[i - 1].exp) out[i].exp = out[i - 1].exp + 1;
   }
-  return out.slice(0, 50);
+  return out.slice(0, 100);
 }
 
 function normalizeConfig(raw) {
@@ -90,11 +188,27 @@ async function loadLevelConfig(prisma) {
   return normalizeConfig(row && row.value);
 }
 
+function looksLikeLegacyTenTier(config) {
+  const levels = (config && config.levels) || [];
+  if (levels.length !== 10) return false;
+  const last = levels[levels.length - 1];
+  return Number(last && last.level) === 10 && String(last && last.title) === "NUMVERSE Elite";
+}
+
 async function ensureLevelConfig(prisma) {
   const existing = await prisma.systemSetting.findUnique({ where: { key: "level_config" } });
   let value;
-  if (existing) value = normalizeConfig(existing.value);
-  else {
+  if (existing) {
+    value = normalizeConfig(existing.value);
+    // Auto-upgrade the original 10-tier pack → 100 ranks (Elite at 100).
+    if (looksLikeLegacyTenTier(value)) {
+      value = normalizeConfig(DEFAULT_LEVEL_CONFIG);
+      await prisma.systemSetting.update({
+        where: { key: "level_config" },
+        data: { value }
+      });
+    }
+  } else {
     value = normalizeConfig(DEFAULT_LEVEL_CONFIG);
     await prisma.systemSetting.create({ data: { key: "level_config", value } });
   }
@@ -328,6 +442,8 @@ async function handleAdminLevelsApi(req, res, pathname) {
 
 module.exports = {
   DEFAULT_LEVEL_CONFIG,
+  RANK_BASE_TITLES,
+  buildDefaultLevels,
   normalizeConfig,
   loadLevelConfig,
   ensureLevelConfig,
