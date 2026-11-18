@@ -213,17 +213,11 @@ export async function renderShopAdmin(root, { user }) {
 
       <div class="card">
         <h3 style="margin-top:0">ตั้งค่ารางวัล pts</h3>
-        <p class="tiny muted" style="margin:0 0 10px">ชนะเกมได้ pts · ไม่นับบอท · เลือกโหมดสุ่มช่วง หรือสูตรตามจำนวนคนจริง</p>
-        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-          <label class="shop-flag" style="align-items:center">
+        <p class="tiny muted" style="margin:0 0 10px">ชนะเกมได้ pts สุ่มในช่วงที่ตั้ง · ไม่นับบอท</p>
+        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));max-width:420px">
+          <label class="shop-flag" style="align-items:center;grid-column:1/-1">
             <input type="checkbox" id="ptsEnabled" ${ptsCfg.enabled ? "checked" : ""}>
             เปิดระบบ Shop / ให้ pts
-          </label>
-          <label>โหมดรางวัล
-            <select class="input" id="ptsMode">
-              <option value="random"${ptsCfg.mode !== "formula" ? " selected" : ""}>สุ่มช่วง</option>
-              <option value="formula"${ptsCfg.mode === "formula" ? " selected" : ""}>สูตรตามคนจริง</option>
-            </select>
           </label>
           <label>สุ่มต่ำสุด
             <input class="input" id="ptsRandomMin" type="number" min="0" max="100000" step="1" value="${ptsCfg.randomMin}">
@@ -231,17 +225,7 @@ export async function renderShopAdmin(root, { user }) {
           <label>สุ่มสูงสุด
             <input class="input" id="ptsRandomMax" type="number" min="0" max="100000" step="1" value="${ptsCfg.randomMax}">
           </label>
-          <label>pts พื้นฐานเมื่อชนะ
-            <input class="input" id="ptsBase" type="number" min="0" max="100000" step="1" value="${ptsCfg.baseWin}">
-          </label>
-          <label>pts ต่อผู้เล่นจริงเพิ่ม
-            <input class="input" id="ptsPer" type="number" min="0" max="100000" step="1" value="${ptsCfg.perHumanOpponent}">
-          </label>
-          <label>โบนัสสูงสุด (คน)
-            <input class="input" id="ptsMaxHumans" type="number" min="0" max="32" step="1" value="${ptsCfg.maxBonusHumans}">
-          </label>
         </div>
-        <p class="tiny muted" style="margin:8px 0 0">โหมดสุ่มใช้แค่ต่ำสุด–สูงสุด · โหมดสูตรใช้ base / ต่อคน / เพดานคน</p>
         <div class="row-actions" style="margin-top:12px">
           <button type="button" class="btn sm" id="ptsSaveBtn">บันทึกตั้งค่า pts</button>
         </div>
@@ -440,20 +424,17 @@ export async function renderShopAdmin(root, { user }) {
     }
 
     function readPtsForm(enabledOverride) {
-      const modeEl = root.querySelector("#ptsMode");
       return {
         enabled:
           enabledOverride != null
             ? !!enabledOverride
             : !!(root.querySelector("#ptsEnabled") && root.querySelector("#ptsEnabled").checked),
-        mode: modeEl && modeEl.value === "formula" ? "formula" : "random",
+        mode: "random",
         randomMin: Number(root.querySelector("#ptsRandomMin") && root.querySelector("#ptsRandomMin").value),
         randomMax: Number(root.querySelector("#ptsRandomMax") && root.querySelector("#ptsRandomMax").value),
-        baseWin: Number(root.querySelector("#ptsBase") && root.querySelector("#ptsBase").value),
-        perHumanOpponent: Number(root.querySelector("#ptsPer") && root.querySelector("#ptsPer").value),
-        maxBonusHumans: Number(
-          root.querySelector("#ptsMaxHumans") && root.querySelector("#ptsMaxHumans").value
-        )
+        baseWin: ptsCfg.baseWin,
+        perHumanOpponent: ptsCfg.perHumanOpponent,
+        maxBonusHumans: ptsCfg.maxBonusHumans
       };
     }
 

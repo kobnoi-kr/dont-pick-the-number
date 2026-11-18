@@ -143,10 +143,10 @@ export async function renderProfile(root, { user, onSaved }) {
         </div>
         <div class="card">
           <h3>การแจ้งเตือน</h3>
-          <p class="tiny muted" style="margin:0 0 10px">เลือกว่าต้องการรับข้อความในกระดิ่ง / ป็อปอัปประเภทใด</p>
-          <form id="notifPrefForm" class="switch-stack">
+          <p class="tiny muted" style="margin:0 0 8px">เลือกรับข้อความในกระดิ่ง / ป็อปอัป</p>
+          <form id="notifPrefForm" class="switch-stack compact">
             <label class="switch-row">
-              <span>ได้ pts เมื่อชนะเกม</span>
+              <span>ได้ pts เมื่อชนะ</span>
               <input id="nfShopPts" type="checkbox" class="switch-input" ${notif.shop_pts !== false ? "checked" : ""}>
               <span class="switch-ui" aria-hidden="true"></span>
             </label>
@@ -161,7 +161,7 @@ export async function renderProfile(root, { user, onSaved }) {
               <span class="switch-ui" aria-hidden="true"></span>
             </label>
             <label class="switch-row">
-              <span>เชิญเข้าห้อง (ในกระดิ่ง)</span>
+              <span>เชิญเข้าห้อง</span>
               <input id="nfInvite" type="checkbox" class="switch-input" ${notif.room_invitation !== false ? "checked" : ""}>
               <span class="switch-ui" aria-hidden="true"></span>
             </label>
@@ -176,11 +176,11 @@ export async function renderProfile(root, { user, onSaved }) {
               <span class="switch-ui" aria-hidden="true"></span>
             </label>
             <label class="switch-row">
-              <span>ข้อความจากแอดมิน / ของรางวัลระบบ</span>
+              <span>แอดมิน / ของระบบ</span>
               <input id="nfAdmin" type="checkbox" class="switch-input" ${notif.admin !== false ? "checked" : ""}>
               <span class="switch-ui" aria-hidden="true"></span>
             </label>
-            <button class="btn ghost" type="submit">บันทึกการแจ้งเตือน</button>
+            <button class="btn ghost sm" type="submit" style="grid-column:1/-1">บันทึกการแจ้งเตือน</button>
           </form>
           <p class="msg" id="notifPrefMsg"></p>
         </div>
