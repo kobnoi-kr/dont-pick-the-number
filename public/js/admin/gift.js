@@ -2,7 +2,7 @@ import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
-const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.level.1", "title.rookie"]);
+const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.rookie"]);
 const RANKING_TITLE_IDS = new Set([
   "title.weekly.1",
   "title.weekly.2",
@@ -11,6 +11,15 @@ const RANKING_TITLE_IDS = new Set([
   "title.monthly.2",
   "title.monthly.3"
 ]);
+
+function isLevelTitleId(id) {
+  return String(id || "").startsWith("title.level.");
+}
+
+/** ของที่ดึงคืนไม่ได้: ยศเลเวลทั้งหมด + ของเริ่มต้น */
+function isRevokeProtected(id) {
+  return PROTECTED_IDS.has(id) || isLevelTitleId(id);
+}
 
 function itemColor(item) {
   if (!item) return "#94a3b8";
@@ -151,13 +160,13 @@ export async function renderGift(root, { user }) {
     const canAct =
       selectedUser &&
       selected &&
-      (mode === "gift" || !PROTECTED_IDS.has(selected.id));
+      (mode === "gift" || !isRevokeProtected(selected.id));
 
     root.innerHTML = `
       <section class="page-head">
         <div>
           <h2 style="margin:0">Gift</h2>
-          <p class="muted" style="margin:6px 0 0">มอบหรือดึงยศ · กรอบ · เอฟเฟกต์ แบบ manual</p>
+          <p class="muted" style="margin:6px 0 0">มอบหรือดึงยศ · กรอบ · เอฟเฟกต์ — ยศเลเวลดึงคืนไม่ได้</p>
         </div>
       </section>
 
@@ -256,7 +265,7 @@ export async function renderGift(root, { user }) {
                             extraIds.includes(it.id) ||
                             (equipped.frameId && equipped.frameId === it.id) ||
                             (equipped.effectId && equipped.effectId === it.id);
-                          const locked = mode === "revoke" && PROTECTED_IDS.has(it.id);
+                          const locked = mode === "revoke" && isRevokeProtected(it.id);
                           const lv = levelOf(it);
                           const kindLine = lv != null ? `ยศ · Lv.${lv}` : KIND_LABEL[it.kind] || it.kind;
                           return `<button type="button" class="gift-item-card${on ? " on" : ""}${
@@ -312,7 +321,7 @@ export async function renderGift(root, { user }) {
                  <input type="checkbox" id="giftAutoEquip">
                  <span>สวมให้อัตโนมัติหลังมอบ</span>
                </label>`
-            : `<p class="tiny muted" style="margin:10px 0 0">ของเริ่มต้น (กรอบเรียบ / ไม่มีเอฟเฟกต์ / ยศเลเวล 1) ดึงไม่ได้</p>`
+            : `<p class="tiny muted" style="margin:10px 0 0">ดึงได้: ยศตกแต่ง · กรอบ · เอฟเฟกต์ — ดึงไม่ได้: ยศเลเวลทั้งหมด · กรอบเรียบ · ไม่มีเอฟเฟกต์</p>`
         }
         <div class="row-actions" style="margin-top:14px">
           <button type="button" class="btn${mode === "revoke" ? " danger" : ""}" id="giftSend" ${
@@ -547,8 +556,11 @@ export async function renderGift(root, { user }) {
     if (sendBtn) {
       sendBtn.onclick = async () => {
         if (!selectedUser || !selectedCosmeticId) return;
-        if (mode === "revoke" && PROTECTED_IDS.has(selectedCosmeticId)) {
-          setMsg("ของเริ่มต้นดึงไม่ได้", false);
+        if (mode === "revoke" && isRevokeProtected(selectedCosmeticId)) {
+          setMsg(
+            isLevelTitleId(selectedCosmeticId) ? "ยศเลเวลดึงคืนไม่ได้" : "ของเริ่มต้นดึงไม่ได้",
+            false
+          );
           return;
         }
         sendBtn.disabled = true;
@@ -589,7 +601,11 @@ export async function renderGift(root, { user }) {
         if (!r.res.ok) {
           const err = (r.data && r.data.error) || "ดึงไม่สำเร็จ";
           setMsg(
-            err === "protected_cosmetic" ? "ของเริ่มต้นดึงไม่ได้" : err === "not_owned" ? "ผู้เล่นไม่มีของนี้" : err,
+            err === "protected_cosmetic"
+              ? "ของนี้ดึงคืนไม่ได้ (ยศเลเวล / ของเริ่มต้น)"
+              : err === "not_owned"
+                ? "ผู้เล่นไม่มีของนี้"
+                : err,
             false
           );
           return;

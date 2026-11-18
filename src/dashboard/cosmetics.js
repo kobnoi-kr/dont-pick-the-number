@@ -1884,9 +1884,12 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 400, { error: "invalid_input" });
       return true;
     }
-    // กันดึงของเริ่มต้นที่จำเป็น
-    const protectedIds = new Set(["frame.basic", "effect.none", "title.level.1"]);
-    if (protectedIds.has(cosmeticId) || cosmeticId === "title.rookie") {
+    // ดึงได้เฉพาะยศ/กรอบ/เอฟเฟกต์ที่ไม่ใช่ยศเลเวล + ของเริ่มต้น
+    if (
+      cosmeticId === "title.rookie" ||
+      isLevelTitleId(cosmeticId) ||
+      PROTECTED_COSMETIC_IDS.has(cosmeticId)
+    ) {
       sendJson(res, 400, { error: "protected_cosmetic" });
       return true;
     }
