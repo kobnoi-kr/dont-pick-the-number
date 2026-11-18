@@ -1,30 +1,16 @@
 /**
- * Server-driven Snake & Ladders board for /play (Phase 3–5).
- * Does not roll locally — parent calls update(state) after WS snaps.
+ * Server-driven Snake & Ladders board for /play.
+ * Board-game look; rolls come from WS snaps only.
  */
 
+import {
+  cellToGrid,
+  cellCenterPercent,
+  renderBoardPaths,
+  diceFaceHtml
+} from "./board-art.js";
+
 const TOKEN_COLORS = ["#5b9cf5", "#2dd4a8", "#f5c542", "#f07178", "#c084fc", "#fb923c"];
-
-function cellToGrid(cell, boardSize) {
-  const size = Number(boardSize) || 100;
-  const n = Number(cell);
-  if (!Number.isInteger(n) || n < 1 || n > size) return null;
-  const side = Math.round(Math.sqrt(size));
-  const idx = n - 1;
-  const rowFromBottom = Math.floor(idx / side);
-  const colInRow = idx % side;
-  const col = rowFromBottom % 2 === 0 ? colInRow : side - 1 - colInRow;
-  return { row: rowFromBottom, col, side };
-}
-
-function cellCenterPercent(cell, boardSize) {
-  const g = cellToGrid(cell, boardSize);
-  if (!g) return null;
-  return {
-    x: ((g.col + 0.5) / g.side) * 100,
-    y: ((g.side - 1 - g.row + 0.5) / g.side) * 100
-  };
-}
 
 function tokenOffset(index, total) {
   if (total <= 1) return { dx: 0, dy: 0 };
@@ -43,6 +29,7 @@ export function createLiveBoard(opts) {
     <div class="sl-live">
       <div class="sl-stage">
         <div class="sl-board-wrap">
+          <div class="sl-board-shadow" aria-hidden="true"></div>
           <div class="sl-board-frame">
             <div class="sl-board" data-el="board"></div>
             <svg class="sl-paths" data-el="paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -51,13 +38,14 @@ export function createLiveBoard(opts) {
         </div>
       </div>
       <aside class="sl-panel">
+        <div class="sl-panel-title">งูและบันได</div>
         <div class="sl-meta">
           <div>สถานะ: <strong data-el="status">—</strong></div>
           <div>ตา: <strong data-el="turn">—</strong></div>
         </div>
         <ul class="sl-players" data-el="players"></ul>
         <div class="sl-dice-block">
-          <div class="sl-dice" data-el="dice">—</div>
+          <div class="sl-dice" data-el="dice">${diceFaceHtml(null)}</div>
           <button type="button" class="sl-btn" data-el="roll">ทอยลูกเต๋า</button>
         </div>
         <div class="sl-banner" data-el="banner" role="status"></div>
@@ -125,38 +113,11 @@ export function createLiveBoard(opts) {
       }
       if (cell === size) {
         div.classList.add("is-goal");
-        div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WIN</span>`;
+        div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WINNER</span>`;
       }
       els.board.appendChild(div);
     }
-    const parts = [];
-    for (const lad of state.ladders || []) {
-      const a = cellCenterPercent(lad.start, size);
-      const b = cellCenterPercent(lad.end, size);
-      if (!a || !b) continue;
-      const mx = (a.x + b.x) / 2 + (a.x < b.x ? -3 : 3);
-      const my = (a.y + b.y) / 2;
-      parts.push(
-        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#8b5a2b" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>`,
-        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#d4a574" stroke-width="1.1" stroke-linecap="round" opacity="0.95"/>`,
-        `<circle cx="${a.x}" cy="${a.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`,
-        `<circle cx="${b.x}" cy="${b.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`
-      );
-    }
-    for (const sn of state.snakes || []) {
-      const a = cellCenterPercent(sn.start, size);
-      const b = cellCenterPercent(sn.end, size);
-      if (!a || !b) continue;
-      const mx = (a.x + b.x) / 2 + (a.x < b.x ? 7 : -7);
-      const my = (a.y + b.y) / 2;
-      parts.push(
-        `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#e11d48" stroke-width="2.8" stroke-linecap="round" opacity="0.95"/>`,
-        `<circle cx="${a.x}" cy="${a.y}" r="2.1" fill="#be123c"/>`,
-        `<circle cx="${a.x}" cy="${a.y}" r="0.55" fill="#fff" opacity="0.9"/>`,
-        `<circle cx="${b.x}" cy="${b.y}" r="1.5" fill="#9f1239"/>`
-      );
-    }
-    els.paths.innerHTML = parts.join("");
+    els.paths.innerHTML = renderBoardPaths(state.ladders, state.snakes, size);
     builtFor = `${size}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
   }
 
@@ -166,8 +127,10 @@ export function createLiveBoard(opts) {
     (players || []).forEach((p, i) => {
       const el = document.createElement("div");
       el.className = "sl-token";
-      el.style.background = TOKEN_COLORS[i % TOKEN_COLORS.length];
-      el.textContent = String((p.username || "?")[0]).toUpperCase();
+      el.style.setProperty("--token", TOKEN_COLORS[i % TOKEN_COLORS.length]);
+      el.innerHTML = `<span class="sl-token-glow"></span><span class="sl-token-face">${String(
+        (p.username || "?")[0]
+      ).toUpperCase()}</span>`;
       el.title = p.username || p.userId;
       els.tokens.appendChild(el);
       tokenEls.set(p.userId, el);
@@ -215,7 +178,6 @@ export function createLiveBoard(opts) {
 
   function pulseDice() {
     els.dice.classList.remove("is-rolling");
-    // reflow so animation retriggers
     void els.dice.offsetWidth;
     els.dice.classList.add("is-rolling");
     setTimeout(() => els.dice.classList.remove("is-rolling"), 480);
@@ -229,7 +191,7 @@ export function createLiveBoard(opts) {
     els.turn.textContent = active
       ? `${active.username} (#${state.turnNumber || 0})`
       : "—";
-    els.dice.textContent = state.lastDice != null ? String(state.lastDice) : "—";
+    els.dice.innerHTML = diceFaceHtml(state.lastDice);
     els.players.innerHTML = "";
     (state.players || [])
       .slice()
@@ -238,17 +200,18 @@ export function createLiveBoard(opts) {
         const li = document.createElement("li");
         li.className =
           "sl-player" + (active && active.userId === p.userId ? " is-turn" : "");
+        const posLabel = p.position > 0 ? `ช่อง ${p.position}` : "เริ่ม";
         li.innerHTML = `
           <span class="sl-player-dot" style="background:${TOKEN_COLORS[p.turnOrder % TOKEN_COLORS.length]}"></span>
           <span class="sl-player-name">${escapeHtml(p.username)}</span>
-          <span class="sl-player-pos">${p.position}</span>
+          <span class="sl-player-pos">${posLabel}</span>
         `;
         els.players.appendChild(li);
       });
 
     if (state.status === "finished" && state.winnerId) {
       const w = (state.players || []).find((p) => p.userId === state.winnerId);
-      els.banner.textContent = `${w ? w.username : "ผู้เล่น"} ชนะ!`;
+      els.banner.textContent = `🏆 ${w ? w.username : "ผู้เล่น"} ถึง 100 แล้ว!`;
       els.banner.classList.add("is-visible");
     } else {
       els.banner.classList.remove("is-visible");
@@ -262,19 +225,12 @@ export function createLiveBoard(opts) {
       active &&
       active.userId === youId;
     els.roll.disabled = !can;
-    if (spectator) {
-      els.roll.textContent = "ชมอย่างเดียว";
-    } else if (can) {
-      els.roll.textContent = "ทอยลูกเต๋า";
-    } else if (animating) {
-      els.roll.textContent = "กำลังเดิน…";
-    } else if (state.status === "finished") {
-      els.roll.textContent = "จบเกม";
-    } else if (active) {
-      els.roll.textContent = `รอ ${active.username}`;
-    } else {
-      els.roll.textContent = "ทอยลูกเต๋า";
-    }
+    if (spectator) els.roll.textContent = "ชมอย่างเดียว";
+    else if (can) els.roll.textContent = "ทอยลูกเต๋า";
+    else if (animating) els.roll.textContent = "กำลังเดิน…";
+    else if (state.status === "finished") els.roll.textContent = "จบเกม";
+    else if (active) els.roll.textContent = `รอ ${active.username}`;
+    else els.roll.textContent = "ทอยลูกเต๋า";
   }
 
   function escapeHtml(s) {
@@ -309,7 +265,7 @@ export function createLiveBoard(opts) {
   }
 
   /**
-   * @param {object|null} state publicState from server
+   * @param {object|null} state
    * @param {{youId?: string, spectator?: boolean}} [meta]
    */
   async function update(state, meta) {
@@ -363,7 +319,8 @@ export function createLiveBoard(opts) {
       } else {
         let msg = `${name} ทอย ${state.lastDice}: ${state.lastMove.from} → ${state.lastMove.landed}`;
         if (state.lastMove.portal) {
-          msg += ` → ${state.lastMove.portal.type} → ${state.lastMove.final}`;
+          msg += state.lastMove.portal.type === "ladder" ? " 🪜" : " 🐍";
+          msg += ` → ${state.lastMove.final}`;
         }
         log(msg);
       }

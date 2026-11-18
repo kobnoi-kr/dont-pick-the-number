@@ -3,9 +3,13 @@ import {
   startGame,
   roll,
   publicState,
-  cellCenterPercent,
   currentPlayer
 } from "./engine.js";
+import {
+  cellCenterPercent,
+  renderBoardPaths,
+  diceFaceHtml
+} from "./board-art.js";
 
 const TOKEN_COLORS = ["#5b9cf5", "#2dd4a8", "#f5c542", "#f07178", "#c084fc", "#fb923c"];
 
@@ -73,44 +77,12 @@ function buildBoard(board) {
     }
     if (cell === size) {
       div.classList.add("is-goal");
-      div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WIN</span>`;
+      div.innerHTML = `<span class="sl-cell-num">${size}</span><span class="sl-cell-tag">WINNER</span>`;
     }
     els.board.appendChild(div);
   }
 
-  drawPaths(board);
-}
-
-function drawPaths(board) {
-  const size = board.boardSize;
-  const parts = [];
-  for (const lad of board.ladders) {
-    const a = cellCenterPercent(lad.start, size);
-    const b = cellCenterPercent(lad.end, size);
-    if (!a || !b) continue;
-    const mx = (a.x + b.x) / 2 + (a.x < b.x ? -3 : 3);
-    const my = (a.y + b.y) / 2;
-    parts.push(
-      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#8b5a2b" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>`,
-      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#d4a574" stroke-width="1.1" stroke-linecap="round" opacity="0.95"/>`,
-      `<circle cx="${a.x}" cy="${a.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`,
-      `<circle cx="${b.x}" cy="${b.y}" r="1.8" fill="#c68a4a" stroke="#6b3f1a" stroke-width="0.35"/>`
-    );
-  }
-  for (const sn of board.snakes) {
-    const a = cellCenterPercent(sn.start, size);
-    const b = cellCenterPercent(sn.end, size);
-    if (!a || !b) continue;
-    const mx = (a.x + b.x) / 2 + (a.x < b.x ? 7 : -7);
-    const my = (a.y + b.y) / 2;
-    parts.push(
-      `<path d="M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}" fill="none" stroke="#e11d48" stroke-width="2.8" stroke-linecap="round" opacity="0.95"/>`,
-      `<circle cx="${a.x}" cy="${a.y}" r="2.1" fill="#be123c"/>`,
-      `<circle cx="${a.x}" cy="${a.y}" r="0.55" fill="#fff" opacity="0.9"/>`,
-      `<circle cx="${b.x}" cy="${b.y}" r="1.5" fill="#9f1239"/>`
-    );
-  }
-  els.paths.innerHTML = parts.join("");
+  els.paths.innerHTML = renderBoardPaths(board.ladders, board.snakes, size);
 }
 
 function tokenOffset(index, total) {
@@ -147,8 +119,10 @@ function ensureTokens(pub) {
     const el = document.createElement("div");
     el.className = "sl-token";
     el.dataset.userId = p.userId;
-    el.style.background = TOKEN_COLORS[i % TOKEN_COLORS.length];
-    el.textContent = String((p.username || "?")[0]).toUpperCase();
+    el.style.setProperty("--token", TOKEN_COLORS[i % TOKEN_COLORS.length]);
+    el.innerHTML = `<span class="sl-token-glow"></span><span class="sl-token-face">${String(
+      (p.username || "?")[0]
+    ).toUpperCase()}</span>`;
     el.title = p.username;
     els.tokens.appendChild(el);
     tokenEls.set(p.userId, el);
@@ -193,7 +167,7 @@ function renderMeta(pub) {
       : active
         ? `${active.username} (turn #${pub.turnNumber})`
         : "—";
-  els.dice.textContent = pub.lastDice != null ? String(pub.lastDice) : "—";
+  els.dice.innerHTML = diceFaceHtml(pub.lastDice);
   if (pub.status === "finished") {
     const w = pub.players.find((p) => p.userId === pub.winnerId);
     els.banner.textContent = `${w ? w.username : "Player"} wins!`;
@@ -301,7 +275,7 @@ async function doRoll(userId) {
   // Keep visual at previous position until animation; engine already advanced
   const prevPos = visualPos.get(userId) ?? 0;
   state = result.state;
-  els.dice.textContent = String(result.dice);
+  els.dice.innerHTML = diceFaceHtml(result.dice);
   visualPos.set(userId, prevPos);
 
   const name = active.username;
