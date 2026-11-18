@@ -1176,7 +1176,8 @@ function renderLobbyGrid(){
     status.textContent=statusBits.join(" · ");
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
-    nm.textContent=name+(meta&&meta.id===myId?" · คุณ":"");
+    nm.textContent=name;
+    if(meta&&meta.id===myId) nm.title="คุณ";
     const acts=document.createElement("div");
     acts.className="lobby-slot-acts";
     const canHostAct=onlineMode&&isHost()&&meta&&meta.id!==myId&&netPhase==="lobby"&&!spinning;
@@ -1309,10 +1310,18 @@ function renderPlayers(){
       if(meta.bot) tags.push("บอท");
       else if(meta.auto) tags.push("ออโต้");
       if(!meta.connected&&!meta.bot) tags.push("หลุด");
-      if(tags.length) nm.textContent=name+" · "+tags.join(" · ");
+      // Name only in the row — roles stay in tooltip / avatar cues
+      if(tags.length) nm.title=tags.join(" · ");
+      if(meta.host){
+        const crown=document.createElement("span");
+        crown.className="prow-crown";
+        crown.title="โฮสต์";
+        crown.textContent="♛";
+        avWrap.appendChild(crown);
+      }
       if(!meta.connected&&!meta.bot) row.classList.add("off");
     }else if(champ){
-      nm.textContent=name+" · ผู้ชนะ";
+      nm.title="ผู้ชนะ";
     }
     const sc=document.createElement("span");
     sc.className="pscore";
