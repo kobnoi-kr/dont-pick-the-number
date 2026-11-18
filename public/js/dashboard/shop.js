@@ -50,7 +50,7 @@ function itemImage(item) {
 function mediaHtml(url, kind) {
   if (!url) return "";
   const cls = kind === "frame" ? "cosmetic-frame-media" : "cosmetic-effect-media";
-  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async">`;
+  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async" onerror="this.remove()">`;
 }
 
 function thumb(item, letter) {

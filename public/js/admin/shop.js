@@ -66,7 +66,7 @@ function itemImage(item) {
 function mediaHtml(url, kind) {
   if (!url) return "";
   const cls = kind === "frame" ? "cosmetic-frame-media" : "cosmetic-effect-media";
-  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async">`;
+  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=\\'tiny muted\\'>รูปหาย — อัปโหลดใหม่</span>')">`;
 }
 
 function thumb(item) {
@@ -665,12 +665,12 @@ export async function renderShopAdmin(root, { user }) {
         const cosmeticId = card && card.getAttribute("data-id");
         if (!cosmeticId) return;
         if (!confirm("เอาออกจาก Shop? (ของยังอยู่ในระบบ แค่ไม่โชว์ราคา)")) return;
-        const { res } = await api("/api/v1/admin/cosmetics/shop", {
+        const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
           method: "PATCH",
           body: JSON.stringify({ cosmeticId, shopPrice: null })
         });
         if (!res.ok) {
-          setMsg("เอาออกไม่สำเร็จ", false);
+          setMsg(((data && data.error) || "เอาออกไม่สำเร็จ") + "", false);
           return;
         }
         msg = "เอาออกจาก Shop แล้ว";

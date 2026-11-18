@@ -41,29 +41,90 @@ function saveCosmeticImage(dataUrl, idHint) {
   return `/uploads/cosmetics/${name}`;
 }
 
-/** Accept https URL, /uploads/cosmetics path, or data URL (saved to disk). */
+function mediaUrlForCosmeticId(id) {
+  return `/api/v1/cosmetics/media/${encodeURIComponent(String(id || "").trim())}`;
+}
+
+/**
+ * Accept https URL, /uploads/cosmetics path, media API path, or data URL.
+ * Data URLs are stored in DB (imageBase64) so GIFs survive ephemeral disks (Render).
+ */
 function resolveCosmeticImageUrl(value, idHint) {
-  if (value == null) return { ok: true, url: null };
+  if (value == null) return { ok: true, url: null, clear: false };
   const raw = String(value).trim();
-  if (!raw) return { ok: true, url: null };
+  if (!raw) return { ok: true, url: null, clear: true };
   if (/^https:\/\/[^\s]{1,2000}$/i.test(raw)) {
-    return { ok: true, url: raw.slice(0, 2000) };
+    return { ok: true, url: raw.slice(0, 2000), clear: false };
   }
   if (/^\/uploads\/cosmetics\/[a-z0-9._-]+\.(png|jpe?g|webp|gif)$/i.test(raw)) {
-    return { ok: true, url: raw };
+    return { ok: true, url: raw, clear: false };
+  }
+  if (/^\/api\/v1\/cosmetics\/media\/[A-Za-z0-9._%-]+$/i.test(raw)) {
+    return { ok: true, url: raw, clear: false };
   }
   if (raw.startsWith("data:image/")) {
-    const saved = saveCosmeticImage(raw, idHint);
-    if (!saved) return { ok: false, error: "invalid_image" };
-    return { ok: true, url: saved };
+    const parsed = parseDataUrlImage(raw);
+    if (!parsed) return { ok: false, error: "invalid_image" };
+    let diskUrl = null;
+    try {
+      diskUrl = saveCosmeticImage(raw, idHint);
+    } catch {
+      diskUrl = null;
+    }
+    return {
+      ok: true,
+      url: null,
+      clear: false,
+      durable: true,
+      imageBase64: parsed.buf.toString("base64"),
+      imageExt: parsed.ext,
+      diskUrl
+    };
   }
   return { ok: false, error: "invalid_image" };
 }
 
+function applyImageMeta(meta, imageRes, cosmeticId) {
+  const next = Object.assign({}, meta || {});
+  delete next.imageBase64;
+  delete next.imageExt;
+  delete next.imageDisk;
+  delete next.mediaUrl;
+  if (!imageRes || imageRes.clear || (!imageRes.url && !imageRes.durable)) {
+    delete next.imageUrl;
+    return next;
+  }
+  if (imageRes.durable) {
+    next.imageBase64 = imageRes.imageBase64;
+    next.imageExt = imageRes.imageExt;
+    if (imageRes.diskUrl) next.imageDisk = imageRes.diskUrl;
+    next.imageUrl = mediaUrlForCosmeticId(cosmeticId);
+    return next;
+  }
+  next.imageUrl = imageRes.url;
+  return next;
+}
+
 function cosmeticImageOf(c) {
   if (!c || !c.meta || typeof c.meta !== "object") return null;
+  if (c.meta.imageBase64 && c.meta.imageExt && c.id) {
+    return mediaUrlForCosmeticId(c.id);
+  }
   const url = c.meta.imageUrl || c.meta.mediaUrl || null;
-  return url ? String(url) : null;
+  if (!url) return null;
+  const s = String(url);
+  if (s.startsWith("data:image/") && c.id) return mediaUrlForCosmeticId(c.id);
+  return s;
+}
+
+function stripHeavyImageMeta(meta) {
+  if (!meta || typeof meta !== "object") return meta;
+  if (!meta.imageBase64 && !meta.imageExt && !meta.imageDisk) return meta;
+  const next = Object.assign({}, meta);
+  delete next.imageBase64;
+  delete next.imageExt;
+  delete next.imageDisk;
+  return next;
 }
 
 function metaFlag(meta, key, defaultValue) {
@@ -288,9 +349,11 @@ function method(req) {
 
 function publicCosmetic(c) {
   if (!c) return null;
-  const meta = c.meta && typeof c.meta === "object" ? Object.assign({}, c.meta) : {};
+  let meta = c.meta && typeof c.meta === "object" ? Object.assign({}, c.meta) : {};
+  meta = stripHeavyImageMeta(meta) || {};
   const imageUrl = cosmeticImageOf(c);
   if (imageUrl) meta.imageUrl = imageUrl;
+  else delete meta.imageUrl;
   const useSystemColor = cosmeticUsesSystemColor(c);
   const useSystemEffect = cosmeticUsesSystemEffect(c);
   const tier = cosmeticTier(c);
@@ -351,6 +414,7 @@ async function ensureCosmeticsCatalog(prisma, opts) {
           if (seedMeta.tier && !prevMeta.tier) prevMeta.tier = seedMeta.tier;
           if (seedMeta.color && !prevMeta.color) prevMeta.color = seedMeta.color;
           if (seedMeta.sample != null && prevMeta.sample == null) prevMeta.sample = seedMeta.sample;
+          // Never re-apply shopPrice here — admin "เอาออกจาก Shop" must stick.
           const data = {
             kind: item.kind,
             name: item.name,
@@ -358,22 +422,6 @@ async function ensureCosmeticsCatalog(prisma, opts) {
             cssClass: item.cssClass,
             meta: prevMeta
           };
-          // Seed shop listing once for sample frame/effect (don't override admin price)
-          if (
-            existing.shopPrice == null &&
-            item.shopPrice != null &&
-            (item.kind === "frame" || item.kind === "effect") &&
-            item.id !== "frame.basic" &&
-            item.id !== "effect.none"
-          ) {
-            data.shopPrice = item.shopPrice;
-          } else if (
-            existing.shopPrice == null &&
-            seedMeta.sample &&
-            (item.kind === "frame" || item.kind === "effect")
-          ) {
-            data.shopPrice = defaultShopPriceForTier(seedMeta.tier || prevMeta.tier);
-          }
           await prisma.cosmetic.update({
             where: { id: item.id },
             data
@@ -605,6 +653,101 @@ async function loadUserCosmetics(prisma, userId) {
 }
 
 async function handleCosmeticsApi(req, res, pathname) {
+  const mediaMatch = String(pathname || "").match(/^\/api\/v1\/cosmetics\/media\/([^/]+)$/);
+  if (mediaMatch) {
+    if (method(req) !== "GET" && method(req) !== "HEAD") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    let cosmeticId = mediaMatch[1];
+    try {
+      cosmeticId = decodeURIComponent(cosmeticId);
+    } catch {
+      sendJson(res, 400, { error: "invalid_id" });
+      return true;
+    }
+    const prisma = await getPrisma();
+    if (!prisma) {
+      sendJson(res, 503, { error: "db_unavailable" });
+      return true;
+    }
+    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    const meta = cosmetic && cosmetic.meta && typeof cosmetic.meta === "object" ? cosmetic.meta : null;
+    const typeMap = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif"
+    };
+
+    function sendBuf(buf, ext) {
+      const ctype = typeMap[String(ext || "").toLowerCase()] || "application/octet-stream";
+      res.writeHead(200, {
+        "Content-Type": ctype,
+        "Content-Length": buf.length,
+        "Cache-Control": "public, max-age=86400"
+      });
+      if (method(req) === "HEAD") {
+        res.end();
+        return;
+      }
+      res.end(buf);
+    }
+
+    if (meta && meta.imageDisk) {
+      const diskRel = String(meta.imageDisk).replace(/^\/+/, "").split("/").join(path.sep);
+      const diskPath = path.resolve(PUBLIC_DIR, diskRel);
+      if (diskPath.startsWith(path.resolve(PUBLIC_DIR) + path.sep) && fs.existsSync(diskPath)) {
+        try {
+          const buf = fs.readFileSync(diskPath);
+          const ext = path.extname(diskPath).slice(1) || meta.imageExt || "png";
+          sendBuf(buf, ext);
+          return true;
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+
+    if (meta && meta.imageBase64) {
+      try {
+        const buf = Buffer.from(String(meta.imageBase64).replace(/\s+/g, ""), "base64");
+        if (buf.length >= 24) {
+          sendBuf(buf, meta.imageExt || "png");
+          return true;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    if (meta && typeof meta.imageUrl === "string" && meta.imageUrl.startsWith("data:image/")) {
+      const parsed = parseDataUrlImage(meta.imageUrl);
+      if (parsed) {
+        sendBuf(parsed.buf, parsed.ext);
+        return true;
+      }
+    }
+
+    if (meta && typeof meta.imageUrl === "string" && meta.imageUrl.startsWith("/uploads/cosmetics/")) {
+      const diskRel = meta.imageUrl.replace(/^\/+/, "").split("/").join(path.sep);
+      const diskPath = path.resolve(PUBLIC_DIR, diskRel);
+      if (diskPath.startsWith(path.resolve(PUBLIC_DIR) + path.sep) && fs.existsSync(diskPath)) {
+        try {
+          const buf = fs.readFileSync(diskPath);
+          sendBuf(buf, path.extname(diskPath).slice(1) || "png");
+          return true;
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+
+    sendJson(res, 404, { error: "image_not_found" });
+    return true;
+  }
+
   if (!authEnabled()) {
     sendJson(res, 503, { error: "auth_disabled" });
     return true;
@@ -1190,16 +1333,15 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         ? !!body.useSystemEffect
         : true;
     const tier = normalizeTier(body && body.tier);
-    const meta = Object.assign(
-      {},
-      color ? { color } : {},
-      imageRes.url ? { imageUrl: imageRes.url } : {},
-      {
+    const meta = applyImageMeta(
+      Object.assign({}, color ? { color } : {}, {
         adminCreated: true,
         useSystemColor,
         useSystemEffect,
         tier
-      }
+      }),
+      imageRes,
+      id
     );
     const created = await prisma.cosmetic.create({
       data: {
@@ -1305,9 +1447,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         sendJson(res, 400, { error: imageRes.error || "invalid_image" });
         return true;
       }
-      metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
-      if (!imageRes.url) delete metaPatch.imageUrl;
-      else metaPatch.imageUrl = imageRes.url;
+      metaPatch = applyImageMeta(metaPatch || cosmetic.meta || {}, imageRes, cosmetic.id);
     }
     if (body && Object.prototype.hasOwnProperty.call(body, "useSystemColor")) {
       metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
