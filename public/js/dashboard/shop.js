@@ -122,7 +122,6 @@ export async function renderShop(root, { user, onSaved } = {}) {
       </div>
       <div class="shop-balance" id="shopBalance" title="คะแนน Shop">0 pts</div>
     </section>
-    <p class="tiny muted" id="shopEarnHint" style="margin:-6px 0 12px">ได้ pts เมื่อชนะเกม · คนจริงในล็อบบี้เยอะ ได้เยอะขึ้น (ไม่นับบอท) · ซื้อของต้องบัญชีจริง</p>
     <p class="msg" id="shopMsg"></p>
     <div id="shopBody"><div class="loading">Loading…</div></div>
   `;
@@ -228,13 +227,6 @@ export async function renderShop(root, { user, onSaved } = {}) {
                   })
                   .join("")}</div>`
               : `<p class="empty">ยังไม่มีสินค้าในหมวดนี้</p>`
-          }
-          ${
-            rewards
-              ? rewards.mode === "formula"
-                ? `<p class="tiny muted shop-reward-hint">ชนะได้ ${rewards.baseWin} pts + ${rewards.perHumanOpponent} pts ต่อผู้เล่นจริงในล็อบบี้ (ไม่นับบอท)</p>`
-                : `<p class="tiny muted shop-reward-hint">ชนะแล้วสุ่มได้ ${rewards.randomMin ?? 20}–${rewards.randomMax ?? 100} pts</p>`
-              : ""
           }
         </div>
         <div class="card shop-preview-card">
