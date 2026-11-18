@@ -174,7 +174,8 @@ async function handleAdminApi(req, res, pathname) {
     const q = (url.searchParams.get("q") || "").trim();
     const status = url.searchParams.get("status") || "";
     const role = url.searchParams.get("role") || "";
-    const take = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50) || 50));
+    const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 20) || 20));
+    const page = Math.max(1, Number(url.searchParams.get("page") || 1) || 1);
     const where = { status: { not: "deleted" } };
     if (status && ["active", "suspended", "banned"].includes(status)) where.status = status;
     if (q) {
@@ -187,9 +188,14 @@ async function handleAdminApi(req, res, pathname) {
     if (role) {
       where.userRoles = { some: { role: { name: role } } };
     }
+    const total = await prisma.user.count({ where });
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, pageCount);
+    const skip = (safePage - 1) * pageSize;
     const users = await prisma.user.findMany({
       where,
-      take,
+      skip,
+      take: pageSize,
       orderBy: { createdAt: "desc" },
       include: {
         userRoles: {
@@ -201,7 +207,13 @@ async function handleAdminApi(req, res, pathname) {
         _count: { select: { sessions: { where: { revokedAt: null, expiresAt: { gt: new Date() } } } } }
       }
     });
-    sendJson(res, 200, { users: users.map(serializeUser) });
+    sendJson(res, 200, {
+      users: users.map(serializeUser),
+      total,
+      page: safePage,
+      pageSize,
+      pageCount
+    });
     return true;
   }
 

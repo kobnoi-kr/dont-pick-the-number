@@ -10,7 +10,11 @@ function avHtml(u) {
   return `<div class="user-card-av ph" aria-hidden="true">${esc(letter)}</div>`;
 }
 
+const PAGE_SIZE = 20;
+
 export async function renderUsers(root, { user }) {
+  let page = 1;
+
   root.innerHTML = `
     <div class="card">
       <div class="toolbar">
@@ -30,8 +34,9 @@ export async function renderUsers(root, { user }) {
         </select>
         <button type="button" class="btn sm" id="uSearch">ค้นหา</button>
       </div>
-      <p class="tiny muted" style="margin:10px 0 0">กดแถวผู้ใช้เพื่อเปิดการ์ดจัดการ</p>
+      <p class="tiny muted" style="margin:10px 0 0">กดแถวผู้ใช้เพื่อเปิดการ์ดจัดการ · หน้าละ ${PAGE_SIZE} คน</p>
       <div id="uList" class="loading" style="margin-top:12px">Loading…</div>
+      <div id="uPager" class="row-between" style="margin-top:12px;align-items:center;gap:8px;flex-wrap:wrap"></div>
     </div>
     <div id="uDetailModal" class="modal hidden" role="dialog" aria-modal="true">
       <div class="modal-card user-detail-card" id="uDetailPanel">
@@ -72,18 +77,29 @@ export async function renderUsers(root, { user }) {
     const status = root.querySelector("#uStatus").value;
     const role = root.querySelector("#uRole").value;
     const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", String(PAGE_SIZE));
     if (q) params.set("q", q);
     if (status) params.set("status", status);
     if (role) params.set("role", role);
     const box = root.querySelector("#uList");
+    const pager = root.querySelector("#uPager");
     box.innerHTML = `<div class="loading">Loading…</div>`;
+    if (pager) pager.innerHTML = "";
     const { res, data } = await api("/api/v1/admin/users?" + params.toString(), { method: "GET" });
     if (!res.ok) {
       box.innerHTML = `<div class="empty">โหลดไม่ได้</div>`;
       return;
     }
     const users = data.users || [];
+    const total = Number(data.total) || users.length;
+    const pageCount = Math.max(1, Number(data.pageCount) || 1);
+    page = Math.min(Math.max(1, Number(data.page) || page), pageCount);
+    const from = total ? (page - 1) * PAGE_SIZE + 1 : 0;
+    const to = Math.min(page * PAGE_SIZE, total);
+
     box.innerHTML = `
+      <p class="tiny muted" style="margin:0 0 8px">แสดง ${from}–${to} จาก ${total} คน · หน้า ${page}/${pageCount}</p>
       <div class="table-wrap">
         <table class="table">
           <thead><tr><th>User</th><th>Type</th><th>Status</th><th>Roles</th><th>Sessions</th><th>Joined</th></tr></thead>
@@ -113,6 +129,31 @@ export async function renderUsers(root, { user }) {
     box.querySelectorAll("[data-id]").forEach((row) => {
       row.onclick = () => openDetail(row.getAttribute("data-id"));
     });
+
+    if (pager) {
+      pager.innerHTML = `
+        <button type="button" class="btn ghost sm" id="uPrev" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
+        <span class="tiny muted">หน้า ${page} / ${pageCount}</span>
+        <button type="button" class="btn ghost sm" id="uNext" ${page >= pageCount ? "disabled" : ""}>ถัดไป →</button>`;
+      const prev = pager.querySelector("#uPrev");
+      const next = pager.querySelector("#uNext");
+      if (prev) {
+        prev.onclick = () => {
+          if (page > 1) {
+            page -= 1;
+            load();
+          }
+        };
+      }
+      if (next) {
+        next.onclick = () => {
+          if (page < pageCount) {
+            page += 1;
+            load();
+          }
+        };
+      }
+    }
   }
 
   async function openDetail(id) {
@@ -370,9 +411,15 @@ export async function renderUsers(root, { user }) {
     }
   }
 
-  root.querySelector("#uSearch").onclick = load;
+  function searchFromStart() {
+    page = 1;
+    load();
+  }
+  root.querySelector("#uSearch").onclick = searchFromStart;
+  root.querySelector("#uStatus").onchange = searchFromStart;
+  root.querySelector("#uRole").onchange = searchFromStart;
   root.querySelector("#uQ").onkeydown = (e) => {
-    if (e.key === "Enter") load();
+    if (e.key === "Enter") searchFromStart();
   };
   await load();
 }
