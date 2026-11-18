@@ -6,19 +6,33 @@ const GAMES = [
     id: "secret",
     defaultName: "หาเลข",
     en: "Don't Get The Secret",
-    blurb: "เกมทายเลข — ห้ามโดนเลขลับ ใช้ในคลังเกมและตอนสร้างห้อง"
+    blurb: "เกมทายเลข — ห้ามโดนเลขลับ ใช้ในคลังเกมและตอนสร้างห้อง",
+    defaultBeta: false,
+    defaultComingSoon: false
   },
   {
     id: "wheel",
     defaultName: "วงล้อ",
     en: "Number Wheel",
-    blurb: "เกมหมุนวงล้อ — ใครโดนเลขตัวเองตกรอบ"
+    blurb: "เกมหมุนวงล้อ — ใครโดนเลขตัวเองตกรอบ",
+    defaultBeta: false,
+    defaultComingSoon: false
   },
   {
     id: "snake",
     defaultName: "งูและบันได",
     en: "Snake & Ladders",
-    blurb: "เกมกระดาน — ทอยลูกเต๋าถึงช่อง 100 (สูงสุด 6 คน)"
+    blurb: "เกมกระดาน — ทอยลูกเต๋าถึงช่อง 100 (สูงสุด 6 คน)",
+    defaultBeta: true,
+    defaultComingSoon: false
+  },
+  {
+    id: "imposter",
+    defaultName: "Imposter",
+    en: "Find the Imposter",
+    blurb: "เกมแนวหาคนเป็น Imposter — ยังไม่เปิดเล่น ใส่ในคลังเป็น Coming Soon ได้",
+    defaultBeta: false,
+    defaultComingSoon: true
   }
 ];
 
@@ -26,6 +40,7 @@ function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "secret") return "หาเลข";
   if (mode === "snake") return "งูและบันได";
+  if (mode === "imposter") return "Imposter";
   return mode || "—";
 }
 
@@ -55,20 +70,26 @@ export async function renderGames(root, { user }) {
     <div class="card">
       <h2>จัดการเกมในคลัง</h2>
       <p class="muted" style="margin-top:0">
-        หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น และป้าย <b>Beta</b>
-        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิด ตั้งชื่อ และทำเครื่องหมายทดลอง
+        หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น ป้าย <b>Beta</b> และ <b>Coming Soon</b>
+        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิด ตั้งชื่อ และทำเครื่องหมายสถานะ
       </p>
       <div class="content-grid" id="gCat" style="margin-top:14px">
         ${GAMES.map((g) => {
           const row = catalog[g.id] || {};
           const name = (row.name && String(row.name).trim()) || g.defaultName;
           const on = row.enabled !== false;
-          const beta = !!row.beta || (row.beta == null && g.id === "snake");
+          const beta =
+            row.beta != null ? !!row.beta : !!g.defaultBeta;
+          const comingSoon =
+            row.comingSoon != null ? !!row.comingSoon : !!g.defaultComingSoon;
+          const badges =
+            (beta ? ` <span class="pill warn">Beta</span>` : "") +
+            (comingSoon ? ` <span class="pill soon">Coming Soon</span>` : "");
           return `<div class="card nested game-admin-card">
             <div class="row-between" style="align-items:flex-start">
               <div>
                 <div class="tiny">รหัสเกม: <code>${esc(g.id)}</code></div>
-                <h3 style="margin:4px 0 2px">${esc(g.defaultName)}${beta ? ` <span class="pill warn">Beta</span>` : ""}</h3>
+                <h3 style="margin:4px 0 2px">${esc(g.defaultName)}${badges}</h3>
                 <div class="tiny">${esc(g.en)}</div>
               </div>
               <label class="switch-row" title="เปิด = โชว์ในคลังเกม">
@@ -77,9 +98,13 @@ export async function renderGames(root, { user }) {
               </label>
             </div>
             <p class="tiny" style="margin:10px 0 8px">${esc(g.blurb)}</p>
-            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Beta ใน Game Library">
+            <label class="switch-row" style="margin:0 0 8px" title="โชว์ป้าย Beta ใน Game Library">
               <input type="checkbox" data-id="${g.id}" data-field="beta" ${beta ? "checked" : ""} ${canManage ? "" : "disabled"}/>
               <span>เกม Beta</span>
+            </label>
+            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Coming Soon และยังสร้างห้องไม่ได้">
+              <input type="checkbox" data-id="${g.id}" data-field="comingSoon" ${comingSoon ? "checked" : ""} ${canManage ? "" : "disabled"}/>
+              <span>Coming Soon</span>
             </label>
             <label class="field">
               <span>ชื่อที่แสดงให้ผู้เล่น</span>
@@ -156,11 +181,13 @@ export async function renderGames(root, { user }) {
       for (const g of GAMES) {
         const en = root.querySelector(`input[data-id="${g.id}"][data-field="enabled"]`);
         const beta = root.querySelector(`input[data-id="${g.id}"][data-field="beta"]`);
+        const soon = root.querySelector(`input[data-id="${g.id}"][data-field="comingSoon"]`);
         const nameEl = root.querySelector(`input[data-id="${g.id}"][data-field="name"]`);
         const name = ((nameEl && nameEl.value) || "").trim() || g.defaultName;
         next[g.id] = {
           enabled: !!(en && en.checked),
           beta: !!(beta && beta.checked),
+          comingSoon: !!(soon && soon.checked),
           name
         };
       }

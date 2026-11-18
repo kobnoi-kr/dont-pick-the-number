@@ -699,6 +699,11 @@ td.row-actions > a.btn:last-child {
 }
 .pill.ok { color: #86efac; border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); }
 .pill.warn { color: #fcd34d; border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.08); }
+.pill.soon {
+  color: #67e8f9;
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.1);
+}
 .pill.busy { color: #93c5fd; border-color: rgba(86,119,252,0.4); background: rgba(86,119,252,0.1); }
 .pill.recent {
   color: #c4b5fd;
@@ -1463,6 +1468,9 @@ body.nav-open .sidebar .nav {
   border-radius: var(--nv-radius);
   border: 1px solid var(--nv-border);
   background: var(--nv-card);
+}
+.lib-card.is-soon {
+  opacity: 0.92;
 }
 .lib-card.is-recent {
   border-color: rgba(167,139,250,0.45);

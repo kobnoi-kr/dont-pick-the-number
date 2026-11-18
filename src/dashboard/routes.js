@@ -56,6 +56,21 @@ const GAME_CATALOG = [
       "โฮสต์เลือกแมพได้หลายแบบ (งู/บันไดคนละตำแหน่ง) แล้วผลัดกันทอยลูกเต๋า 1–6 เจอบันไดขึ้น เจองูลง ต้องทอยพอดีถึง 100 — เปิดเล่นอัตโนมัติได้ สูงสุด 6 คน",
     popular: true,
     beta: true
+  },
+  {
+    id: "imposter",
+    slug: "imposter",
+    name: "Imposter",
+    nameEn: "Find the Imposter",
+    category: "social",
+    categoryLabel: "สืบหา",
+    maxPlayers: 12,
+    description: "หาคนที่เป็น Imposter — คุย โหวต และจับคนร้ายก่อนสายเกินแก้",
+    howTo:
+      "ผู้เล่นส่วนใหญ่เป็นทีมปกติ มี Imposter แอบอยู่ในกลุ่ม พูดคุยสังเกตพฤติกรรม แล้วโหวตหาตัวคนร้าย — รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    popular: false,
+    beta: false,
+    comingSoon: true
   }
 ];
 
@@ -186,6 +201,13 @@ async function handleDashboardApi(req, res, pathname) {
         out.beta = g.beta;
       } else {
         out.beta = false;
+      }
+      if (override && Object.prototype.hasOwnProperty.call(override, "comingSoon")) {
+        out.comingSoon = !!override.comingSoon;
+      } else if (typeof g.comingSoon === "boolean") {
+        out.comingSoon = g.comingSoon;
+      } else {
+        out.comingSoon = false;
       }
       return out;
     });
