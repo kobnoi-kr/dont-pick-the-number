@@ -1,21 +1,21 @@
 import { api } from "/js/dashboard/api.js";
 import { wireContactForm } from "/js/dashboard/contact-form.js";
-import { hasPerm } from "./util.js";
-import { renderOverview } from "./overview.js";
-import { renderAnalytics } from "./analytics.js";
-import { renderLive } from "./live.js";
-import { renderUsers } from "./users.js";
-import { renderGames } from "./games.js";
-import { renderRooms } from "./rooms.js";
-import { renderAnnouncements } from "./announcements.js";
-import { renderPermissions } from "./permissions.js";
-import { renderSystem } from "./system.js";
-import { renderLogs } from "./logs.js";
-import { renderInbox } from "./inbox.js";
-import { renderSettings } from "./settings.js";
-import { renderLevels } from "./levels.js";
-import { renderGift } from "./gift.js";
-import { renderShopAdmin } from "./shop.js";
+import { hasPerm } from "./util.js?v=users-page2";
+import { renderOverview } from "./overview.js?v=users-page2";
+import { renderAnalytics } from "./analytics.js?v=users-page2";
+import { renderLive } from "./live.js?v=users-page2";
+import { renderUsers } from "./users.js?v=users-page2";
+import { renderGames } from "./games.js?v=users-page2";
+import { renderRooms } from "./rooms.js?v=users-page2";
+import { renderAnnouncements } from "./announcements.js?v=users-page2";
+import { renderPermissions } from "./permissions.js?v=users-page2";
+import { renderSystem } from "./system.js?v=users-page2";
+import { renderLogs } from "./logs.js?v=users-page2";
+import { renderInbox } from "./inbox.js?v=users-page2";
+import { renderSettings } from "./settings.js?v=users-page2";
+import { renderLevels } from "./levels.js?v=users-page2";
+import { renderGift } from "./gift.js?v=users-page2";
+import { renderShopAdmin } from "./shop.js?v=users-page2";
 
 const TITLES = {
   overview: "Overview",

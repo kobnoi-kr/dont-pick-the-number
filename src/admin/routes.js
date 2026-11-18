@@ -174,10 +174,14 @@ async function handleAdminApi(req, res, pathname) {
     const q = (url.searchParams.get("q") || "").trim();
     const status = url.searchParams.get("status") || "";
     const role = url.searchParams.get("role") || "";
+    const accountType = url.searchParams.get("accountType") || "";
     const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 20) || 20));
     const page = Math.max(1, Number(url.searchParams.get("page") || 1) || 1);
     const where = { status: { not: "deleted" } };
     if (status && ["active", "suspended", "banned"].includes(status)) where.status = status;
+    if (accountType && ["guest", "registered"].includes(accountType)) {
+      where.accountType = accountType;
+    }
     if (q) {
       where.OR = [
         { username: { contains: q, mode: "insensitive" } },

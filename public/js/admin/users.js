@@ -19,6 +19,11 @@ export async function renderUsers(root, { user }) {
     <div class="card">
       <div class="toolbar">
         <input class="input" id="uQ" placeholder="ค้นหาชื่อ / username / friend code" />
+        <select class="input" id="uAccountType">
+          <option value="">ทุกประเภท</option>
+          <option value="registered">registered</option>
+          <option value="guest">guest</option>
+        </select>
         <select class="input" id="uStatus">
           <option value="">ทุกสถานะ</option>
           <option value="active">active</option>
@@ -34,9 +39,10 @@ export async function renderUsers(root, { user }) {
         </select>
         <button type="button" class="btn sm" id="uSearch">ค้นหา</button>
       </div>
-      <p class="tiny muted" style="margin:10px 0 0">กดแถวผู้ใช้เพื่อเปิดการ์ดจัดการ · หน้าละ ${PAGE_SIZE} คน</p>
+      <p class="tiny muted" style="margin:10px 0 0">กดแถวเพื่อจัดการ · หน้าละ ${PAGE_SIZE} · ผู้ใช้เก่าอยู่หน้าถัดไป (guest ใหม่จะขึ้นก่อน)</p>
+      <div id="uPagerTop" style="margin-top:12px"></div>
       <div id="uList" class="loading" style="margin-top:12px">Loading…</div>
-      <div id="uPager" class="row-between" style="margin-top:12px;align-items:center;gap:8px;flex-wrap:wrap"></div>
+      <div id="uPager" style="margin-top:12px"></div>
     </div>
     <div id="uDetailModal" class="modal hidden" role="dialog" aria-modal="true">
       <div class="modal-card user-detail-card" id="uDetailPanel">
@@ -72,19 +78,53 @@ export async function renderUsers(root, { user }) {
     if (e.key === "Escape" && !modal.classList.contains("hidden")) closeDetail();
   });
 
+  function paintPager(el, total, pageCount, suffix) {
+    if (!el) return;
+    const idPrev = "uPrev" + (suffix || "");
+    const idNext = "uNext" + (suffix || "");
+    el.innerHTML = `
+      <div class="row-between" style="width:100%;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--nv-border);border-radius:12px;background:var(--nv-bg-2)">
+        <button type="button" class="btn sm" id="${idPrev}" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
+        <span class="tiny">หน้า <b>${page}</b> / ${pageCount} · ทั้งหมด ${total} คน</span>
+        <button type="button" class="btn sm" id="${idNext}" ${page >= pageCount ? "disabled" : ""}>ถัดไป →</button>
+      </div>`;
+    const prev = el.querySelector("#" + idPrev);
+    const next = el.querySelector("#" + idNext);
+    if (prev) {
+      prev.onclick = () => {
+        if (page > 1) {
+          page -= 1;
+          load();
+        }
+      };
+    }
+    if (next) {
+      next.onclick = () => {
+        if (page < pageCount) {
+          page += 1;
+          load();
+        }
+      };
+    }
+  }
+
   async function load() {
     const q = root.querySelector("#uQ").value.trim();
     const status = root.querySelector("#uStatus").value;
     const role = root.querySelector("#uRole").value;
+    const accountType = root.querySelector("#uAccountType").value;
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("limit", String(PAGE_SIZE));
     if (q) params.set("q", q);
     if (status) params.set("status", status);
     if (role) params.set("role", role);
+    if (accountType) params.set("accountType", accountType);
     const box = root.querySelector("#uList");
+    const pagerTop = root.querySelector("#uPagerTop");
     const pager = root.querySelector("#uPager");
     box.innerHTML = `<div class="loading">Loading…</div>`;
+    if (pagerTop) pagerTop.innerHTML = "";
     if (pager) pager.innerHTML = "";
     const { res, data } = await api("/api/v1/admin/users?" + params.toString(), { method: "GET" });
     if (!res.ok) {
@@ -97,6 +137,9 @@ export async function renderUsers(root, { user }) {
     page = Math.min(Math.max(1, Number(data.page) || page), pageCount);
     const from = total ? (page - 1) * PAGE_SIZE + 1 : 0;
     const to = Math.min(page * PAGE_SIZE, total);
+
+    paintPager(pagerTop, total, pageCount, "Top");
+    paintPager(pager, total, pageCount, "");
 
     box.innerHTML = `
       <p class="tiny muted" style="margin:0 0 8px">แสดง ${from}–${to} จาก ${total} คน · หน้า ${page}/${pageCount}</p>
@@ -129,33 +172,6 @@ export async function renderUsers(root, { user }) {
     box.querySelectorAll("[data-id]").forEach((row) => {
       row.onclick = () => openDetail(row.getAttribute("data-id"));
     });
-
-    if (pager) {
-      pager.innerHTML = `
-        <div class="row-between" style="width:100%;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--nv-border);border-radius:12px;background:var(--nv-bg-2)">
-          <button type="button" class="btn sm" id="uPrev" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
-          <span class="tiny">หน้า <b>${page}</b> / ${pageCount} · ทั้งหมด ${total} คน</span>
-          <button type="button" class="btn sm" id="uNext" ${page >= pageCount ? "disabled" : ""}>ถัดไป →</button>
-        </div>`;
-      const prev = pager.querySelector("#uPrev");
-      const next = pager.querySelector("#uNext");
-      if (prev) {
-        prev.onclick = () => {
-          if (page > 1) {
-            page -= 1;
-            load();
-          }
-        };
-      }
-      if (next) {
-        next.onclick = () => {
-          if (page < pageCount) {
-            page += 1;
-            load();
-          }
-        };
-      }
-    }
   }
 
   async function openDetail(id) {
@@ -418,6 +434,7 @@ export async function renderUsers(root, { user }) {
     load();
   }
   root.querySelector("#uSearch").onclick = searchFromStart;
+  root.querySelector("#uAccountType").onchange = searchFromStart;
   root.querySelector("#uStatus").onchange = searchFromStart;
   root.querySelector("#uRole").onchange = searchFromStart;
   root.querySelector("#uQ").onkeydown = (e) => {
