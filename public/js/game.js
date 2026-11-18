@@ -971,7 +971,6 @@ function renderLobbyGrid(){
     const status=document.createElement("div");
     status.className="lobby-slot-status"+(ready?" on":"");
     const statusBits=[];
-    if(champ) statusBits.push("WINNER");
     if(hostFlag) statusBits.push("HOST");
     if(!statusBits.length) statusBits.push(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE"));
     status.textContent=statusBits.join(" · ");
@@ -1016,7 +1015,7 @@ function renderLobbyGrid(){
       const mark=document.createElement("span");
       mark.className="lobby-champ-mark";
       mark.title="ผู้ชนะ";
-      mark.textContent="✦";
+      mark.textContent="WINNER";
       avWrap.appendChild(mark);
     }
     const avCore=document.createElement("div");
