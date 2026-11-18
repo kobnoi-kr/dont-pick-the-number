@@ -132,9 +132,11 @@ export async function renderUsers(root, { user }) {
 
     if (pager) {
       pager.innerHTML = `
-        <button type="button" class="btn ghost sm" id="uPrev" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
-        <span class="tiny muted">หน้า ${page} / ${pageCount}</span>
-        <button type="button" class="btn ghost sm" id="uNext" ${page >= pageCount ? "disabled" : ""}>ถัดไป →</button>`;
+        <div class="row-between" style="width:100%;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--nv-border);border-radius:12px;background:var(--nv-bg-2)">
+          <button type="button" class="btn sm" id="uPrev" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
+          <span class="tiny">หน้า <b>${page}</b> / ${pageCount} · ทั้งหมด ${total} คน</span>
+          <button type="button" class="btn sm" id="uNext" ${page >= pageCount ? "disabled" : ""}>ถัดไป →</button>
+        </div>`;
       const prev = pager.querySelector("#uPrev");
       const next = pager.querySelector("#uNext");
       if (prev) {

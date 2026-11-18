@@ -2096,11 +2096,12 @@ function staticCacheControl(rel) {
   ) {
     return "public, max-age=604800, stale-while-revalidate=86400";
   }
-  // CSS/JS have no content-hash in filenames — short cache + revalidate.
+  // CSS/JS are not content-hashed — always revalidate so deploys show up.
+  // ETag still allows cheap 304 when unchanged.
   if (ext === ".css" || ext === ".js") {
-    return "public, max-age=3600, must-revalidate";
+    return "no-cache";
   }
-  return "public, max-age=300, must-revalidate";
+  return "no-cache";
 }
 
 function fileEtag(stat) {
