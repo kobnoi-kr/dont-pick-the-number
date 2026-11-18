@@ -126,8 +126,7 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 }
 .lobby-slot.empty{
   opacity:.7;justify-content:center;gap:8px;
-  aspect-ratio:1;min-height:0;padding:18px 12px;
-  border-radius:50%;
+  /* การ์ดสี่เหลี่ยมเหมือนช่องผู้เล่น · วงกลมแค่ข้างใน */
 }
 .lobby-empty-circle{
   width:72px;height:72px;border-radius:50%;flex:0 0 auto;
@@ -139,9 +138,10 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   font-size:1.6rem;font-weight:800;line-height:1;color:#fff;
 }
 .lobby-slot.empty .lobby-slot-name{
-  white-space:nowrap;overflow:visible;text-overflow:clip;
-  line-height:1.55;padding:.15em 0 .25em;
+  white-space:normal;overflow:visible;text-overflow:clip;
+  line-height:1.6;padding:.2em 4px .35em;
   font-size:.82rem;font-weight:700;color:var(--muted);
+  word-break:keep-all;
 }
 .lobby-slot.host{border-color:rgba(245,158,11,.55);box-shadow:0 0 0 1px rgba(245,158,11,.2)}
 .lobby-av-wrap{
@@ -264,10 +264,7 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   0%,100%{box-shadow:0 0 0 2px rgba(249,115,22,.35),0 0 10px rgba(239,68,68,.25)}
   50%{box-shadow:0 0 0 3px rgba(249,115,22,.55),0 0 18px rgba(251,191,36,.45)}
 }
-/* Glow must never steal taps from โอนโฮสต์ / เตะ under the avatar */
-.lobby-av-wrap.champion{
-  pointer-events:none;
-}
+/* Winner frame มาก่อนเอฟเฟกต์/กรอบ cosmetic — ปิดเอฟเฟกต์ทับตอนเป็น champion */
 .lobby-av-wrap.champion::before{
   content:"";position:absolute;inset:-4px;border-radius:50%;z-index:0;pointer-events:none;
   background:conic-gradient(from 0deg,#ff0040,#ffea00,#00ff6a,#00e5ff,#2f6bff,#ff00ea,#ff0040);
@@ -278,16 +275,31 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   background:radial-gradient(circle,rgba(0,229,255,.42),transparent 68%);
   animation:champPulse 2s ease-in-out infinite,champRgbGlow 3s linear infinite;
 }
-.lobby-av-wrap.champion .lobby-av{
+.lobby-av-wrap.champion .lobby-av,
+.lobby-av-wrap.champion .lobby-av-core .lobby-av{
   position:relative;z-index:1;
   border:2px solid rgba(255,255,255,.9);
   box-shadow:0 0 14px rgba(255,0,64,.55),0 0 28px rgba(0,229,255,.35),inset 0 0 0 1px rgba(255,255,255,.35);
-  animation:champRgbBorder 3s linear infinite;
+  animation:champRgbBorder 3s linear infinite !important;
+}
+.lobby-av-wrap.champion .lobby-av-core[class*="effect-"] .lobby-av{
+  /* winner ชนะเอฟเฟกต์ cosmetic */
+  transform:none !important;
+}
+.lobby-av-wrap.champion .lobby-av-core.effect-ring::before{
+  display:none !important;
 }
 .lobby-slot.champion{
   border-color:rgba(0,229,255,.45);
   box-shadow:0 0 0 1px rgba(255,0,234,.2),0 8px 24px rgba(47,107,255,.18);
   animation:champSlotRgb 4s linear infinite;
+  /* กรอบ winner ของการ์ดมาก่อนกรอบ cosmetic */
+  background:var(--chip);
+}
+.lobby-slot.champion[class*="frame-"]{
+  /* คง animation การ์ด winner — ไม่ให้กรอบ cosmetic ทับ */
+  border-color:rgba(0,229,255,.45);
+  background:var(--chip);
 }
 .lobby-slot-acts{
   position:relative;
@@ -530,11 +542,11 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   .lobby-slot-name{font-size:.82rem;line-height:1.45;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .lobby-slot-status{font-size:.68rem;letter-spacing:.02em}
   .lobby-slot.empty{
-    aspect-ratio:1;border-radius:50%;padding:14px 8px;gap:6px;
+    padding:12px 8px 10px;gap:6px;border-radius:16px;aspect-ratio:auto;min-height:0;
   }
   .lobby-slot.empty .lobby-slot-name{
-    font-size:.74rem;line-height:1.55;display:block;-webkit-line-clamp:unset;
-    white-space:nowrap;overflow:visible;padding:.1em 0 .2em;
+    font-size:.74rem;line-height:1.6;display:block;-webkit-line-clamp:unset;
+    white-space:normal;overflow:visible;padding:.15em 2px .3em;
   }
   .lobby-room-title{font-size:1.25rem;line-height:1.25}
   .lobby-meta-row{gap:6px;align-items:center}

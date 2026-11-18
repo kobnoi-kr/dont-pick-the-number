@@ -971,7 +971,8 @@ function renderLobbyGrid(){
       acts.appendChild(kick);
     }
     const avWrap=document.createElement("div");
-    const effectClass=meta&&meta.effectClass?String(meta.effectClass):"";
+    // Winner มาก่อน — ไม่ใส่เอฟเฟกต์ cosmetic ทับกรอบ winner
+    const effectClass=!champ&&meta&&meta.effectClass?String(meta.effectClass):"";
     avWrap.className="lobby-av-wrap"+(champ?" champion":"");
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
