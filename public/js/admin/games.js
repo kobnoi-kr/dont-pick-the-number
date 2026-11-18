@@ -33,6 +33,22 @@ const GAMES = [
     blurb: "เกมแนวหาคนเป็น Imposter — ยังไม่เปิดเล่น ใส่ในคลังเป็น Coming Soon ได้",
     defaultBeta: false,
     defaultComingSoon: true
+  },
+  {
+    id: "race2048",
+    defaultName: "2048 Race",
+    en: "2048 Race",
+    blurb: "แข่งรวมเลขแบบ 2048 — Coming Soon ในคลังเกม",
+    defaultBeta: false,
+    defaultComingSoon: true
+  },
+  {
+    id: "cardmemory",
+    defaultName: "Card Memory",
+    en: "Card Memory",
+    blurb: "พลิกไพ่จับคู่ความจำ — Coming Soon ในคลังเกม",
+    defaultBeta: false,
+    defaultComingSoon: true
   }
 ];
 
@@ -41,6 +57,8 @@ function modeLabel(mode) {
   if (mode === "secret") return "หาเลข";
   if (mode === "snake") return "งูและบันได";
   if (mode === "imposter") return "Imposter";
+  if (mode === "race2048") return "2048 Race";
+  if (mode === "cardmemory") return "Card Memory";
   return mode || "—";
 }
 

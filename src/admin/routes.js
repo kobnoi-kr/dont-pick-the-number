@@ -648,7 +648,9 @@ async function handleAdminApi(req, res, pathname) {
         secret: { enabled: true, name: "หาเลข", beta: false, comingSoon: false },
         wheel: { enabled: true, name: "วงล้อ", beta: false, comingSoon: false },
         snake: { enabled: true, name: "งูและบันได", beta: true, comingSoon: false },
-        imposter: { enabled: true, name: "Imposter", beta: false, comingSoon: true }
+        imposter: { enabled: true, name: "Imposter", beta: false, comingSoon: true },
+        race2048: { enabled: true, name: "2048 Race", beta: false, comingSoon: true },
+        cardmemory: { enabled: true, name: "Card Memory", beta: false, comingSoon: true }
       });
       sendJson(res, 200, { catalog });
       return true;
@@ -666,9 +668,11 @@ async function handleAdminApi(req, res, pathname) {
         secret: "หาเลข",
         wheel: "วงล้อ",
         snake: "งูและบันได",
-        imposter: "Imposter"
+        imposter: "Imposter",
+        race2048: "2048 Race",
+        cardmemory: "Card Memory"
       };
-      for (const id of ["secret", "wheel", "snake", "imposter"]) {
+      for (const id of ["secret", "wheel", "snake", "imposter", "race2048", "cardmemory"]) {
         const row = body.catalog[id] || {};
         next[id] = {
           enabled: row.enabled !== false,

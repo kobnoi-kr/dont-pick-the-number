@@ -50,6 +50,30 @@ const FALLBACK = [
     howTo: "รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
     popular: false,
     comingSoon: true
+  },
+  {
+    id: "race2048",
+    name: "2048 Race",
+    nameEn: "2048 Race",
+    category: "puzzle",
+    categoryLabel: "พัซเซิล",
+    maxPlayers: 8,
+    description: "แข่งรวมเลขแบบ 2048 — ใครถึงเป้าก่อนหรือได้คะแนนสูงสุดชนะ",
+    howTo: "รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    popular: false,
+    comingSoon: true
+  },
+  {
+    id: "cardmemory",
+    name: "Card Memory",
+    nameEn: "Card Memory",
+    category: "memory",
+    categoryLabel: "ความจำ",
+    maxPlayers: 8,
+    description: "พลิกไพ่จับคู่ — จำตำแหน่งให้แม่น ใครจับคู่ได้มากสุดชนะ",
+    howTo: "รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    popular: false,
+    comingSoon: true
   }
 ];
 
@@ -57,6 +81,8 @@ function thumbFor(id) {
   if (id === "wheel") return "🎡";
   if (id === "snake") return "🐍";
   if (id === "imposter") return "🕵️";
+  if (id === "race2048") return "🏁";
+  if (id === "cardmemory") return "🃏";
   return "🔢";
 }
 

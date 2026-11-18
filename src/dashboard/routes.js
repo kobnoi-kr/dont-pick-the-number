@@ -71,6 +71,36 @@ const GAME_CATALOG = [
     popular: false,
     beta: false,
     comingSoon: true
+  },
+  {
+    id: "race2048",
+    slug: "race2048",
+    name: "2048 Race",
+    nameEn: "2048 Race",
+    category: "puzzle",
+    categoryLabel: "พัซเซิล",
+    maxPlayers: 8,
+    description: "แข่งรวมเลขแบบ 2048 — ใครถึงเป้าก่อนหรือได้คะแนนสูงสุดชนะ",
+    howTo:
+      "เลื่อนแผ่นตัวเลขรวมคู่ที่เหมือนกัน แข่งกับผู้เล่นคนอื่นแบบเรียลไทม์ — รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    popular: false,
+    beta: false,
+    comingSoon: true
+  },
+  {
+    id: "cardmemory",
+    slug: "cardmemory",
+    name: "Card Memory",
+    nameEn: "Card Memory",
+    category: "memory",
+    categoryLabel: "ความจำ",
+    maxPlayers: 8,
+    description: "พลิกไพ่จับคู่ — จำตำแหน่งให้แม่น ใครจับคู่ได้มากสุดชนะ",
+    howTo:
+      "ผลัดกันพลิกไพ่สองใบ จับคู่ที่ตรงกันเก็บแต้ม — รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    popular: false,
+    beta: false,
+    comingSoon: true
   }
 ];
 
