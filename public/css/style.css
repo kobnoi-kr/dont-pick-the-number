@@ -792,11 +792,21 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .setup.locked button,.setup.locked input{opacity:.85}
 .host-only-note{display:none;margin:0 0 10px;color:var(--muted);font-size:.92rem}
 .setup.locked .host-only-note{display:block}
-.volbar{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+/* Volume — top-left (away from in-game chat) */
+.volbar{position:fixed;left:max(12px,env(safe-area-inset-left));right:auto;top:max(12px,env(safe-area-inset-top));bottom:auto;z-index:40;display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12);touch-action:manipulation;-webkit-user-select:none;user-select:none}
 .volbtn{width:44px;height:44px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:1.35rem;font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .volbtn:hover{background:var(--blue);color:#fff}
 .volbtn:disabled{opacity:.4;cursor:not-allowed}
 .vollabel{min-width:3.2em;text-align:center;font-size:.85rem;font-weight:700;color:var(--muted);pointer-events:none}
+body.room-bg .volbar{
+  background:rgba(12,16,28,.92);
+  border-color:rgba(255,255,255,.12);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  backdrop-filter:blur(10px);
+}
+body.room-bg .volbtn{background:rgba(255,255,255,.08);color:#e8edf8}
+body.room-bg .volbtn:hover{background:var(--blue);color:#fff}
+body.room-bg .vollabel{color:#9eb0d0}
 .auth-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip)}
 .auth-bar.profile{justify-content:flex-start;gap:12px}
 .auth-bar .hint{margin:0;color:var(--muted);font-size:.85rem}
@@ -877,8 +887,8 @@ img.auth-avatar.on{display:block;object-fit:cover}
   .dial canvas,.numdial canvas{transition:none !important}
 }
 
-/* Lobby chat — centered bottom */
-.room-chat-bar{
+/* Chat dock — lobby: composer only at bottom center; in-game: tall message panel */
+.room-chat-dock{
   position:fixed;
   left:50%;
   right:auto;
@@ -886,9 +896,53 @@ img.auth-avatar.on{display:block;object-fit:cover}
   transform:translateX(-50%);
   z-index:35;
   display:flex;
+  flex-direction:column;
+  gap:8px;
+  width:min(420px, calc(100vw - 24px));
+  max-height:min(220px, 34vh);
+  padding:0;
+  pointer-events:none;
+}
+.room-chat-dock.hidden{display:none !important}
+.room-chat-dock > *{pointer-events:auto}
+.room-chat-log{
+  display:none;
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  padding:10px 12px;
+  border-radius:16px;
+  background:rgba(12,16,28,.92);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 12px 36px rgba(0,0,0,.45);
+  backdrop-filter:blur(10px);
+  overscroll-behavior:contain;
+}
+.room-chat-line{
+  display:grid;
+  gap:2px;
+  margin:0 0 8px;
+  font-size:.82rem;
+  line-height:1.35;
+  color:var(--text);
+  word-break:break-word;
+}
+.room-chat-line:last-child{margin-bottom:0}
+.room-chat-line .who{
+  font-size:.72rem;
+  font-weight:800;
+  color:#93c5fd;
+}
+.room-chat-line.is-me .who{color:#86efac}
+.room-chat-line.is-private .who{color:#c4b5fd}
+.room-chat-line .body{color:rgba(255,255,255,.92)}
+.room-chat-line.is-private .body{color:#e9d5ff}
+.room-chat-bar{
+  position:relative;
+  display:flex;
   gap:8px;
   align-items:center;
-  width:min(420px, calc(100vw - 24px));
+  width:100%;
   padding:8px;
   border-radius:16px;
   background:rgba(12,16,28,.92);
@@ -896,7 +950,6 @@ img.auth-avatar.on{display:block;object-fit:cover}
   box-shadow:0 12px 36px rgba(0,0,0,.45);
   backdrop-filter:blur(10px);
 }
-.room-chat-bar.hidden{display:none !important}
 .room-chat-bar input{
   flex:1;
   min-width:0;
@@ -1006,23 +1059,50 @@ body.in-game .room-emoji-panel{
 }
 .room-chat-hint.hidden{display:none !important}
 
-/* In-game chat (หาเลข / วงล้อ / งู) — right side only */
-body.in-game .room-chat-bar,
+/* In-game: tall chat rectangle on the right; messages stream inside */
+body.in-game .room-chat-dock{
+  left:auto;
+  right:calc(12px + env(safe-area-inset-right,0px));
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  transform:none;
+  width:min(320px, calc(100vw - 24px));
+  max-height:min(460px, calc(100vh - 96px));
+  height:min(420px, 52vh);
+}
+body.in-game .room-chat-log{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
 body.in-game .room-chat-hint{
   left:auto;
   right:calc(12px + env(safe-area-inset-right,0px));
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
   transform:none;
   width:min(320px, calc(100vw - 24px));
 }
-body.snake-play .room-chat-bar,
-body.snake-play .room-chat-hint{
-  bottom:calc(64px + env(safe-area-inset-bottom,0px));
-  width:min(280px, calc(100vw - 24px));
+/* Leave room for the fixed chat dock so the board/panel aren't covered */
+body.in-game .stage{
+  padding-right:min(336px, calc(100vw - 40px));
+  box-sizing:border-box;
 }
-@media (min-width:961px){
-  body.snake-play .room-chat-bar,
-  body.snake-play .room-chat-hint{
-    width:min(250px, 28vw);
+body.snake-play .room-chat-dock{
+  width:min(280px, 28vw);
+  height:min(380px, 48vh);
+  max-height:calc(100vh - 120px);
+}
+body.snake-play .stage{
+  padding-right:min(296px, 30vw);
+}
+@media (max-width:960px){
+  body.in-game .room-chat-dock{
+    width:min(100vw - 24px, 360px);
+    height:min(280px, 40vh);
+  }
+  body.in-game .stage,
+  body.snake-play .stage{
+    padding-right:0;
+    padding-bottom:min(300px, 42vh);
   }
 }
 

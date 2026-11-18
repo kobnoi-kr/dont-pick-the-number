@@ -199,15 +199,18 @@
 </aside>
 </div>
 
-<form id="roomChatBar" class="room-chat-bar hidden" autocomplete="off">
-  <button type="button" class="room-emoji-btn" id="roomEmojiBtn" aria-label="อิโมจิ" aria-expanded="false" title="อิโมจิ">😊</button>
-  <div id="roomEmojiPanel" class="room-emoji-panel hidden" role="listbox" aria-label="เลือกอิโมจิ"></div>
-  <select id="roomChatTo" class="room-chat-to" aria-label="ส่งถึง" title="ส่งถึง">
-    <option value="">ทุกคน</option>
-  </select>
-  <input id="roomChatInput" type="text" maxlength="64" placeholder="พิมพ์แชทหรืออิโมจิ…" aria-label="แชทในห้อง">
-  <button class="btn sm" type="submit">ส่ง</button>
-</form>
+<div id="roomChatDock" class="room-chat-dock hidden">
+  <div id="roomChatLog" class="room-chat-log" aria-live="polite"></div>
+  <form id="roomChatBar" class="room-chat-bar" autocomplete="off">
+    <button type="button" class="room-emoji-btn" id="roomEmojiBtn" aria-label="อิโมจิ" aria-expanded="false" title="อิโมจิ">😊</button>
+    <div id="roomEmojiPanel" class="room-emoji-panel hidden" role="listbox" aria-label="เลือกอิโมจิ"></div>
+    <select id="roomChatTo" class="room-chat-to" aria-label="ส่งถึง" title="ส่งถึง">
+      <option value="">ทุกคน</option>
+    </select>
+    <input id="roomChatInput" type="text" maxlength="64" placeholder="พิมพ์แชทหรืออิโมจิ…" aria-label="แชทในห้อง">
+    <button class="btn sm" type="submit">ส่ง</button>
+  </form>
+</div>
 <p id="roomChatHint" class="room-chat-hint hidden">เข้าสู่ระบบเพื่อแชทในห้อง</p>
 
 <div id="winnerModal" class="modal winner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="winnerModalTitle">

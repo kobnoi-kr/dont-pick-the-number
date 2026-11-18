@@ -1294,7 +1294,8 @@ function finishSnakeMatch(room, winnerId) {
     reset: true,
     winners: [name],
     winTarget: 1,
-    mode: "snake"
+    mode: "snake",
+    at: Date.now()
   };
 }
 

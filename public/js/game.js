@@ -30,21 +30,21 @@ function ensureSnakeBoard(){
 }
 function updateSnakeBoard(s){
   const board=ensureSnakeBoard();
-  if(!board) return;
+  if(!board) return Promise.resolve();
   const seq=++snakeSnapSeq;
   const note=$("snakeSpectateNote");
   if(note){
     note.classList.toggle("hidden",!spectating);
     if(spectating) note.textContent="โหมด Spectator — ดูกระดานได้อย่างเดียว ไม่สามารถทอยได้";
   }
-  Promise.resolve(
+  return Promise.resolve(
     board.update(s&&s.snake?s.snake:null,{
       youId:s&&s.youId||myId||"",
       spectator:!!spectating,
       auto:!!myAuto
     })
   ).then(()=>{
-    void seq;
+    if(seq!==snakeSnapSeq) return;
   });
 }
 const $=id=>document.getElementById(id);
@@ -389,21 +389,57 @@ function show(n){
   if(card) card.classList.toggle("lobby-card", lobby);
   paintRoomChatBar();
 }
+function clearRoomChatLog(){
+  const log=$("roomChatLog");
+  if(log) log.innerHTML="";
+}
 function paintRoomChatBar(){
-  const bar=$("roomChatBar");
+  const dock=$("roomChatDock");
   const hint=$("roomChatHint");
   const panel=$("roomEmojiPanel");
   const emojiBtn=$("roomEmojiBtn");
   const inRoom=onlineMode&&!spectating&&document.body.classList.contains("room-bg");
   const registered=canUseFriends();
-  if(bar) bar.classList.toggle("hidden", !(inRoom&&registered));
+  const show=inRoom&&registered;
+  if(dock){
+    const wasHidden=dock.classList.contains("hidden");
+    dock.classList.toggle("hidden", !show);
+    if(!show&&!wasHidden) clearRoomChatLog();
+  }
   if(hint) hint.classList.toggle("hidden", !(inRoom&&!registered));
-  if(!(inRoom&&registered)){
+  if(!show){
     if(panel) panel.classList.add("hidden");
     if(emojiBtn) emojiBtn.setAttribute("aria-expanded","false");
   }else{
     paintRoomChatTargets();
   }
+}
+function appendRoomChatLog(msg){
+  const log=$("roomChatLog");
+  if(!log) return;
+  const fromName=String((msg&&msg.fromName)||"ผู้เล่น");
+  const body=String((msg&&msg.body)||"").trim();
+  if(!body) return;
+  const priv=!!(msg&&msg.private);
+  const fromMe=!!(msg&&msg.fromMe);
+  const line=document.createElement("div");
+  line.className="room-chat-line"+(fromMe?" is-me":"")+(priv?" is-private":"");
+  const who=document.createElement("div");
+  who.className="who";
+  if(priv){
+    who.textContent=fromMe
+      ?("🔒 คุณ → "+(msg.toName||"ผู้เล่น"))
+      :("🔒 "+fromName+" → คุณ");
+  }else{
+    who.textContent=fromMe?("คุณ"):fromName;
+  }
+  const text=document.createElement("div");
+  text.className="body";
+  text.textContent=body;
+  line.append(who, text);
+  log.appendChild(line);
+  while(log.childElementCount>100) log.firstChild.remove();
+  log.scrollTop=log.scrollHeight;
 }
 function paintRoomChatTargets(){
   const sel=$("roomChatTo");
@@ -551,7 +587,14 @@ function openWinnerModal(names, opts={}){
 function celebrateMatchWin(names, opts={}){
   const list=Array.isArray(names)?names.filter(Boolean):[];
   if(!list.length) return;
-  const key=[roomCode||"local", winTarget, list.slice().sort().join("|")].join("::");
+  // Include match note/session so rematches with the same winner still pop
+  const key=[
+    roomCode||"local",
+    opts.winTarget!=null?opts.winTarget:winTarget,
+    opts.note||"",
+    opts.matchKey||"",
+    list.slice().sort().join("|")
+  ].join("::");
   if(key===lastWinCelebrateKey) return;
   lastWinCelebrateKey=key;
   openWinnerModal(list, opts);
@@ -560,6 +603,59 @@ function celebrateMatchWin(names, opts={}){
 function resetWinCelebration(){
   lastWinCelebrateKey="";
   closeWinnerModal();
+}
+function paintOverScreen(s){
+  if(!s||!s.over) return;
+  $("overTitle").textContent=s.over.title||"";
+  $("overNote").textContent=s.over.note||"";
+  setOverOutOrder(s.over.outOrder||[]);
+  $("secretLabel").textContent=s.over.secretLabel||"";
+  const shown=$("secret");
+  if(shown){
+    shown.textContent=s.over.secretText||"";
+    shown.classList.toggle("many",!!s.over.many);
+  }
+  renderOverHist(s.over.hist);
+  $("again").textContent=s.over.again||"เล่นอีกครั้ง";
+  $("again").dataset.reset=s.over.reset?"1":"";
+  $("again").disabled=!isHost();
+  $("back").textContent=s.over.reset?"กลับล็อบบี้ · รีแต้ม":"กลับล็อบบี้";
+  $("back").disabled=!isHost();
+  renderScores($("finalScores"));
+  show("over");
+  renderPlayers();
+}
+function winnersFromOver(s){
+  if(!s||!s.over) return [];
+  if(Array.isArray(s.over.winners)&&s.over.winners.length) return s.over.winners.filter(Boolean);
+  return playerMeta.filter(p=>p&&p.champion).map(p=>p.name).filter(Boolean);
+}
+function shouldCelebrateOver(s){
+  if(!s||!s.over) return false;
+  if(s.over.mode==="snake"||s.cat==="snake") return true;
+  return !!s.over.reset;
+}
+function celebrateOverSnap(s){
+  if(!shouldCelebrateOver(s)){
+    closeWinnerModal();
+    return;
+  }
+  const winners=winnersFromOver(s);
+  if(!winners.length){
+    // Snake title fallback if winners array missing on older snaps
+    const titled=String((s.over&&s.over.title)||"").replace(/\s*ชนะ!?\s*$/,"").trim();
+    if(titled) celebrateMatchWin([titled],{
+      winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
+      note:s.over.note||"",
+      matchKey:String((s.snake&&s.snake.sessionId)||s.over.at||"")
+    });
+    return;
+  }
+  celebrateMatchWin(winners,{
+    winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
+    note:s.over.note||"",
+    matchKey:String((s.snake&&s.snake.sessionId)||s.over.at||"")
+  });
 }
 function screenOpen(id){
   const el=$(id);
@@ -3012,6 +3108,7 @@ function applySnap(s){
   syncSetup(s);
   paintRoom(s);
   if(s.phase==="lobby"){
+    resetWinCelebration();
     show("start");
     drawWheel();
     syncOrderWheel(s);
@@ -3077,34 +3174,20 @@ function applySnap(s){
     }
     renderPlayers();
   }else if(s.phase==="over"&&s.over){
-    $("overTitle").textContent=s.over.title||"";
-    $("overNote").textContent=s.over.note||"";
-    setOverOutOrder(s.over.outOrder||[]);
-    $("secretLabel").textContent=s.over.secretLabel||"";
-    const shown=$("secret");
-    shown.textContent=s.over.secretText||"";
-    shown.classList.toggle("many",!!s.over.many);
-    renderOverHist(s.over.hist);
-    $("again").textContent=s.over.again||"เล่นอีกครั้ง";
-    $("again").dataset.reset=s.over.reset?"1":"";
-    $("again").disabled=!isHost();
-    $("back").textContent=s.over.reset?"กลับล็อบบี้ · รีแต้ม":"กลับล็อบบี้";
-    $("back").disabled=!isHost();
-    renderScores($("finalScores"));
-    show("over");
-    renderPlayers();
-    if(s.over.reset){
-      const winners=Array.isArray(s.over.winners)&&s.over.winners.length
-        ? s.over.winners
-        : playerMeta.filter(p=>p&&p.champion).map(p=>p.name);
-      if(winners.length){
-        celebrateMatchWin(winners,{
-          winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
-          note:s.over.note||""
-        });
-      }
+    const isSnakeOver=s.over.mode==="snake"||s.cat==="snake"||(s.snake&&s.snake.status==="finished");
+    if(isSnakeOver&&s.snake){
+      // Keep the board up so the winning walk can play, then pop the winner modal
+      show("snakeGame");
+      updateSnakeBoard(s).then(()=>{
+        if(netPhase!=="over") return;
+        paintOverScreen(s);
+        celebrateOverSnap(s);
+        hostLocks();
+        paintInviteBtn();
+      });
     }else{
-      closeWinnerModal();
+      paintOverScreen(s);
+      celebrateOverSnap(s);
     }
   }
   hostLocks();
@@ -3126,7 +3209,26 @@ function finishLiveSpin(){
   pendingSnap=null;
   if(next) onSnap(next);
 }
+function clearLiveSpinAnim(){
+  if(!animId) return;
+  animId="";
+  animGen++;
+  liveSpin=null;
+  liveSpinUntil=0;
+  pendingSnap=null;
+  clearSpinTimers();
+  cancelAnimationFrame(orderAnim);
+  cancelAnimationFrame(wheelAnim);
+  stopSpinSound();
+  spinning=false;
+  wheelSpinning=false;
+  try{ closeSpinModal(); }catch(_){}
+}
 function onSnap(s){
+  // Never block end-of-match / lobby behind a stuck wheel animation
+  if(s&&(s.phase==="over"||s.phase==="lobby"||s.phase==="gate")){
+    clearLiveSpinAnim();
+  }
   if(animId){
     if(s.activeSpin&&s.activeSpin.id===animId){
       rememberSpin(s.activeSpin);
@@ -3498,12 +3600,19 @@ function connect(){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
     }else if(msg.t==="roomChat"){
       if(msg.fromId){
-        showRoomChatBubble(msg.fromId, msg.body||"", {
+        const meta={
           private:!!msg.private,
           toId:msg.toId||"",
           toName:msg.toName||"",
-          fromMe:msg.fromId===myId
-        });
+          fromMe:msg.fromId===myId,
+          fromName:msg.fromName||"",
+          body:msg.body||""
+        };
+        appendRoomChatLog(meta);
+        // Lobby keeps avatar bubbles; in-game messages live in the tall chat panel
+        if(!document.body.classList.contains("in-game")){
+          showRoomChatBubble(msg.fromId, msg.body||"", meta);
+        }
         if(msg.fromId!==myId) playClip(ROOM_CHAT_SOUND);
       }
     }else if(msg.t==="err"){
@@ -3638,7 +3747,7 @@ async function bootOnline(){
   if($("deleteRoomModal")) $("deleteRoomModal").addEventListener("click",e=>{
     if(e.target===$("deleteRoomModal")) closeDeleteRoomModal();
   });
-  $("again").onclick=()=>{ closeWinnerModal(); if(isHost()) send({t:"again"}); };
+  $("again").onclick=()=>{ resetWinCelebration(); if(isHost()) send({t:"again"}); };
   if($("winnerModalClose")) $("winnerModalClose").onclick=()=>closeWinnerModal();
   if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
     if(e.target===$("winnerModal")) closeWinnerModal();
@@ -3749,7 +3858,7 @@ async function bootOnline(){
   }
   document.addEventListener("click",e=>{
     if(!roomEmojiPanel||roomEmojiPanel.classList.contains("hidden")) return;
-    if(e.target.closest("#roomChatBar")) return;
+    if(e.target.closest("#roomChatDock")||e.target.closest("#roomChatBar")) return;
     setEmojiPanel(false);
   });
   const roomChatTo=$("roomChatTo");
