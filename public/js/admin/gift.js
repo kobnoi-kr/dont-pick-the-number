@@ -68,7 +68,7 @@ export async function renderGift(root, { user }) {
   let itemQuery = "";
   let itemSort = "level"; // level | name | kind | id
   let owned = [];
-  let equipped = { titleId: null, frameId: null, effectId: null };
+  let equipped = { titleId: null, frameId: null, effectId: null, extraTitleIds: [] };
   let ownedLoading = false;
   let createMsg = "";
   let createMsgOk = false;
@@ -117,7 +117,7 @@ export async function renderGift(root, { user }) {
 
   async function loadOwned() {
     owned = [];
-    equipped = { titleId: null, frameId: null, effectId: null };
+    equipped = { titleId: null, frameId: null, effectId: null, extraTitleIds: [] };
     if (!selectedUser) return;
     ownedLoading = true;
     paint();
@@ -248,8 +248,12 @@ export async function renderGift(root, { user }) {
                     ? list
                         .map((it) => {
                           const on = selectedCosmeticId === it.id;
+                          const extraIds = Array.isArray(equipped.extraTitleIds)
+                            ? equipped.extraTitleIds
+                            : [];
                           const isEq =
                             (equipped.titleId && equipped.titleId === it.id) ||
+                            extraIds.includes(it.id) ||
                             (equipped.frameId && equipped.frameId === it.id) ||
                             (equipped.effectId && equipped.effectId === it.id);
                           const locked = mode === "revoke" && PROTECTED_IDS.has(it.id);
@@ -314,6 +318,11 @@ export async function renderGift(root, { user }) {
           <button type="button" class="btn${mode === "revoke" ? " danger" : ""}" id="giftSend" ${
             canAct ? "" : "disabled"
           }>${mode === "gift" ? "มอบของ" : "ดึงของกลับ"}</button>
+          ${
+            selected && selected.kind === "title" && selected.deletable
+              ? `<button type="button" class="btn ghost danger sm" id="titleDeleteBtn">ลบยศนี้ถาวร</button>`
+              : ""
+          }
           <p class="msg" id="giftMsg" style="margin:0"></p>
         </div>
       </div>
@@ -494,6 +503,45 @@ export async function renderGift(root, { user }) {
         paint();
       };
     });
+
+    const deleteTitleBtn = root.querySelector("#titleDeleteBtn");
+    if (deleteTitleBtn) {
+      deleteTitleBtn.onclick = async () => {
+        const item =
+          mode === "gift"
+            ? items.find((it) => it.id === selectedCosmeticId)
+            : owned.find((it) => it.id === selectedCosmeticId);
+        if (!item || item.kind !== "title" || !item.deletable) return;
+        if (
+          !window.confirm(
+            "ลบยศ「" + item.name + "」ถาวร?\nผู้เล่นที่ถือยศนี้จะเสียไปด้วย และกู้คืนไม่ได้"
+          )
+        ) {
+          return;
+        }
+        deleteTitleBtn.disabled = true;
+        const { res, data } = await api("/api/v1/admin/cosmetics", {
+          method: "DELETE",
+          body: JSON.stringify({ cosmeticId: item.id })
+        });
+        deleteTitleBtn.disabled = false;
+        if (!res.ok) {
+          const err = (data && data.error) || "";
+          setMsg(
+            err === "protected_cosmetic" || err === "protected_title"
+              ? "ยศนี้ลบไม่ได้"
+              : "ลบยศไม่สำเร็จ",
+            false
+          );
+          return;
+        }
+        items = items.filter((x) => x.id !== item.id);
+        owned = owned.filter((x) => x.id !== item.id);
+        selectedCosmeticId = "";
+        setMsg("ลบยศ「" + item.name + "」แล้ว", true);
+        paint();
+      };
+    }
 
     const sendBtn = root.querySelector("#giftSend");
     if (sendBtn) {

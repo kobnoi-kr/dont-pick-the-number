@@ -66,9 +66,27 @@ function publicCosmeticLite(c) {
   };
 }
 
+function normalizeExtraIdsLite(raw) {
+  const arr = Array.isArray(raw) ? raw : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of arr) {
+    const id = String(item || "").trim();
+    if (!id || id.startsWith("title.level.") || id === "title.rookie" || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
 function publicUser(user) {
   if (!user) return null;
   const roles = (user.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
+  const title = publicCosmeticLite(user.equippedTitle);
+  const extraTitles = (Array.isArray(user.equippedExtraTitles) ? user.equippedExtraTitles : [])
+    .map(publicCosmeticLite)
+    .filter(Boolean);
   return {
     id: user.id,
     username: user.username,
@@ -88,15 +106,31 @@ function publicUser(user) {
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
     equipped: {
-      title: publicCosmeticLite(user.equippedTitle),
+      title,
+      extraTitles,
+      titles: [title, ...extraTitles].filter(Boolean),
       frame: publicCosmeticLite(user.equippedFrame),
-      effect: publicCosmeticLite(user.equippedEffect)
+      effect: publicCosmeticLite(user.equippedEffect),
+      maxExtraTitles: 4
     }
   };
 }
 
+async function hydrateEquippedExtras(prisma, user) {
+  if (!user) return user;
+  const ids = normalizeExtraIdsLite(user.equippedExtraTitleIds);
+  if (!ids.length) {
+    user.equippedExtraTitles = [];
+    return user;
+  }
+  const rows = await prisma.cosmetic.findMany({ where: { id: { in: ids } } });
+  const map = new Map(rows.map((row) => [row.id, row]));
+  user.equippedExtraTitles = ids.map((id) => map.get(id)).filter(Boolean);
+  return user;
+}
+
 async function getUserWithRoles(prisma, userId) {
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       userRoles: {
@@ -111,6 +145,7 @@ async function getUserWithRoles(prisma, userId) {
       equippedEffect: true
     }
   });
+  return hydrateEquippedExtras(prisma, user);
 }
 
 async function touchLastLogin(prisma, userId) {
@@ -125,6 +160,7 @@ module.exports = {
   ensurePlayerRole,
   createGuestUser,
   publicUser,
+  hydrateEquippedExtras,
   getUserWithRoles,
   touchLastLogin
 };

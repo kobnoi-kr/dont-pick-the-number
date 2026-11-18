@@ -104,17 +104,39 @@ function thumbHtml(item, user) {
   return `<span class="tiny">—</span>`;
 }
 
+function equippedTitlesList(eq) {
+  if (eq && Array.isArray(eq.titles) && eq.titles.length) return eq.titles.filter(Boolean);
+  const out = [];
+  if (eq && eq.title) out.push(eq.title);
+  if (eq && Array.isArray(eq.extraTitles)) {
+    for (const t of eq.extraTitles) if (t) out.push(t);
+  }
+  return out;
+}
+
+function isTitleEquipped(eq, itemId) {
+  return equippedTitlesList(eq).some((t) => t && t.id === itemId);
+}
+
+function isLevelTitleItem(item) {
+  return !!(item && String(item.id || "").startsWith("title.level."));
+}
+
 function previewHtml(user, eq) {
   const name = (user && (user.displayName || user.username)) || "ผู้เล่น";
   const uname = user && user.username ? "@" + user.username : "@—";
   const letter = String(name).slice(0, 1).toUpperCase();
-  const title = eq.title;
+  const titles = equippedTitlesList(eq);
   const frame = eq.frame;
   const effect = eq.effect;
   const frameCls = itemCssClass(frame);
   const effectCls = itemCssClass(effect);
   const frameImg = itemImage(frame);
   const effectImg = itemImage(effect);
+  const pills =
+    titles.length > 0
+      ? titles.map((t) => titlePillHtml(t, "dec-title-pill-md")).join("")
+      : titlePillHtml(null, "dec-title-pill-md");
   return `
     <div class="dec-preview-card dec-profile-card${frameCls ? " " + frameCls : ""}${frameImg ? " has-media" : ""}" style="--dec-accent:${esc(
       itemColor(frame)
@@ -131,7 +153,7 @@ function previewHtml(user, eq) {
           <b class="dec-preview-name">${esc(name)}</b>
           <span class="dec-preview-user">${esc(uname)}</span>
           <div class="nv-pills dec-preview-pills">
-            ${titlePillHtml(title, "dec-title-pill-md")}
+            ${pills}
           </div>
         </div>
       </div>
@@ -146,7 +168,7 @@ export async function renderDecorate(root, { user } = {}) {
     <section class="page-head">
       <div>
         <h2 style="margin:0">ตกแต่งโปรไฟล์</h2>
-        <p class="muted" style="margin:6px 0 0">ใส่ยศ · กรอบ · เอฟเฟกต์ — ยศเลเวลเก็บได้เรื่อยๆ ไม่ถูกลบ</p>
+        <p class="muted" style="margin:6px 0 0">ใส่ยศ · กรอบ · เอฟเฟกต์ — ยศเลเวล 1 ช่อง · ยศตกแต่งได้อีกสูงสุด 4</p>
       </div>
     </section>
     ${
@@ -165,7 +187,7 @@ export async function renderDecorate(root, { user } = {}) {
            </div>
            <div class="card" style="margin-top:14px">
              <h3 style="margin-top:0">คลังของฉัน</h3>
-             <p class="tiny muted" style="margin:0 0 10px">กดการ์ดเพื่อสวมใส่ · ของที่ยศเลเวลปลดล็อกจะอยู่ที่นี่ถาวร</p>
+             <p class="tiny muted" style="margin:0 0 10px">กดยศตกแต่งเพื่อสวม/ถอด (สูงสุด 4 ไม่นับยศเลเวล) · กดยศเลเวลเพื่อสลับช่องเลเวล</p>
              <div class="dec-kind-tabs" id="decKindTabs" role="tablist" aria-label="หมวดของตกแต่ง">
                <button type="button" class="dec-kind-tab on" data-kind="all" role="tab" aria-selected="true">ทั้งหมด</button>
                <button type="button" class="dec-kind-tab" data-kind="title" role="tab" aria-selected="false">ยศ</button>
@@ -228,18 +250,35 @@ export async function renderDecorate(root, { user } = {}) {
     paintTabs();
 
     if (eqBox) {
-      eqBox.innerHTML = ["title", "frame", "effect"]
-        .map((kind) => {
-          const item = eq[kind];
-          return `<div class="dec-eq-row">
+      const titles = equippedTitlesList(eq);
+      const maxExtra = (eq && eq.maxExtraTitles) || 4;
+      const extraCount = titles.filter((t) => t && !isLevelTitleItem(t)).length;
+      const titleVisual =
+        titles.length > 0
+          ? `<div class="dec-eq-titles">${titles.map((t) => thumbHtml(t, user)).join("")}</div>`
+          : thumbHtml(null, user);
+      const titleNames =
+        titles.length > 0 ? titles.map((t) => esc(t.name)).join(" · ") : "—";
+      eqBox.innerHTML =
+        `<div class="dec-eq-row">
+            <div class="dec-eq-visual">${titleVisual}</div>
+            <div class="dec-eq-meta">
+              <span class="tiny">ยศ <em class="muted">ตกแต่ง ${extraCount}/${maxExtra}</em></span>
+              <b>${titleNames}</b>
+            </div>
+          </div>` +
+        ["frame", "effect"]
+          .map((kind) => {
+            const item = eq[kind];
+            return `<div class="dec-eq-row">
             <div class="dec-eq-visual">${thumbHtml(item, user)}</div>
             <div class="dec-eq-meta">
               <span class="tiny">${KIND_LABEL[kind]}</span>
               <b>${item ? esc(item.name) : "—"}</b>
             </div>
           </div>`;
-        })
-        .join("");
+          })
+          .join("");
     }
 
     if (!ownBox) return;
@@ -257,9 +296,9 @@ export async function renderDecorate(root, { user } = {}) {
     ownBox.innerHTML = filtered
       .map((item) => {
         const isOn =
-          (eq.title && eq.title.id === item.id) ||
-          (eq.frame && eq.frame.id === item.id) ||
-          (eq.effect && eq.effect.id === item.id);
+          item.kind === "title"
+            ? isTitleEquipped(eq, item.id)
+            : (eq[item.kind] && eq[item.kind].id === item.id);
         const srcLabel =
           item.source === "level"
             ? "ยศเลเวล"
@@ -277,13 +316,19 @@ export async function renderDecorate(root, { user } = {}) {
                 item.tierLabel || tier
               )}</span>`
             : "";
+        const wearLabel =
+          item.kind === "title" && isOn && !isLevelTitleItem(item)
+            ? "ถอดยศ"
+            : isOn
+              ? "สวมอยู่"
+              : "สวมใส่";
         return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}">
           <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
           ${tierPill}
           <b>${esc(item.name)}</b>
           <span class="tiny muted">${esc(srcLabel)}</span>
-          <span class="dec-wear">${isOn ? "สวมอยู่" : "สวมใส่"}</span>
+          <span class="dec-wear">${wearLabel}</span>
         </button>`;
       })
       .join("");
@@ -293,15 +338,19 @@ export async function renderDecorate(root, { user } = {}) {
         const id = btn.getAttribute("data-id");
         const item = owned.find((x) => x.id === id);
         if (!item) return;
-        if (equipped[item.kind] && equipped[item.kind].id === item.id) return;
+        // Level title already on: no-op. Frame/effect already on: no-op.
+        // Extra titles already on: toggle off via API.
+        if (item.kind !== "title" && equipped[item.kind] && equipped[item.kind].id === item.id) {
+          return;
+        }
+        if (item.kind === "title" && isLevelTitleItem(item) && isTitleEquipped(equipped, item.id)) {
+          return;
+        }
 
-        // Allow rapid clicks: UI updates immediately, latest request wins.
         equipSeq += 1;
         const seq = equipSeq;
-        equipped = Object.assign({}, equipped, { [item.kind]: item });
-        if (user) user.equipped = equipped;
-        paint();
-        setMsg("สวมใส่แล้ว", true);
+        const wasOn = item.kind === "title" && isTitleEquipped(equipped, item.id) && !isLevelTitleItem(item);
+        setMsg(wasOn ? "ถอดยศแล้ว" : "สวมใส่แล้ว", true);
 
         const r = await api("/api/v1/cosmetics/equip", {
           method: "POST",
@@ -312,11 +361,21 @@ export async function renderDecorate(root, { user } = {}) {
           owned = Array.isArray(r.data.owned) ? r.data.owned : owned;
           equipped = r.data.equipped || equipped;
           if (user) user.equipped = equipped;
-          setMsg("สวมใส่แล้ว", true);
+          const nowOn = item.kind === "title" ? isTitleEquipped(equipped, item.id) : true;
+          setMsg(
+            item.kind === "title" && !nowOn ? "ถอดยศแล้ว" : "สวมใส่แล้ว",
+            true
+          );
           paint();
           return;
         }
-        setMsg((r.data && r.data.error) || "ไม่สำเร็จ", false);
+        const err = (r.data && r.data.error) || "";
+        setMsg(
+          err === "title_slots_full"
+            ? "สวมยศตกแต่งได้สูงสุด 4 ยศ (ไม่นับยศเลเวล)"
+            : err || "ไม่สำเร็จ",
+          false
+        );
         await load();
       };
     });

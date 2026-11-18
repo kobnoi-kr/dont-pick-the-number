@@ -9,7 +9,7 @@ const {
   appendSetCookie
 } = require("./cookies");
 const { sendJson, clientIp, readJsonBody } = require("./http");
-const { createGuestUser, publicUser } = require("./users");
+const { createGuestUser, publicUser, hydrateEquippedExtras } = require("./users");
 const {
   createSession,
   findValidSession,
@@ -418,6 +418,7 @@ async function handleAccountProfile(req, res) {
           equippedEffect: true
         }
       });
+      await hydrateEquippedExtras(auth.prisma, user);
       sendJson(res, 200, { user: publicUser(user) });
     } catch (err) {
       sendJson(res, 400, { error: "update_failed" });

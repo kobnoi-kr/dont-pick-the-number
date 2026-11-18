@@ -3029,7 +3029,18 @@ body.modal-open {
   white-space: nowrap;
 }
 .dec-preview-user { display: block; margin-top: 2px; color: var(--nv-muted); font-size: 0.9rem; }
-.dec-preview-pills { margin-top: 8px; }
+.dec-preview-pills {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dec-eq-titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 .nv-pills {
   display: flex;
   flex-wrap: wrap;

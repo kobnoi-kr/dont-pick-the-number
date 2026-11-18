@@ -2434,16 +2434,25 @@ async function openPlayerProfileModal(userId){
     const gender=u&&u.gender?String(u.gender):"";
     pillsEl.appendChild(makeNvPill(genderLabelOf(gender), "gender"+(gender?" gender-"+gender:"")));
     pillsEl.appendChild(makeNvPill(u&&u.age!=null&&u.age!==""?String(u.age):"—", "age"));
-    const titleName=(eq.title&&eq.title.name)||"—";
-    const titleClass=(eq.title&&eq.title.cssClass)||"";
-    const titlePill=makeNvPill(titleName, "title"+(titleClass?" "+titleClass:""));
-    const titleColor=(eq.title&&eq.title.meta&&eq.title.meta.color)?String(eq.title.meta.color):"";
-    if(titleColor){
-      titlePill.style.borderColor=titleColor;
-      titlePill.style.color=titleColor;
-      titlePill.style.boxShadow="0 0 10px "+titleColor+"44";
+    const titleList=(eq.titles&&eq.titles.length)
+      ? eq.titles
+      : [].concat(eq.title||[], Array.isArray(eq.extraTitles)?eq.extraTitles:[]).filter(Boolean);
+    if(!titleList.length){
+      pillsEl.appendChild(makeNvPill("—", "title"));
+    }else{
+      titleList.forEach(function(t){
+        const titleName=(t&&t.name)||"—";
+        const titleClass=(t&&t.cssClass)||"";
+        const titlePill=makeNvPill(titleName, "title"+(titleClass?" "+titleClass:""));
+        const titleColor=(t&&t.meta&&t.meta.color)?String(t.meta.color):"";
+        if(titleColor){
+          titlePill.style.borderColor=titleColor;
+          titlePill.style.color=titleColor;
+          titlePill.style.boxShadow="0 0 10px "+titleColor+"44";
+        }
+        pillsEl.appendChild(titlePill);
+      });
     }
-    pillsEl.appendChild(titlePill);
     const adminLabel=adminRoleLabel(u&&u.roles);
     if(adminLabel) pillsEl.appendChild(makeNvPill(adminLabel, "admin"));
   }

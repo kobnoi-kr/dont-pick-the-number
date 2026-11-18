@@ -6,7 +6,9 @@ const {
   ensureCosmeticsCatalog,
   grantCosmetic,
   RANK_TITLE_IDS,
-  STARTER_COSMETICS
+  STARTER_COSMETICS,
+  normalizeExtraTitleIds,
+  MAX_EXTRA_TITLES
 } = require("./cosmetics");
 
 function periodLabelTh(period) {
@@ -104,18 +106,18 @@ async function grantPeriodRewards(prisma, period) {
       await grantCosmetic(prisma, userId, cosmeticId, `ranking_${period}`);
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { equippedTitleId: true }
+        select: { equippedExtraTitleIds: true }
       });
-      // Auto-equip if they still use the starter / level-1 title.
-      const starterTitles = new Set(["title.rookie", "title.level.1"]);
-      if (
-        user &&
-        (!user.equippedTitleId || starterTitles.has(user.equippedTitleId))
-      ) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { equippedTitleId: cosmeticId }
-        });
+      // Ranking titles go into decorative slots (max 4), never replace level title.
+      if (user) {
+        const extras = normalizeExtraTitleIds(user.equippedExtraTitleIds);
+        if (!extras.includes(cosmeticId) && extras.length < MAX_EXTRA_TITLES) {
+          extras.push(cosmeticId);
+          await prisma.user.update({
+            where: { id: userId },
+            data: { equippedExtraTitleIds: extras }
+          });
+        }
       }
       try {
         await notifyRankingReward(prisma, {

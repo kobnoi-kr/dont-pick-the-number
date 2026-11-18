@@ -51,6 +51,12 @@ async function findValidSession(prisma, rawToken) {
   if (session.revokedAt) return null;
   if (session.expiresAt.getTime() <= Date.now()) return null;
   if (!session.user || session.user.status !== "active") return null;
+  try {
+    const { hydrateEquippedExtras } = require("./users");
+    await hydrateEquippedExtras(prisma, session.user);
+  } catch {
+    /* ignore */
+  }
   return session;
 }
 

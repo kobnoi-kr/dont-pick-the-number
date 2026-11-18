@@ -203,6 +203,70 @@ function isRankingTitleId(id) {
   return RANK_TITLE_ID_SET.has(String(id || ""));
 }
 
+function isLevelTitleId(id) {
+  return String(id || "").startsWith("title.level.");
+}
+
+const MAX_EXTRA_TITLES = 4;
+
+function normalizeExtraTitleIds(raw) {
+  const arr = Array.isArray(raw) ? raw : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of arr) {
+    const id = String(item || "").trim();
+    if (!id || isLevelTitleId(id) || id === "title.rookie" || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= MAX_EXTRA_TITLES) break;
+  }
+  return out;
+}
+
+function canDeleteCosmetic(c) {
+  if (!c) return false;
+  if (PROTECTED_COSMETIC_IDS.has(c.id)) return false;
+  if (c.id === "title.rookie") return false;
+  if (isLevelTitleId(c.id)) return false;
+  if (isRankingTitleId(c.id)) return false;
+  if (c.kind === "title") return !!isAdminCreatedCosmetic(c) || !String(c.id || "").startsWith("title.");
+  if (c.kind === "frame" || c.kind === "effect") {
+    const isStarter = STARTER_COSMETICS.some((x) => x.id === c.id);
+    if (isStarter && !isAdminCreatedCosmetic(c)) return false;
+    return true;
+  }
+  return false;
+}
+
+async function loadExtraTitleCosmetics(prisma, ids) {
+  const extraIds = normalizeExtraTitleIds(ids);
+  if (!extraIds.length) return [];
+  const rows = await prisma.cosmetic.findMany({ where: { id: { in: extraIds } } });
+  const map = new Map(rows.map((row) => [row.id, row]));
+  return extraIds.map((id) => map.get(id)).filter(Boolean);
+}
+
+async function clearCosmeticFromExtraTitles(prisma, cosmeticId) {
+  const id = String(cosmeticId || "").trim();
+  if (!id) return;
+  try {
+    await prisma.$executeRaw`
+      UPDATE users
+      SET equipped_extra_title_ids = COALESCE(
+        (
+          SELECT jsonb_agg(elem)
+          FROM jsonb_array_elements(COALESCE(equipped_extra_title_ids, '[]'::jsonb)) AS elem
+          WHERE elem #>> '{}' <> ${id}
+        ),
+        '[]'::jsonb
+      )
+      WHERE equipped_extra_title_ids @> ${JSON.stringify([id])}::jsonb
+    `;
+  } catch (err) {
+    console.warn("[cosmetics] clear extra title failed", err && err.message);
+  }
+}
+
 const STARTER_COSMETICS = [
   {
     id: "title.rookie",
@@ -389,15 +453,23 @@ function publicCosmetic(c) {
     useSystemColor,
     useSystemEffect,
     adminCreated: isAdminCreatedCosmetic(c),
+    deletable: canDeleteCosmetic(c),
     meta: Object.keys(meta).length ? meta : null
   };
 }
 
-function equippedBundle(user) {
+function equippedBundle(user, extraCosmetics) {
+  const title = publicCosmetic(user && user.equippedTitle);
+  const extras = (Array.isArray(extraCosmetics) ? extraCosmetics : [])
+    .map(publicCosmetic)
+    .filter(Boolean);
   return {
-    title: publicCosmetic(user.equippedTitle),
-    frame: publicCosmetic(user.equippedFrame),
-    effect: publicCosmetic(user.equippedEffect)
+    title,
+    extraTitles: extras,
+    titles: [title, ...extras].filter(Boolean),
+    frame: publicCosmetic(user && user.equippedFrame),
+    effect: publicCosmetic(user && user.equippedEffect),
+    maxExtraTitles: MAX_EXTRA_TITLES
   };
 }
 
@@ -571,9 +643,11 @@ async function ensureStarterCosmetics(prisma, userId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      level: true,
       equippedTitleId: true,
       equippedFrameId: true,
       equippedEffectId: true,
+      equippedExtraTitleIds: true,
       cosmetics: {
         where: { cosmeticId: { in: [level1, "frame.basic", "effect.none", "title.rookie"] } },
         select: { cosmeticId: true }
@@ -587,9 +661,14 @@ async function ensureStarterCosmetics(prisma, userId) {
   const needsFrame = !have.has("frame.basic");
   const needsEffect = !have.has("effect.none");
   const hasRookie = have.has("title.rookie");
+  const equippedIsNonLevel =
+    !!user.equippedTitleId &&
+    user.equippedTitleId !== "title.rookie" &&
+    !isLevelTitleId(user.equippedTitleId);
   const needsEquipFix =
     !user.equippedTitleId ||
     user.equippedTitleId === "title.rookie" ||
+    equippedIsNonLevel ||
     !user.equippedFrameId ||
     !user.equippedEffectId;
 
@@ -614,8 +693,17 @@ async function ensureStarterCosmetics(prisma, userId) {
   }
 
   const data = {};
-  if (!user.equippedTitleId || user.equippedTitleId === "title.rookie") {
-    data.equippedTitleId = level1;
+  if (!user.equippedTitleId || user.equippedTitleId === "title.rookie" || equippedIsNonLevel) {
+    // Non-level titles belong in extra slots (max 4), not the level title slot.
+    if (equippedIsNonLevel) {
+      data.equippedExtraTitleIds = normalizeExtraTitleIds([
+        user.equippedTitleId,
+        ...normalizeExtraTitleIds(user.equippedExtraTitleIds)
+      ]);
+    }
+    const lv = Math.max(1, Number(user.level) || 1);
+    data.equippedTitleId = levelTitleCosmeticId(lv);
+    await grantCosmetic(prisma, userId, data.equippedTitleId, "level");
   }
   if (!user.equippedFrameId) data.equippedFrameId = "frame.basic";
   if (!user.equippedEffectId) data.equippedEffectId = "effect.none";
@@ -638,10 +726,8 @@ async function loadUserCosmetics(prisma, userId) {
     select: { level: true }
   });
   const level = Math.max(1, (userLite && userLite.level) || 1);
-  await Promise.all([
-    grantLevelTitlesUpTo(prisma, userId, level),
-    ensureStarterCosmetics(prisma, userId)
-  ]);
+  await grantLevelTitlesUpTo(prisma, userId, level);
+  await ensureStarterCosmetics(prisma, userId);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -654,6 +740,10 @@ async function loadUserCosmetics(prisma, userId) {
       }
     }
   });
+  const extraCosmetics = await loadExtraTitleCosmetics(
+    prisma,
+    user && user.equippedExtraTitleIds
+  );
   // Hide legacy starter title so inventory never shows duplicate มือใหม่.
   const ownedPublic = ((user && user.cosmetics) || [])
     .filter((row) => row.cosmetic && row.cosmetic.id !== "title.rookie")
@@ -664,7 +754,7 @@ async function loadUserCosmetics(prisma, userId) {
     }));
   return {
     owned: ownedPublic,
-    equipped: equippedBundle(user || {})
+    equipped: equippedBundle(user || {}, extraCosmetics)
   };
 }
 
@@ -818,13 +908,45 @@ async function handleCosmeticsApi(req, res, pathname) {
       return true;
     }
     const kind = owned.cosmetic.kind;
-    const data =
-      kind === "title"
-        ? { equippedTitleId: cosmeticId }
-        : kind === "frame"
-          ? { equippedFrameId: cosmeticId }
-          : { equippedEffectId: cosmeticId };
-    await auth.prisma.user.update({ where: { id: auth.user.id }, data });
+    if (kind === "title") {
+      const user = await auth.prisma.user.findUnique({
+        where: { id: auth.user.id },
+        select: { equippedTitleId: true, equippedExtraTitleIds: true, level: true }
+      });
+      if (!user) {
+        sendJson(res, 404, { error: "not_found" });
+        return true;
+      }
+      if (isLevelTitleId(cosmeticId)) {
+        await auth.prisma.user.update({
+          where: { id: auth.user.id },
+          data: { equippedTitleId: cosmeticId }
+        });
+      } else {
+        const extras = normalizeExtraTitleIds(user.equippedExtraTitleIds);
+        const idx = extras.indexOf(cosmeticId);
+        if (idx >= 0) {
+          extras.splice(idx, 1);
+        } else {
+          if (extras.length >= MAX_EXTRA_TITLES) {
+            sendJson(res, 400, {
+              error: "title_slots_full",
+              maxExtraTitles: MAX_EXTRA_TITLES
+            });
+            return true;
+          }
+          extras.push(cosmeticId);
+        }
+        await auth.prisma.user.update({
+          where: { id: auth.user.id },
+          data: { equippedExtraTitleIds: extras }
+        });
+      }
+    } else {
+      const data =
+        kind === "frame" ? { equippedFrameId: cosmeticId } : { equippedEffectId: cosmeticId };
+      await auth.prisma.user.update({ where: { id: auth.user.id }, data });
+    }
     const fresh = await loadUserCosmetics(auth.prisma, auth.user.id);
     sendJson(res, 200, fresh);
     return true;
@@ -1132,14 +1254,38 @@ async function adminGiftCosmetic(prisma, { targetUserId, cosmeticId, autoEquip, 
   await grantCosmetic(prisma, targetUserId, cosmeticId, source || "admin_gift");
   let equipped = false;
   if (autoEquip) {
-    const data =
-      cosmetic.kind === "title"
-        ? { equippedTitleId: cosmeticId }
-        : cosmetic.kind === "frame"
+    if (cosmetic.kind === "title") {
+      if (isLevelTitleId(cosmeticId)) {
+        await prisma.user.update({
+          where: { id: targetUserId },
+          data: { equippedTitleId: cosmeticId }
+        });
+        equipped = true;
+      } else {
+        const user = await prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: { equippedExtraTitleIds: true }
+        });
+        const extras = normalizeExtraTitleIds(user && user.equippedExtraTitleIds);
+        if (!extras.includes(cosmeticId) && extras.length < MAX_EXTRA_TITLES) {
+          extras.push(cosmeticId);
+          await prisma.user.update({
+            where: { id: targetUserId },
+            data: { equippedExtraTitleIds: extras }
+          });
+          equipped = true;
+        } else if (extras.includes(cosmeticId)) {
+          equipped = true;
+        }
+      }
+    } else {
+      const data =
+        cosmetic.kind === "frame"
           ? { equippedFrameId: cosmeticId }
           : { equippedEffectId: cosmeticId };
-    await prisma.user.update({ where: { id: targetUserId }, data });
-    equipped = true;
+      await prisma.user.update({ where: { id: targetUserId }, data });
+      equipped = true;
+    }
   }
   return { cosmetic: publicCosmetic(cosmetic), alreadyOwned: !!already, equipped };
 }
@@ -1198,7 +1344,8 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         status: true,
         equippedTitleId: true,
         equippedFrameId: true,
-        equippedEffectId: true
+        equippedEffectId: true,
+        equippedExtraTitleIds: true
       }
     });
     if (!target || target.status === "deleted") {
@@ -1219,7 +1366,8 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       equipped: {
         titleId: target.equippedTitleId || null,
         frameId: target.equippedFrameId || null,
-        effectId: target.equippedEffectId || null
+        effectId: target.equippedEffectId || null,
+        extraTitleIds: normalizeExtraTitleIds(target.equippedExtraTitleIds)
       },
       owned: owned
         .filter((row) => row.cosmetic && row.cosmetic.id !== "title.rookie")
@@ -1650,11 +1798,14 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     return true;
   }
 
-  // Hard-delete frame/effect (admin-created only; starters are protected)
-  if (pathname === "/api/v1/admin/cosmetics/shop" && method(req) === "DELETE") {
+  // Hard-delete frame/effect/title (level + ranking + starters protected)
+  if (
+    (pathname === "/api/v1/admin/cosmetics/shop" || pathname === "/api/v1/admin/cosmetics") &&
+    method(req) === "DELETE"
+  ) {
     const auth = await requireAdmin(req, res);
     if (!auth) return true;
-    if (!canManageShop(auth.user, userHasPermission)) {
+    if (!canManageShop(auth.user, userHasPermission) && !userHasPermission(auth.user, "cosmetics.gift")) {
       sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
       return true;
     }
@@ -1670,7 +1821,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 400, { error: "invalid_input" });
       return true;
     }
-    if (PROTECTED_COSMETIC_IDS.has(cosmeticId)) {
+    if (PROTECTED_COSMETIC_IDS.has(cosmeticId) || isLevelTitleId(cosmeticId) || isRankingTitleId(cosmeticId)) {
       sendJson(res, 400, { error: "protected_cosmetic" });
       return true;
     }
@@ -1679,15 +1830,24 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 404, { error: "cosmetic_not_found" });
       return true;
     }
-    if (cosmetic.kind !== "frame" && cosmetic.kind !== "effect") {
-      sendJson(res, 400, { error: "invalid_kind" });
+    if (!canDeleteCosmetic(cosmetic)) {
+      sendJson(res, 400, { error: cosmetic.kind === "title" ? "protected_title" : "protected_cosmetic" });
       return true;
     }
-    const isStarter = STARTER_COSMETICS.some((x) => x.id === cosmeticId);
-    if (isStarter && !isAdminCreatedCosmetic(cosmetic)) {
-      sendJson(res, 400, { error: "starter_cosmetic" });
-      return true;
-    }
+    // Unequip from level slot + extra title slots before hard delete
+    await prisma.user.updateMany({
+      where: { equippedTitleId: cosmeticId },
+      data: { equippedTitleId: levelTitleCosmeticId(1) }
+    });
+    await clearCosmeticFromExtraTitles(prisma, cosmeticId);
+    await prisma.user.updateMany({
+      where: { equippedFrameId: cosmeticId },
+      data: { equippedFrameId: "frame.basic" }
+    });
+    await prisma.user.updateMany({
+      where: { equippedEffectId: cosmeticId },
+      data: { equippedEffectId: "effect.none" }
+    });
     await prisma.cosmetic.delete({ where: { id: cosmeticId } });
     cosmeticsEnsuredAt = 0;
     await writeAdminLog(prisma, {
@@ -1753,6 +1913,10 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     if (target.equippedTitleId === cosmeticId) data.equippedTitleId = fallTitle;
     if (target.equippedFrameId === cosmeticId) data.equippedFrameId = "frame.basic";
     if (target.equippedEffectId === cosmeticId) data.equippedEffectId = "effect.none";
+    const extras = normalizeExtraTitleIds(target.equippedExtraTitleIds);
+    if (extras.includes(cosmeticId)) {
+      data.equippedExtraTitleIds = extras.filter((id) => id !== cosmeticId);
+    }
     if (Object.keys(data).length) {
       await ensureLevelOneTitleCosmetic(prisma);
       await grantCosmetic(prisma, target.id, fallTitle, "level");
@@ -1823,7 +1987,11 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
 module.exports = {
   STARTER_COSMETICS,
   RANK_TITLE_IDS,
+  MAX_EXTRA_TITLES,
   isRankingTitleId,
+  isLevelTitleId,
+  normalizeExtraTitleIds,
+  loadExtraTitleCosmetics,
   publicCosmetic,
   equippedBundle,
   ensureCosmeticsCatalog,

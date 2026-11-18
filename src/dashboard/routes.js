@@ -993,6 +993,11 @@ async function handleDashboardApi(req, res, pathname) {
       relation = { status: "self" };
     }
     const roles = (u.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
+    const {
+      loadExtraTitleCosmetics,
+      equippedBundle
+    } = require("./cosmetics");
+    const extraCosmetics = await loadExtraTitleCosmetics(prisma, u.equippedExtraTitleIds);
     sendJson(res, 200, {
       user: {
         id: u.id,
@@ -1004,11 +1009,7 @@ async function handleDashboardApi(req, res, pathname) {
         gender: u.gender || null,
         age: u.age == null ? null : u.age,
         roles,
-        equipped: {
-          title: publicCosmetic(u.equippedTitle),
-          frame: publicCosmetic(u.equippedFrame),
-          effect: publicCosmetic(u.equippedEffect)
-        }
+        equipped: equippedBundle(u, extraCosmetics)
       },
       stats,
       relation
