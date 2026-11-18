@@ -101,7 +101,9 @@
     </div>
     <div id="chatThreadMsgs" class="chat-thread-msgs"></div>
     <form id="chatThreadForm" class="chat-thread-form" autocomplete="off">
-      <input id="chatThreadInput" type="text" maxlength="280" placeholder="พิมพ์ข้อความ…" aria-label="ข้อความ">
+      <button type="button" class="chat-emoji-btn" id="chatEmojiBtn" aria-label="อิโมจิ" aria-expanded="false" title="อิโมจิ">😊</button>
+      <div id="chatEmojiPanel" class="chat-emoji-panel hidden" role="listbox" aria-label="เลือกอิโมจิ"></div>
+      <input id="chatThreadInput" type="text" maxlength="280" placeholder="พิมพ์ข้อความหรืออิโมจิ…" aria-label="ข้อความ">
       <button class="btn sm" type="submit">ส่ง</button>
     </form>
     <p class="msg tiny" id="chatThreadMsg"></p>

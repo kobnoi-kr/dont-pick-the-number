@@ -2,11 +2,31 @@ import { api } from "./api.js";
 import { playSfx } from "./sfx.js";
 
 const DM_SOUND = "/audio/snapchat-message.mp3";
+const CHAT_EMOJIS = [
+  "😀","😁","😂","🤣","😊","😍","😘","😎",
+  "🤩","😇","🙂","😉","😭","😤","😡","🤔",
+  "😴","🤒","🤢","😈","👻","💀","🔥","✨",
+  "💥","❤️","🧡","💛","💚","💙","💜","🖤",
+  "👍","👎","👏","🙌","🤝","✌️","🤞","💪",
+  "🎮","🎲","🐍","🪜","🏆","🥇","🎯","⚡",
+  "🍀","🎉","🎊","💯","✅","❌","⭐","🌟"
+];
 
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
+}
+
+function clipChatBody(s) {
+  return Array.from(String(s || "").trim().replace(/\s+/g, " ")).slice(0, 280).join("");
+}
+
+function looksLikeEmojiOnly(s) {
+  const t = String(s || "").trim();
+  if (!t) return false;
+  // short emoji / emoji clusters without much plain text
+  return Array.from(t).length <= 8 && /[\p{Extended_Pictographic}\uFE0F\u200D]/u.test(t);
 }
 
 function when(iso) {
@@ -106,14 +126,16 @@ async function openThread(peerId) {
     box.innerHTML = (data.messages || [])
       .map((m) => {
         const mine = meId && m.senderId === meId;
+        const emoji = looksLikeEmojiOnly(m.body);
         return `<div class="chat-bubble-row${mine ? " mine" : ""}">
-          <div class="chat-bubble">${esc(m.body)}</div>
+          <div class="chat-bubble${emoji ? " is-emoji" : ""}">${esc(m.body)}</div>
           <div class="chat-bubble-time">${esc(when(m.createdAt))}</div>
         </div>`;
       })
       .join("");
     box.scrollTop = box.scrollHeight;
   }
+  setChatEmojiPanel(false);
   const input = document.getElementById("chatThreadInput");
   if (input) {
     input.value = "";
@@ -149,18 +171,61 @@ async function sendThread() {
     return;
   }
   if (input) input.value = "";
+  setChatEmojiPanel(false);
   const box = document.getElementById("chatThreadMsgs");
   if (box && data.message) {
     const m = data.message;
+    const emoji = looksLikeEmojiOnly(m.body);
     box.insertAdjacentHTML(
       "beforeend",
       `<div class="chat-bubble-row mine">
-        <div class="chat-bubble">${esc(m.body)}</div>
+        <div class="chat-bubble${emoji ? " is-emoji" : ""}">${esc(m.body)}</div>
         <div class="chat-bubble-time">${esc(when(m.createdAt))}</div>
       </div>`
     );
     box.scrollTop = box.scrollHeight;
   }
+}
+
+function setChatEmojiPanel(open) {
+  const panel = document.getElementById("chatEmojiPanel");
+  const btn = document.getElementById("chatEmojiBtn");
+  if (!panel) return;
+  panel.classList.toggle("hidden", !open);
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function wireChatEmoji() {
+  const btn = document.getElementById("chatEmojiBtn");
+  const panel = document.getElementById("chatEmojiPanel");
+  const form = document.getElementById("chatThreadForm");
+  if (!btn || !panel) return;
+  panel.innerHTML = CHAT_EMOJIS.map(
+    (e) => `<button type="button" data-emoji="${e}" aria-label="${e}">${e}</button>`
+  ).join("");
+  panel.onclick = (e) => {
+    const pick = e.target.closest("[data-emoji]");
+    if (!pick) return;
+    const input = document.getElementById("chatThreadInput");
+    if (!input) return;
+    const emoji = pick.getAttribute("data-emoji") || "";
+    input.value = clipChatBody(input.value + emoji);
+    input.focus();
+    try {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    } catch (_) {}
+  };
+  btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setChatEmojiPanel(panel.classList.contains("hidden"));
+  };
+  document.addEventListener("click", (e) => {
+    if (!panel || panel.classList.contains("hidden")) return;
+    if (form && form.contains(e.target)) return;
+    setChatEmojiPanel(false);
+  });
 }
 
 export async function refreshChatUnread() {
@@ -231,6 +296,7 @@ export function wireChat(user) {
       sendThread();
     };
   }
+  wireChatEmoji();
 
   refreshChatUnread();
 }

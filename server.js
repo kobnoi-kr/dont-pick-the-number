@@ -78,6 +78,7 @@ const TYPES = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2"
@@ -595,6 +596,8 @@ function snap(room, player, opts) {
       titleClass: item.titleClass || null,
       frameClass: item.frameClass || null,
       effectClass: item.effectClass || null,
+      frameImage: item.frameImage || null,
+      effectImage: item.effectImage || null,
       score: scoreOf(room, item),
       connected: item.connected,
       host: item.id === room.hostId,
@@ -1659,8 +1662,8 @@ async function hydratePlayerProfile(player) {
         age: true,
         userRoles: { select: { role: { select: { name: true } } } },
         equippedTitle: { select: { name: true, cssClass: true } },
-        equippedFrame: { select: { cssClass: true } },
-        equippedEffect: { select: { cssClass: true } }
+        equippedFrame: { select: { cssClass: true, meta: true } },
+        equippedEffect: { select: { cssClass: true, meta: true } }
       }
     });
     if (!u) return player;
@@ -1671,6 +1674,10 @@ async function hydratePlayerProfile(player) {
     player.titleClass = (u.equippedTitle && u.equippedTitle.cssClass) || null;
     player.frameClass = (u.equippedFrame && u.equippedFrame.cssClass) || null;
     player.effectClass = (u.equippedEffect && u.equippedEffect.cssClass) || null;
+    player.frameImage =
+      (u.equippedFrame && u.equippedFrame.meta && u.equippedFrame.meta.imageUrl) || null;
+    player.effectImage =
+      (u.equippedEffect && u.equippedEffect.meta && u.equippedEffect.meta.imageUrl) || null;
   } catch (_) {
     /* ignore */
   }

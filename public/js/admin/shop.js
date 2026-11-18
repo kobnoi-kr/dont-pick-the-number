@@ -2,6 +2,7 @@ import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
 const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์" };
+const MAX_IMAGE_BYTES = 1_400_000;
 
 const PRESET_CSS = {
   frame: [
@@ -26,17 +27,44 @@ function itemColor(item) {
   return "#94a3b8";
 }
 
+function itemImage(item) {
+  if (!item) return "";
+  if (item.imageUrl) return String(item.imageUrl);
+  if (item.meta && item.meta.imageUrl) return String(item.meta.imageUrl);
+  return "";
+}
+
+function mediaHtml(url, kind) {
+  if (!url) return "";
+  const cls = kind === "frame" ? "cosmetic-frame-media" : "cosmetic-effect-media";
+  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async">`;
+}
+
 function thumb(item) {
   const color = itemColor(item);
   const cls = item.cssClass ? " " + item.cssClass : "";
+  const img = itemImage(item);
   if (item.kind === "frame") {
-    return `<div class="dec-card-thumb${cls}" style="--dec-accent:${esc(
+    return `<div class="dec-card-thumb${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
       color
-    )}"><div class="dec-av-core"><span class="dec-av-letter">N</span></div></div>`;
+    )}">${mediaHtml(img, "frame")}<div class="dec-av-core"><span class="dec-av-letter">N</span></div></div>`;
   }
-  return `<div class="dec-effect-shell"><div class="dec-av-core${cls}" style="--dec-accent:${esc(
+  return `<div class="dec-effect-shell"><div class="dec-av-core${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
     color
-  )}"><span class="dec-av-letter">N</span></div></div>`;
+  )}">${mediaHtml(img, "effect")}<span class="dec-av-letter">N</span></div></div>`;
+}
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(png|jpe?g|webp|gif)$/i.test(file.type)) {
+      return reject(new Error("invalid_file"));
+    }
+    if (file.size > MAX_IMAGE_BYTES) return reject(new Error("too_large"));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read_failed"));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
 }
 
 export async function renderShopAdmin(root, { user }) {
@@ -54,6 +82,7 @@ export async function renderShopAdmin(root, { user }) {
   let kind = "frame";
   let msg = "";
   let msgOk = false;
+  let pendingImage = "";
 
   async function load() {
     const { res, data } = await api("/api/v1/admin/cosmetics/shop", { method: "GET" });
@@ -78,6 +107,16 @@ export async function renderShopAdmin(root, { user }) {
     }
   }
 
+  function paintMediaPreview() {
+    const box = root.querySelector("#shopMediaPreview");
+    if (!box) return;
+    if (!pendingImage) {
+      box.innerHTML = `<span class="tiny muted">ยังไม่มีรูป</span>`;
+      return;
+    }
+    box.innerHTML = `<img src="${esc(pendingImage)}" alt="" style="max-width:96px;max-height:96px;border-radius:12px;object-fit:contain;background:rgba(0,0,0,.25)">`;
+  }
+
   function paint() {
     const listedIds = new Set(listed.map((x) => x.id));
     const unlisted = catalog.filter((x) => !listedIds.has(x.id));
@@ -87,7 +126,7 @@ export async function renderShopAdmin(root, { user }) {
       <section class="page-head">
         <div>
           <h2 style="margin:0">Shop · กรอบ / เอฟเฟกต์</h2>
-          <p class="muted" style="margin:6px 0 0">เพิ่มของลง Shop หรือตั้งราคาให้รายการที่มีอยู่ — ของที่ตั้งราคาจะโชว์ในแคตตาล็อกผู้เล่น</p>
+          <p class="muted" style="margin:6px 0 0">เพิ่มของลง Shop ได้ทั้งสไตล์ CSS และรูป/GIF — ของที่ตั้งราคาจะโชว์ในแคตตาล็อกผู้เล่น</p>
         </div>
       </section>
 
@@ -123,9 +162,15 @@ export async function renderShopAdmin(root, { user }) {
           <label>ID (ว่างได้)
             <input class="input" id="shopId" name="id" maxlength="64" placeholder="frame.my-item">
           </label>
+          <label style="grid-column:1/-1">รูป / GIF
+            <input class="input" id="shopImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+            <p class="tiny muted" style="margin:6px 0 0">รองรับ PNG · JPG · WEBP · GIF (สูงสุด ~1.4MB) — กรอบวางบนการ์ด · เอฟเฟกต์วางรอบรูปโปรไฟล์</p>
+          </label>
+          <div id="shopMediaPreview" style="grid-column:1/-1"></div>
         </form>
         <div class="row-actions" style="margin-top:12px">
           <button type="button" class="btn" id="shopCreateBtn">สร้างแล้วใส่ Shop</button>
+          <button type="button" class="btn ghost" id="shopClearImage">ลบรูป</button>
           <p class="msg" id="shopAdminMsg" style="margin:0">${esc(msg)}</p>
         </div>
       </div>
@@ -144,13 +189,18 @@ export async function renderShopAdmin(root, { user }) {
                   <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
                   <b>${esc(it.name)}</b>
                   <span class="tiny muted">${esc(it.id)}</span>
+                  ${itemImage(it) ? `<span class="tiny muted">มีรูป/GIF</span>` : ""}
                   <label class="tiny" style="display:flex;gap:6px;align-items:center;margin-top:6px">ราคา
                     <input class="input" data-price-input type="number" min="0" max="1000000" step="1" value="${
                       it.shopPrice != null ? it.shopPrice : 0
                     }" style="width:96px">
                   </label>
+                  <label class="tiny" style="display:block;margin-top:8px">เปลี่ยนรูป/GIF
+                    <input class="input" data-image-file type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                  </label>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
                     <button type="button" class="btn sm" data-save-price>บันทึกราคา</button>
+                    <button type="button" class="btn ghost sm" data-clear-image>ลบรูป</button>
                     <button type="button" class="btn ghost sm" data-unlist>เอาออกจาก Shop</button>
                   </div>
                 </div>`
@@ -190,6 +240,7 @@ export async function renderShopAdmin(root, { user }) {
     if (msgEl && msg) {
       msgEl.className = "msg" + (msgOk ? " ok" : "");
     }
+    paintMediaPreview();
 
     root.querySelector("#shopKind").onchange = (e) => {
       kind = e.target.value === "effect" ? "effect" : "frame";
@@ -200,6 +251,30 @@ export async function renderShopAdmin(root, { user }) {
       await load();
       paint();
       setMsg("รีเฟรชแล้ว", true);
+    };
+
+    root.querySelector("#shopClearImage").onclick = () => {
+      pendingImage = "";
+      const file = root.querySelector("#shopImageFile");
+      if (file) file.value = "";
+      paintMediaPreview();
+    };
+
+    root.querySelector("#shopImageFile").onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        pendingImage = await readImageFile(file);
+        paintMediaPreview();
+        setMsg("เลือกรูปแล้ว — กดสร้างเพื่อบันทึก", true);
+      } catch (err) {
+        pendingImage = "";
+        paintMediaPreview();
+        setMsg(
+          err && err.message === "too_large" ? "ไฟล์ใหญ่เกินไป (สูงสุด ~1.4MB)" : "อ่านรูปไม่สำเร็จ",
+          false
+        );
+      }
     };
 
     root.querySelector("#shopCreateBtn").onclick = async () => {
@@ -224,7 +299,8 @@ export async function renderShopAdmin(root, { user }) {
         description: description || undefined,
         cssClass: cssClass || undefined,
         color: color || undefined,
-        id: id || undefined
+        id: id || undefined,
+        imageUrl: pendingImage || undefined
       };
       const { res, data } = await api("/api/v1/admin/cosmetics", {
         method: "POST",
@@ -237,11 +313,14 @@ export async function renderShopAdmin(root, { user }) {
             ? "ID ซ้ำ — เปลี่ยนชื่อหรือใส่ ID ใหม่"
             : err === "invalid_id"
               ? "ID ไม่ถูกต้อง"
-              : "สร้างไม่สำเร็จ (" + err + ")",
+              : err === "invalid_image" || err === "body_too_large"
+                ? "รูปไม่ถูกต้องหรือใหญ่เกินไป"
+                : "สร้างไม่สำเร็จ (" + err + ")",
           false
         );
         return;
       }
+      pendingImage = "";
       msg = "สร้างและใส่ Shop แล้ว: " + ((data.item && data.item.name) || name);
       msgOk = true;
       await load();
@@ -258,7 +337,7 @@ export async function renderShopAdmin(root, { user }) {
           setMsg("ราคาไม่ถูกต้อง", false);
           return;
         }
-        const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
+        const { res } = await api("/api/v1/admin/cosmetics/shop", {
           method: "PATCH",
           body: JSON.stringify({ cosmeticId, shopPrice })
         });
@@ -267,6 +346,60 @@ export async function renderShopAdmin(root, { user }) {
           return;
         }
         msg = "อัปเดตราคาแล้ว";
+        msgOk = true;
+        await load();
+        paint();
+      };
+    });
+
+    root.querySelectorAll("[data-image-file]").forEach((input) => {
+      input.onchange = async () => {
+        const card = input.closest("[data-id]");
+        const cosmeticId = card && card.getAttribute("data-id");
+        const file = input.files && input.files[0];
+        if (!cosmeticId || !file) return;
+        try {
+          const imageUrl = await readImageFile(file);
+          const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
+            method: "PATCH",
+            body: JSON.stringify({ cosmeticId, imageUrl })
+          });
+          if (!res.ok) {
+            setMsg(
+              (data && data.error) === "body_too_large" || (data && data.error) === "invalid_image"
+                ? "อัปโหลดรูปไม่สำเร็จ — ไฟล์ใหญ่หรือชนิดไม่รองรับ"
+                : "อัปโหลดรูปไม่สำเร็จ",
+              false
+            );
+            return;
+          }
+          msg = "อัปเดตรูปแล้ว";
+          msgOk = true;
+          await load();
+          paint();
+        } catch (err) {
+          setMsg(
+            err && err.message === "too_large" ? "ไฟล์ใหญ่เกินไป (สูงสุด ~1.4MB)" : "อ่านรูปไม่สำเร็จ",
+            false
+          );
+        }
+      };
+    });
+
+    root.querySelectorAll("[data-clear-image]").forEach((btn) => {
+      btn.onclick = async () => {
+        const card = btn.closest("[data-id]");
+        const cosmeticId = card && card.getAttribute("data-id");
+        if (!cosmeticId) return;
+        const { res } = await api("/api/v1/admin/cosmetics/shop", {
+          method: "PATCH",
+          body: JSON.stringify({ cosmeticId, imageUrl: "" })
+        });
+        if (!res.ok) {
+          setMsg("ลบรูปไม่สำเร็จ", false);
+          return;
+        }
+        msg = "ลบรูปแล้ว";
         msgOk = true;
         await load();
         paint();

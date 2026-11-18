@@ -197,6 +197,42 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
   border-color:rgba(239,68,68,.65);color:#fecaca;
   box-shadow:0 0 8px rgba(239,68,68,.25)
 }
+/* Custom frame/effect media (PNG/GIF) */
+.lobby-slot,
+.player-profile-card{
+  position:relative;
+}
+.cosmetic-frame-media{
+  position:absolute;
+  inset:-6px;
+  width:calc(100% + 12px);
+  height:calc(100% + 12px);
+  object-fit:fill;
+  pointer-events:none;
+  z-index:2;
+}
+.cosmetic-effect-media{
+  position:absolute;
+  inset:-10px;
+  width:calc(100% + 20px);
+  height:calc(100% + 20px);
+  object-fit:contain;
+  pointer-events:none;
+  z-index:2;
+}
+.lobby-av-core,
+.player-profile-av-core{position:relative}
+.lobby-av-core.has-media > .lobby-av,
+.player-profile-av-core.has-media > .player-profile-av{
+  position:relative;
+  z-index:1;
+}
+.lobby-slot.has-media > :not(.cosmetic-frame-media),
+.player-profile-card.has-media > :not(.cosmetic-frame-media){
+  position:relative;
+  z-index:1;
+}
+
 /* Frame = square profile CARD styling (not avatar) */
 .lobby-slot.frame-gold,
 .player-profile-card.frame-gold{

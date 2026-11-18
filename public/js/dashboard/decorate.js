@@ -46,26 +46,40 @@ function titlePillHtml(item, sizeClass) {
   )};color:${esc(color)}">${esc((item && item.name) || "—")}</span>`;
 }
 
+function itemImage(item) {
+  if (!item) return "";
+  if (item.imageUrl) return String(item.imageUrl);
+  if (item.meta && item.meta.imageUrl) return String(item.meta.imageUrl);
+  return "";
+}
+
+function mediaHtml(url, kind) {
+  if (!url) return "";
+  const cls = kind === "frame" ? "cosmetic-frame-media" : "cosmetic-effect-media";
+  return `<img class="${cls}" src="${esc(url)}" alt="" decoding="async">`;
+}
+
 function thumbHtml(item, user) {
   const kind = item && item.kind;
   const color = itemColor(item);
   const letter = ((user && (user.displayName || user.username)) || "?").slice(0, 1).toUpperCase();
+  const img = itemImage(item);
   if (kind === "title") {
     return titlePillHtml(item, "dec-title-pill-sm");
   }
   if (kind === "frame") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
     // กรอบ = การ์ดสี่เหลี่ยม (ไม่ใช่รอบรูป)
-    return `<div class="dec-card-thumb${cls}" style="--dec-accent:${esc(color)}">
+    return `<div class="dec-card-thumb${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(color)}">
+      ${mediaHtml(img, "frame")}
       <div class="dec-av-core">${avHtml(user, letter)}</div>
     </div>`;
   }
   if (kind === "effect") {
     const cls = item && item.cssClass ? " " + item.cssClass : "";
-    return `<div class="dec-effect-shell"><div class="dec-av-core${cls}" style="--dec-accent:${esc(color)}">${avHtml(
-      user,
-      letter
-    )}</div></div>`;
+    return `<div class="dec-effect-shell"><div class="dec-av-core${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
+      color
+    )}">${mediaHtml(img, "effect")}${avHtml(user, letter)}</div></div>`;
   }
   return `<span class="tiny">—</span>`;
 }
@@ -79,11 +93,17 @@ function previewHtml(user, eq) {
   const effect = eq.effect;
   const frameCls = frame && frame.cssClass ? " " + frame.cssClass : "";
   const effectCls = effect && effect.cssClass ? " " + effect.cssClass : "";
+  const frameImg = itemImage(frame);
+  const effectImg = itemImage(effect);
   return `
-    <div class="dec-preview-card dec-profile-card${frameCls}" style="--dec-accent:${esc(itemColor(frame))}">
+    <div class="dec-preview-card dec-profile-card${frameCls}${frameImg ? " has-media" : ""}" style="--dec-accent:${esc(
+      itemColor(frame)
+    )}">
+      ${mediaHtml(frameImg, "frame")}
       <div class="dec-preview-head">
         <div class="dec-effect-shell dec-preview-av">
-          <div class="dec-av-core${effectCls}">
+          <div class="dec-av-core${effectCls}${effectImg ? " has-media" : ""}">
+            ${mediaHtml(effectImg, "effect")}
             ${avHtml(user, letter)}
           </div>
         </div>
@@ -126,6 +146,12 @@ export async function renderDecorate(root, { user } = {}) {
            <div class="card" style="margin-top:14px">
              <h3 style="margin-top:0">คลังของฉัน</h3>
              <p class="tiny muted" style="margin:0 0 10px">กดการ์ดเพื่อสวมใส่ · ของที่ยศเลเวลปลดล็อกจะอยู่ที่นี่ถาวร</p>
+             <div class="dec-kind-tabs" id="decKindTabs" role="tablist" aria-label="หมวดของตกแต่ง">
+               <button type="button" class="dec-kind-tab on" data-kind="all" role="tab" aria-selected="true">ทั้งหมด</button>
+               <button type="button" class="dec-kind-tab" data-kind="title" role="tab" aria-selected="false">ยศ</button>
+               <button type="button" class="dec-kind-tab" data-kind="frame" role="tab" aria-selected="false">กรอบ</button>
+               <button type="button" class="dec-kind-tab" data-kind="effect" role="tab" aria-selected="false">เอฟเฟกต์</button>
+             </div>
              <div id="decOwned" class="dec-inv-grid"><div class="loading">Loading…</div></div>
            </div>`
     }
@@ -141,6 +167,37 @@ export async function renderDecorate(root, { user } = {}) {
   let owned = [];
   let equipped = {};
   let equipSeq = 0;
+  let kindFilter = "all";
+
+  const KIND_TABS = [
+    { id: "all", label: "ทั้งหมด" },
+    { id: "title", label: "ยศ" },
+    { id: "frame", label: "กรอบ" },
+    { id: "effect", label: "เอฟเฟกต์" }
+  ];
+
+  function countByKind(kind) {
+    if (kind === "all") return owned.length;
+    return owned.filter((x) => x.kind === kind).length;
+  }
+
+  function paintTabs() {
+    const tabs = root.querySelector("#decKindTabs");
+    if (!tabs) return;
+    tabs.innerHTML = KIND_TABS.map((t) => {
+      const n = countByKind(t.id);
+      const on = kindFilter === t.id;
+      return `<button type="button" class="dec-kind-tab${on ? " on" : ""}" data-kind="${t.id}" role="tab" aria-selected="${on ? "true" : "false"}">${esc(t.label)} <em>${n}</em></button>`;
+    }).join("");
+    tabs.querySelectorAll("[data-kind]").forEach((btn) => {
+      btn.onclick = () => {
+        const next = btn.getAttribute("data-kind") || "all";
+        if (next === kindFilter) return;
+        kindFilter = next;
+        paint();
+      };
+    });
+  }
 
   function paint() {
     const eqBox = root.querySelector("#decEquipped");
@@ -148,6 +205,7 @@ export async function renderDecorate(root, { user } = {}) {
     const preview = root.querySelector("#decPreview");
     const eq = equipped || {};
     if (preview) preview.innerHTML = previewHtml(user, eq);
+    paintTabs();
 
     if (eqBox) {
       eqBox.innerHTML = ["title", "frame", "effect"]
@@ -165,11 +223,18 @@ export async function renderDecorate(root, { user } = {}) {
     }
 
     if (!ownBox) return;
+    const filtered =
+      kindFilter === "all" ? owned : owned.filter((x) => x.kind === kindFilter);
     if (!owned.length) {
       ownBox.innerHTML = `<div class="empty">ยังไม่มีของตกแต่ง</div>`;
       return;
     }
-    ownBox.innerHTML = owned
+    if (!filtered.length) {
+      const label = KIND_LABEL[kindFilter] || "หมวดนี้";
+      ownBox.innerHTML = `<div class="empty">ยังไม่มี${esc(label)}ในคลัง</div>`;
+      return;
+    }
+    ownBox.innerHTML = filtered
       .map((item) => {
         const isOn =
           (eq.title && eq.title.id === item.id) ||

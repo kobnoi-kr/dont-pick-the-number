@@ -1151,12 +1151,22 @@ function renderLobbyGrid(){
     const ready=ranked||(meta&&meta.connected);
     const champ=isChampion(name);
     const frameClass=meta&&meta.frameClass?String(meta.frameClass):"";
+    const frameImage=meta&&meta.frameImage?String(meta.frameImage):"";
     // กรอบ = สไตล์การ์ดโปรไฟล์ · เอฟเฟกต์ = วงกลมรอบรูป
     slot.className="lobby-slot"
       +(hostFlag?" host":"")
       +(connected?"":" offline")
       +(champ?" champion":"")
-      +(frameClass?" "+frameClass:"");
+      +(frameClass?" "+frameClass:"")
+      +(frameImage?" has-media":"");
+    if(frameImage){
+      const frameMedia=document.createElement("img");
+      frameMedia.className="cosmetic-frame-media";
+      frameMedia.src=frameImage;
+      frameMedia.alt="";
+      frameMedia.decoding="async";
+      slot.appendChild(frameMedia);
+    }
     const av=document.createElement(meta&&meta.avatarUrl?"img":"div");
     av.className="lobby-av"+(meta&&meta.avatarUrl?"":" ph");
     if(meta&&meta.avatarUrl){
@@ -1209,6 +1219,7 @@ function renderLobbyGrid(){
     const avWrap=document.createElement("div");
     // Winner มาก่อน — ไม่ใส่เอฟเฟกต์ cosmetic ทับกรอบ winner
     const effectClass=!champ&&meta&&meta.effectClass?String(meta.effectClass):"";
+    const effectImage=!champ&&meta&&meta.effectImage?String(meta.effectImage):"";
     avWrap.className="lobby-av-wrap"+(champ?" champion":"");
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.innerHTML=crown;
@@ -1220,7 +1231,15 @@ function renderLobbyGrid(){
       avWrap.appendChild(mark);
     }
     const avCore=document.createElement("div");
-    avCore.className="lobby-av-core"+(effectClass?" "+effectClass:"");
+    avCore.className="lobby-av-core"+(effectClass?" "+effectClass:"")+(effectImage?" has-media":"");
+    if(effectImage){
+      const effectMedia=document.createElement("img");
+      effectMedia.className="cosmetic-effect-media";
+      effectMedia.src=effectImage;
+      effectMedia.alt="";
+      effectMedia.decoding="async";
+      avCore.appendChild(effectMedia);
+    }
     avCore.appendChild(av);
     avWrap.appendChild(avCore);
     const pts=Math.max(0, Number(meta&&meta.score!=null?meta.score:scores[name])||0);
@@ -2348,14 +2367,34 @@ async function openPlayerProfileModal(userId){
     const eq=(u&&u.equipped)||{};
     const frameCls=(eq.frame&&eq.frame.cssClass)?String(eq.frame.cssClass):"";
     const effectCls=(eq.effect&&eq.effect.cssClass)?String(eq.effect.cssClass):"";
+    const frameImg=(eq.frame&&(eq.frame.imageUrl||(eq.frame.meta&&eq.frame.meta.imageUrl)))?String(eq.frame.imageUrl||eq.frame.meta.imageUrl):"";
+    const effectImg=(eq.effect&&(eq.effect.imageUrl||(eq.effect.meta&&eq.effect.meta.imageUrl)))?String(eq.effect.imageUrl||eq.effect.meta.imageUrl):"";
     if(profileCard){
-      profileCard.className="modal-card player-profile-card"+(frameCls?" "+frameCls:"");
+      profileCard.className="modal-card player-profile-card"+(frameCls?" "+frameCls:"")+(frameImg?" has-media":"");
+      profileCard.querySelectorAll(".cosmetic-frame-media").forEach(el=>el.remove());
+      if(frameImg){
+        const img=document.createElement("img");
+        img.className="cosmetic-frame-media";
+        img.src=frameImg;
+        img.alt="";
+        img.decoding="async";
+        profileCard.prepend(img);
+      }
     }
     if(avShell){
       avShell.className="player-profile-av-shell";
     }
     if(avCore){
-      avCore.className="player-profile-av-core"+(effectCls?" "+effectCls:"");
+      avCore.className="player-profile-av-core"+(effectCls?" "+effectCls:"")+(effectImg?" has-media":"");
+      avCore.querySelectorAll(".cosmetic-effect-media").forEach(el=>el.remove());
+      if(effectImg){
+        const img=document.createElement("img");
+        img.className="cosmetic-effect-media";
+        img.src=effectImg;
+        img.alt="";
+        img.decoding="async";
+        avCore.prepend(img);
+      }
     }
   }
   function setProfileAv(src, letter){

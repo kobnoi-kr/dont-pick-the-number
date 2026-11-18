@@ -1,8 +1,70 @@
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const { sendJson, readJsonBody, clientIp } = require("../auth/http");
 const { requireAuth } = require("../auth/middleware");
 const { getPrisma, authEnabled } = require("../db");
+
+const PUBLIC_DIR = path.join(__dirname, "..", "..", "public");
+const COSMETIC_UPLOAD_DIR = path.join(PUBLIC_DIR, "uploads", "cosmetics");
+const COSMETIC_IMAGE_MAX_BYTES = 1_500_000;
+
+function parseDataUrlImage(dataUrl) {
+  const m = String(dataUrl || "").match(
+    /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)$/i
+  );
+  if (!m) return null;
+  const extRaw = m[1].toLowerCase();
+  const ext = extRaw === "jpeg" ? "jpg" : extRaw;
+  let buf;
+  try {
+    buf = Buffer.from(String(m[2]).replace(/\s+/g, ""), "base64");
+  } catch {
+    return null;
+  }
+  if (!buf || buf.length < 24 || buf.length > COSMETIC_IMAGE_MAX_BYTES) return null;
+  return { ext, buf };
+}
+
+function saveCosmeticImage(dataUrl, idHint) {
+  const parsed = parseDataUrlImage(dataUrl);
+  if (!parsed) return null;
+  fs.mkdirSync(COSMETIC_UPLOAD_DIR, { recursive: true });
+  const safe = String(idHint || "cos")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "cos";
+  const name = `${safe}-${Date.now().toString(36)}.${parsed.ext}`;
+  fs.writeFileSync(path.join(COSMETIC_UPLOAD_DIR, name), parsed.buf);
+  return `/uploads/cosmetics/${name}`;
+}
+
+/** Accept https URL, /uploads/cosmetics path, or data URL (saved to disk). */
+function resolveCosmeticImageUrl(value, idHint) {
+  if (value == null) return { ok: true, url: null };
+  const raw = String(value).trim();
+  if (!raw) return { ok: true, url: null };
+  if (/^https:\/\/[^\s]{1,2000}$/i.test(raw)) {
+    return { ok: true, url: raw.slice(0, 2000) };
+  }
+  if (/^\/uploads\/cosmetics\/[a-z0-9._-]+\.(png|jpe?g|webp|gif)$/i.test(raw)) {
+    return { ok: true, url: raw };
+  }
+  if (raw.startsWith("data:image/")) {
+    const saved = saveCosmeticImage(raw, idHint);
+    if (!saved) return { ok: false, error: "invalid_image" };
+    return { ok: true, url: saved };
+  }
+  return { ok: false, error: "invalid_image" };
+}
+
+function cosmeticImageOf(c) {
+  if (!c || !c.meta || typeof c.meta !== "object") return null;
+  const url = c.meta.imageUrl || c.meta.mediaUrl || null;
+  return url ? String(url) : null;
+}
 
 const RANK_TITLE_IDS = {
   weekly: ["title.weekly.1", "title.weekly.2", "title.weekly.3"],
@@ -171,6 +233,9 @@ function method(req) {
 
 function publicCosmetic(c) {
   if (!c) return null;
+  const meta = c.meta && typeof c.meta === "object" ? Object.assign({}, c.meta) : {};
+  const imageUrl = cosmeticImageOf(c);
+  if (imageUrl) meta.imageUrl = imageUrl;
   return {
     id: c.id,
     kind: c.kind,
@@ -178,7 +243,8 @@ function publicCosmetic(c) {
     description: c.description || null,
     shopPrice: c.shopPrice == null ? null : c.shopPrice,
     cssClass: c.cssClass || null,
-    meta: c.meta || null
+    imageUrl,
+    meta: Object.keys(meta).length ? meta : null
   };
 }
 
@@ -804,6 +870,31 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     return true;
   }
 
+  // Upload image/GIF for frame/effect (returns /uploads/cosmetics/…)
+  if (pathname === "/api/v1/admin/cosmetics/upload" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canManageShop(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req, 2 * 1024 * 1024);
+    } catch (err) {
+      sendJson(res, 400, { error: (err && err.code) || "invalid_json" });
+      return true;
+    }
+    const hint = String((body && (body.id || body.name)) || "cos").slice(0, 40);
+    const imageRes = resolveCosmeticImageUrl(body && body.imageUrl, hint);
+    if (!imageRes.ok || !imageRes.url) {
+      sendJson(res, 400, { error: imageRes.error || "invalid_image" });
+      return true;
+    }
+    sendJson(res, 200, { ok: true, url: imageRes.url });
+    return true;
+  }
+
   // Create frame/effect (optional shop listing via shopPrice)
   if (pathname === "/api/v1/admin/cosmetics" && method(req) === "POST") {
     const auth = await requireAdmin(req, res);
@@ -814,9 +905,9 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     }
     let body;
     try {
-      body = await readJsonBody(req);
-    } catch {
-      sendJson(res, 400, { error: "invalid_json" });
+      body = await readJsonBody(req, 2 * 1024 * 1024);
+    } catch (err) {
+      sendJson(res, 400, { error: (err && err.code) || "invalid_json" });
       return true;
     }
     const kind = String((body && body.kind) || "").trim();
@@ -870,7 +961,17 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 409, { error: "cosmetic_exists" });
       return true;
     }
-    const meta = Object.assign({}, color ? { color } : {}, { adminCreated: true });
+    const imageRes = resolveCosmeticImageUrl(body && body.imageUrl, id);
+    if (!imageRes.ok) {
+      sendJson(res, 400, { error: imageRes.error || "invalid_image" });
+      return true;
+    }
+    const meta = Object.assign(
+      {},
+      color ? { color } : {},
+      imageRes.url ? { imageUrl: imageRes.url } : {},
+      { adminCreated: true }
+    );
     const created = await prisma.cosmetic.create({
       data: {
         id,
@@ -909,9 +1010,9 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     }
     let body;
     try {
-      body = await readJsonBody(req);
-    } catch {
-      sendJson(res, 400, { error: "invalid_json" });
+      body = await readJsonBody(req, 2 * 1024 * 1024);
+    } catch (err) {
+      sendJson(res, 400, { error: (err && err.code) || "invalid_json" });
       return true;
     }
     const cosmeticId = String((body && body.cosmeticId) || (body && body.id) || "").trim();
@@ -956,19 +1057,30 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     if (body && Object.prototype.hasOwnProperty.call(body, "description")) {
       data.description = String(body.description || "").trim().slice(0, 255) || null;
     }
+    let metaPatch = null;
     if (body && body.color != null) {
       const colorRaw = String(body.color || "").trim();
+      metaPatch = Object.assign({}, cosmetic.meta || {});
       if (colorRaw === "") {
-        const meta = Object.assign({}, cosmetic.meta || {});
-        delete meta.color;
-        data.meta = meta;
+        delete metaPatch.color;
       } else if (/^#[0-9a-fA-F]{6}$/.test(colorRaw)) {
-        data.meta = Object.assign({}, cosmetic.meta || {}, { color: colorRaw.toLowerCase() });
+        metaPatch.color = colorRaw.toLowerCase();
       } else {
         sendJson(res, 400, { error: "invalid_color" });
         return true;
       }
     }
+    if (body && Object.prototype.hasOwnProperty.call(body, "imageUrl")) {
+      const imageRes = resolveCosmeticImageUrl(body.imageUrl, cosmetic.id);
+      if (!imageRes.ok) {
+        sendJson(res, 400, { error: imageRes.error || "invalid_image" });
+        return true;
+      }
+      metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
+      if (!imageRes.url) delete metaPatch.imageUrl;
+      else metaPatch.imageUrl = imageRes.url;
+    }
+    if (metaPatch) data.meta = metaPatch;
     if (!Object.keys(data).length) {
       sendJson(res, 400, { error: "no_changes" });
       return true;
