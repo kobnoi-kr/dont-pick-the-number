@@ -15,6 +15,7 @@ const { writeAdminLog } = require("./audit");
 const { publishAnnouncement, isDueNow } = require("./publish-announcement");
 const { invalidatePublicSettingsCache } = require("../system/public-settings");
 const { handleAdminLevelsApi } = require("../dashboard/levels");
+const { handleAdminCosmeticsApi } = require("../dashboard/cosmetics");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -71,6 +72,7 @@ async function handleAdminApi(req, res, pathname) {
   const ip = clientIp(req);
 
   if (await handleAdminLevelsApi(req, res, pathname)) return true;
+  if (await handleAdminCosmeticsApi(req, res, pathname)) return true;
 
   // —— Overview ——
   if (pathname === "/api/v1/admin/overview") {
@@ -1451,9 +1453,29 @@ async function handleAdminApi(req, res, pathname) {
       sendJson(res, 405, { error: "method_not_allowed" });
       return true;
     }
+    try {
+      const { ensurePermissionsCatalog } = require("./permissions-catalog");
+      await ensurePermissionsCatalog(prisma);
+    } catch {
+      /* ignore */
+    }
+    // Re-load roles/permissions after catalog sync so new perms appear immediately.
+    const fresh = await prisma.user.findUnique({
+      where: { id: auth.user.id },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: { rolePermissions: { include: { permission: true } } }
+            }
+          }
+        }
+      }
+    });
+    const meUser = fresh || auth.user;
     sendJson(res, 200, {
-      user: publicUser(auth.user),
-      permissions: permissionsOf(auth.user)
+      user: publicUser(meUser),
+      permissions: permissionsOf(meUser)
     });
     return true;
   }

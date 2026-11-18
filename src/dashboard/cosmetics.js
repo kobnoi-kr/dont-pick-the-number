@@ -1,6 +1,6 @@
 "use strict";
 
-const { sendJson, readJsonBody } = require("../auth/http");
+const { sendJson, readJsonBody, clientIp } = require("../auth/http");
 const { requireAuth } = require("../auth/middleware");
 const { getPrisma, authEnabled } = require("../db");
 
@@ -95,19 +95,73 @@ const STARTER_COSMETICS = [
     id: "frame.gold",
     kind: "frame",
     name: "กรอบทอง",
-    description: "เร็วๆ นี้ใน Shop",
-    shopPrice: 500,
+    description: "กรอบตัวอย่าง — โทนทอง",
+    shopPrice: null,
     cssClass: "frame-gold",
-    meta: { comingSoon: true }
+    meta: { color: "#fbbf24", sample: true }
+  },
+  {
+    id: "frame.neon",
+    kind: "frame",
+    name: "กรอบนีออน",
+    description: "กรอบตัวอย่าง — ขอบนีออนฟ้าชมพู",
+    shopPrice: null,
+    cssClass: "frame-neon",
+    meta: { color: "#22d3ee", sample: true }
+  },
+  {
+    id: "frame.ice",
+    kind: "frame",
+    name: "กรอบน้ำแข็ง",
+    description: "กรอบตัวอย่าง — เย็นสดใส",
+    shopPrice: null,
+    cssClass: "frame-ice",
+    meta: { color: "#93c5fd", sample: true }
+  },
+  {
+    id: "frame.crimson",
+    kind: "frame",
+    name: "กรอบแดงโลหิต",
+    description: "กรอบตัวอย่าง — แดงเข้ม",
+    shopPrice: null,
+    cssClass: "frame-crimson",
+    meta: { color: "#ef4444", sample: true }
   },
   {
     id: "effect.sparkle",
     kind: "effect",
     name: "ประกาย",
-    description: "เร็วๆ นี้ใน Shop",
-    shopPrice: 300,
+    description: "เอฟเฟกต์ตัวอย่าง — กระพริบเบาๆ",
+    shopPrice: null,
     cssClass: "effect-sparkle",
-    meta: { comingSoon: true }
+    meta: { color: "#a78bfa", sample: true }
+  },
+  {
+    id: "effect.pulse",
+    kind: "effect",
+    name: "ชีพจร",
+    description: "เอฟเฟกต์ตัวอย่าง — เต้นเป็นจังหวะ",
+    shopPrice: null,
+    cssClass: "effect-pulse",
+    meta: { color: "#34d399", sample: true }
+  },
+  {
+    id: "effect.ring",
+    kind: "effect",
+    name: "วงแหวน",
+    description: "เอฟเฟกต์ตัวอย่าง — วงแสงหมุน",
+    shopPrice: null,
+    cssClass: "effect-ring",
+    meta: { color: "#60a5fa", sample: true }
+  },
+  {
+    id: "effect.flame",
+    kind: "effect",
+    name: "เปลวไฟ",
+    description: "เอฟเฟกต์ตัวอย่าง — โทนไฟอุ่น",
+    shopPrice: null,
+    cssClass: "effect-flame",
+    meta: { color: "#f97316", sample: true }
   }
 ];
 
@@ -397,6 +451,192 @@ async function handleCosmeticsApi(req, res, pathname) {
   return false;
 }
 
+const KIND_TH = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
+
+async function resolveGiftTarget(prisma, body) {
+  const userId = String((body && body.userId) || "").trim();
+  const username = String((body && body.username) || "").trim();
+  if (userId) {
+    return prisma.user.findUnique({ where: { id: userId } });
+  }
+  if (username) {
+    return prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: "insensitive" },
+        status: { not: "deleted" }
+      }
+    });
+  }
+  return null;
+}
+
+async function adminGiftCosmetic(prisma, { targetUserId, cosmeticId, autoEquip, source }) {
+  await ensureCosmeticsCatalog(prisma);
+  const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+  if (!cosmetic) {
+    const err = new Error("cosmetic_not_found");
+    err.code = "cosmetic_not_found";
+    throw err;
+  }
+  const already = await prisma.userCosmetic.findUnique({
+    where: { userId_cosmeticId: { userId: targetUserId, cosmeticId } }
+  });
+  await grantCosmetic(prisma, targetUserId, cosmeticId, source || "admin_gift");
+  let equipped = false;
+  if (autoEquip) {
+    const data =
+      cosmetic.kind === "title"
+        ? { equippedTitleId: cosmeticId }
+        : cosmetic.kind === "frame"
+          ? { equippedFrameId: cosmeticId }
+          : { equippedEffectId: cosmeticId };
+    await prisma.user.update({ where: { id: targetUserId }, data });
+    equipped = true;
+  }
+  return { cosmetic: publicCosmetic(cosmetic), alreadyOwned: !!already, equipped };
+}
+
+async function handleAdminCosmeticsApi(req, res, pathname) {
+  if (!pathname.startsWith("/api/v1/admin/cosmetics")) return false;
+  const { requireAdmin, userHasPermission } = require("../auth/middleware");
+  const { writeAdminLog } = require("../admin/audit");
+  const { getGameApi } = require("./bridge");
+  const prisma = await getPrisma();
+
+  if (pathname === "/api/v1/admin/cosmetics" && method(req) === "GET") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!userHasPermission(auth.user, "cosmetics.gift") && !userHasPermission(auth.user, "users.ban")) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    await ensureCosmeticsCatalog(prisma);
+    try {
+      const { loadLevelConfig } = require("./levels");
+      const config = await loadLevelConfig(prisma);
+      await syncLevelTitleCosmetics(prisma, config.levels);
+    } catch {
+      /* ignore */
+    }
+    const items = await prisma.cosmetic.findMany({
+      orderBy: [{ kind: "asc" }, { name: "asc" }]
+    });
+    sendJson(res, 200, { items: items.map(publicCosmetic) });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/cosmetics/gift" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!userHasPermission(auth.user, "cosmetics.gift") && !userHasPermission(auth.user, "users.ban")) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const target = await resolveGiftTarget(prisma, body || {});
+    if (!target || target.status === "deleted") {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    if (target.accountType !== "registered") {
+      sendJson(res, 400, { error: "registered_required" });
+      return true;
+    }
+    const autoEquip = !!(body && body.autoEquip);
+    const note = String((body && body.note) || "").trim().slice(0, 200);
+    let result;
+    try {
+      result = await adminGiftCosmetic(prisma, {
+        targetUserId: target.id,
+        cosmeticId,
+        autoEquip,
+        source: "admin_gift"
+      });
+    } catch (err) {
+      if (err && err.code === "cosmetic_not_found") {
+        sendJson(res, 404, { error: "cosmetic_not_found" });
+        return true;
+      }
+      throw err;
+    }
+
+    const kindLabel = KIND_TH[result.cosmetic.kind] || result.cosmetic.kind;
+    const title = "ได้รับของจากแอดมิน";
+    const bodyText = result.alreadyOwned
+      ? `แอดมินยืนยันของ ${kindLabel}「${result.cosmetic.name}」ให้คุณแล้ว` +
+        (result.equipped ? " และสวมให้แล้ว" : "")
+      : `แอดมินมอบ ${kindLabel}「${result.cosmetic.name}」ให้คุณ` +
+        (result.equipped ? " และสวมให้แล้ว" : " — ไปสวมได้ที่เมนู ตกแต่ง");
+    await prisma.notification.create({
+      data: {
+        userId: target.id,
+        type: "system_grant",
+        title,
+        body: bodyText,
+        payload: {
+          kind: "admin_gift",
+          fullBody:
+            bodyText +
+            (note ? "\n\nข้อความจากแอดมิน: " + note : "") +
+            "\n\nเปิดเมนู ตกแต่ง เพื่อดูของในคลัง",
+          cosmeticId: result.cosmetic.id,
+          cosmeticKind: result.cosmetic.kind,
+          cosmeticName: result.cosmetic.name,
+          autoEquip: result.equipped,
+          note: note || null,
+          href: "/app#decorate"
+        }
+      }
+    });
+    const gameApi = getGameApi();
+    if (gameApi && typeof gameApi.notifyUser === "function") {
+      try {
+        gameApi.notifyUser(target.id, { type: "system_grant" });
+      } catch {
+        /* ignore */
+      }
+    }
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.gift",
+      targetId: target.id,
+      metadata: {
+        cosmeticId: result.cosmetic.id,
+        kind: result.cosmetic.kind,
+        name: result.cosmetic.name,
+        alreadyOwned: result.alreadyOwned,
+        autoEquip: result.equipped,
+        note: note || null
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, {
+      ok: true,
+      user: {
+        id: target.id,
+        username: target.username,
+        displayName: target.displayName
+      },
+      ...result
+    });
+    return true;
+  }
+
+  sendJson(res, 405, { error: "method_not_allowed" });
+  return true;
+}
+
 module.exports = {
   STARTER_COSMETICS,
   RANK_TITLE_IDS,
@@ -409,5 +649,7 @@ module.exports = {
   syncLevelTitleCosmetics,
   grantLevelTitlesUpTo,
   loadUserCosmetics,
-  handleCosmeticsApi
+  adminGiftCosmetic,
+  handleCosmeticsApi,
+  handleAdminCosmeticsApi
 };

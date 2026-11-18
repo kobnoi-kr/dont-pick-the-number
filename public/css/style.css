@@ -175,9 +175,47 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .lobby-av-wrap.frame-gold .lobby-av{
   box-shadow:0 0 0 2px rgba(251,191,36,.55),0 0 14px rgba(251,191,36,.35);
 }
+.lobby-av-wrap.frame-neon .lobby-av,
+.frame-neon .lobby-av{
+  box-shadow:0 0 0 2px rgba(34,211,238,.55),0 0 14px rgba(236,72,153,.35);
+}
+.lobby-av-wrap.frame-ice .lobby-av,
+.frame-ice .lobby-av{
+  box-shadow:0 0 0 2px rgba(147,197,253,.6),0 0 16px rgba(186,230,253,.45);
+}
+.lobby-av-wrap.frame-crimson .lobby-av,
+.frame-crimson .lobby-av{
+  box-shadow:0 0 0 2px rgba(239,68,68,.55),0 0 14px rgba(220,38,38,.35);
+}
 .effect-sparkle .lobby-av,
 .lobby-av-wrap.effect-sparkle .lobby-av{
   animation:champPulse 2.4s ease-in-out infinite;
+}
+.lobby-av-wrap.effect-pulse .lobby-av,
+.effect-pulse .lobby-av{
+  animation:effectPulse 1.6s ease-in-out infinite;
+}
+.lobby-av-wrap.effect-ring{
+  position:relative;
+}
+.lobby-av-wrap.effect-ring::before{
+  content:"";position:absolute;inset:-5px;border-radius:50%;z-index:0;pointer-events:none;
+  border:2px solid transparent;border-top-color:#60a5fa;border-right-color:rgba(96,165,250,.35);
+  animation:effectRingSpin 1.4s linear infinite;
+}
+.lobby-av-wrap.effect-ring .lobby-av{position:relative;z-index:1}
+.lobby-av-wrap.effect-flame .lobby-av,
+.effect-flame .lobby-av{
+  animation:effectFlame 1.8s ease-in-out infinite;
+}
+@keyframes effectPulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(52,211,153,.25)}
+  50%{box-shadow:0 0 0 4px rgba(52,211,153,.5),0 0 16px rgba(52,211,153,.4);transform:scale(1.03)}
+}
+@keyframes effectRingSpin{to{transform:rotate(360deg)}}
+@keyframes effectFlame{
+  0%,100%{box-shadow:0 0 0 2px rgba(249,115,22,.35),0 0 10px rgba(239,68,68,.25)}
+  50%{box-shadow:0 0 0 3px rgba(249,115,22,.55),0 0 18px rgba(251,191,36,.45)}
 }
 /* Glow must never steal taps from โอนโฮสต์ / เตะ under the avatar */
 .lobby-av-wrap.champion{

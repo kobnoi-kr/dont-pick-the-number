@@ -15,7 +15,13 @@ function itemColor(item) {
   if (item.cssClass === "title-weekly-2" || item.cssClass === "title-monthly-2") return "#cbd5e1";
   if (item.cssClass === "title-weekly-3" || item.cssClass === "title-monthly-3") return "#cd7f32";
   if (item.cssClass === "frame-gold") return "#fbbf24";
+  if (item.cssClass === "frame-neon") return "#22d3ee";
+  if (item.cssClass === "frame-ice") return "#93c5fd";
+  if (item.cssClass === "frame-crimson") return "#ef4444";
   if (item.cssClass === "effect-sparkle") return "#a78bfa";
+  if (item.cssClass === "effect-pulse") return "#34d399";
+  if (item.cssClass === "effect-ring") return "#60a5fa";
+  if (item.cssClass === "effect-flame") return "#f97316";
   return "#94a3b8";
 }
 

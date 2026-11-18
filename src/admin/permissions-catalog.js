@@ -22,6 +22,7 @@ const PERMISSION_CATALOG = [
   { name: "announcements.manage", group: "content", label: "ประกาศ", description: "สร้าง/แก้/ส่งประกาศ" },
   { name: "levels.view", group: "content", label: "ดู Level & ยศ", description: "ดูตารางเลเวล EXP และสียศ" },
   { name: "levels.manage", group: "content", label: "ตั้งค่า Level & ยศ", description: "แก้ EXP / ชื่อยศ / สียศ" },
+  { name: "cosmetics.gift", group: "content", label: "Gift ของตกแต่ง", description: "มอบยศ / กรอบ / เอฟเฟกต์ให้ผู้เล่นแบบ manual" },
 
   { name: "settings.view", group: "system", label: "ดู Settings", description: "ดูการตั้งค่าระบบ / System" },
   { name: "settings.manage", group: "system", label: "จัดการ Settings", description: "แก้ maintenance และค่าคอนฟิก" },
@@ -51,6 +52,7 @@ const ROLE_DEFAULT_PERMS = {
     "rooms.kick",
     "rooms.close",
     "levels.view",
+    "cosmetics.gift",
     "logs.view"
   ],
   admin: [
@@ -69,6 +71,7 @@ const ROLE_DEFAULT_PERMS = {
     "announcements.manage",
     "levels.view",
     "levels.manage",
+    "cosmetics.gift",
     "settings.view",
     "settings.manage",
     "logs.view"
