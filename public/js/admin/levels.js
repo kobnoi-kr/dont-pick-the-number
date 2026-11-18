@@ -1,6 +1,8 @@
 import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
+const PAGE_SIZE = 10;
+
 function blankRow(level, exp) {
   return { level, exp, title: "Level " + level, color: "#94a3b8" };
 }
@@ -18,8 +20,30 @@ export async function renderLevels(root, { user }) {
   if (!Array.isArray(config.levels) || !config.levels.length) {
     config.levels = [blankRow(1, 0)];
   }
+  let page = 1;
+
+  function pageCount() {
+    return Math.max(1, Math.ceil((config.levels.length || 1) / PAGE_SIZE));
+  }
+
+  function clampPage() {
+    page = Math.min(Math.max(1, page), pageCount());
+  }
+
+  function pageSlice() {
+    clampPage();
+    const start = (page - 1) * PAGE_SIZE;
+    return { start, rows: config.levels.slice(start, start + PAGE_SIZE) };
+  }
 
   function paint() {
+    clampPage();
+    const { start, rows: visible } = pageSlice();
+    const total = config.levels.length;
+    const pages = pageCount();
+    const from = total ? start + 1 : 0;
+    const to = Math.min(start + visible.length, total);
+
     root.innerHTML = `
       <section class="page-head">
         <div>
@@ -54,7 +78,13 @@ export async function renderLevels(root, { user }) {
           }
         </div>
         <p class="tiny muted">EXP = EXP รวมถึงเลเวลนั้น (เลเวลแรก = 0) · ยศทั่วไปใช้ชื่อ + I/II/III · Lv.100 = NUMVERSE Elite</p>
+        <p class="tiny muted" id="lvPageMeta" style="margin:8px 0 0">แสดง ${from}–${to} จาก ${total} ชั้น · หน้า ${page}/${pages} (หน้าละ ${PAGE_SIZE})</p>
         <div class="level-admin-table" id="lvRows"></div>
+        <div class="row-between level-admin-pager" style="margin-top:12px;align-items:center;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ghost sm" id="lvPrev" ${page <= 1 ? "disabled" : ""}>← ก่อนหน้า</button>
+          <span class="tiny muted">หน้า ${page} / ${pages}</span>
+          <button type="button" class="btn ghost sm" id="lvNext" ${page >= pages ? "disabled" : ""}>ถัดไป →</button>
+        </div>
       </div>
 
       ${
@@ -67,9 +97,10 @@ export async function renderLevels(root, { user }) {
       }
     `;
 
-    const rows = root.querySelector("#lvRows");
-    rows.innerHTML = config.levels
-      .map((row, i) => {
+    const rowsEl = root.querySelector("#lvRows");
+    rowsEl.innerHTML = visible
+      .map((row, localI) => {
+        const i = start + localI;
         return `<div class="level-admin-row" data-i="${i}">
           <label>Lv
             <input class="input" data-f="level" type="number" min="1" max="100" value="${Number(row.level) || i + 1}" ${canManage ? "" : "disabled"}>
@@ -95,16 +126,18 @@ export async function renderLevels(root, { user }) {
       })
       .join("");
 
-    if (!canManage) return;
-
-    function syncFromDom() {
-      config.expPlay = Number(root.querySelector("#lvExpPlay").value) || 0;
-      config.expWin = Number(root.querySelector("#lvExpWin").value) || 0;
-      config.levels = [...rows.querySelectorAll(".level-admin-row")].map((el) => {
+    function syncVisibleFromDom() {
+      const playEl = root.querySelector("#lvExpPlay");
+      const winEl = root.querySelector("#lvExpWin");
+      if (playEl) config.expPlay = Number(playEl.value) || 0;
+      if (winEl) config.expWin = Number(winEl.value) || 0;
+      rowsEl.querySelectorAll(".level-admin-row").forEach((el) => {
+        const i = Number(el.getAttribute("data-i"));
+        if (!Number.isInteger(i) || i < 0 || i >= config.levels.length) return;
         const colorEl = el.querySelector('[data-f="color"]');
         const colorText = el.querySelector('[data-f="colorText"]');
         const color = (colorText && colorText.value) || (colorEl && colorEl.value) || "#94a3b8";
-        return {
+        config.levels[i] = {
           level: Number(el.querySelector('[data-f="level"]').value) || 1,
           exp: Number(el.querySelector('[data-f="exp"]').value) || 0,
           title: el.querySelector('[data-f="title"]').value.trim() || "Level",
@@ -113,24 +146,42 @@ export async function renderLevels(root, { user }) {
       });
     }
 
-    rows.querySelectorAll('[data-f="color"]').forEach((inp) => {
+    root.querySelector("#lvPrev").onclick = () => {
+      if (canManage) syncVisibleFromDom();
+      if (page > 1) {
+        page -= 1;
+        paint();
+      }
+    };
+    root.querySelector("#lvNext").onclick = () => {
+      if (canManage) syncVisibleFromDom();
+      if (page < pageCount()) {
+        page += 1;
+        paint();
+      }
+    };
+
+    if (!canManage) return;
+
+    rowsEl.querySelectorAll('[data-f="color"]').forEach((inp) => {
       inp.oninput = () => {
         const text = inp.parentElement.querySelector('[data-f="colorText"]');
         if (text) text.value = inp.value;
       };
     });
-    rows.querySelectorAll('[data-f="colorText"]').forEach((inp) => {
+    rowsEl.querySelectorAll('[data-f="colorText"]').forEach((inp) => {
       inp.onchange = () => {
         const color = inp.parentElement.querySelector('[data-f="color"]');
         if (color && /^#[0-9a-fA-F]{6}$/.test(inp.value.trim())) color.value = inp.value.trim();
       };
     });
-    rows.querySelectorAll("[data-del]").forEach((btn) => {
+    rowsEl.querySelectorAll("[data-del]").forEach((btn) => {
       btn.onclick = () => {
-        syncFromDom();
+        syncVisibleFromDom();
         const i = Number(btn.getAttribute("data-del"));
         if (config.levels.length <= 1) return;
         config.levels.splice(i, 1);
+        clampPage();
         paint();
       };
     });
@@ -139,7 +190,6 @@ export async function renderLevels(root, { user }) {
       packBtn.onclick = async () => {
         if (!confirm("แทนที่ตารางยศด้วยชุดมาตรฐาน 100 ขั้น (I/II/III · Lv.100 = NUMVERSE Elite)?")) return;
         const cfgRes = await api("/api/v1/levels/config", { method: "GET" });
-        // Prefer server default via PUT of known pack from a tiny inline rebuild matching server.
         const ROMANS = ["I", "II", "III"];
         const BASES = [
           "มือใหม่","ผู้ฝึกหัด","นักสำรวจ","นักแข่ง","นักกลยุทธ์","นักล่าเลข","ผู้กล้า","นักรบ","มือโปร","อัศวิน",
@@ -162,22 +212,24 @@ export async function renderLevels(root, { user }) {
           }
         }
         levels.push({ level: 100, exp: expFor(100), title: "NUMVERSE Elite", color: "#38bdf8" });
-        syncFromDom();
+        syncVisibleFromDom();
         config.levels = levels;
+        page = 1;
         void cfgRes;
         paint();
       };
     }
     root.querySelector("#lvAdd").onclick = () => {
-      syncFromDom();
+      syncVisibleFromDom();
       const last = config.levels[config.levels.length - 1] || blankRow(1, 0);
       const nextLv = Math.min(100, (Number(last.level) || config.levels.length) + 1);
       if (config.levels.length >= 100 || nextLv > 100) return;
       config.levels.push(blankRow(nextLv, (Number(last.exp) || 0) + 100));
+      page = pageCount();
       paint();
     };
     root.querySelector("#lvSave").onclick = async () => {
-      syncFromDom();
+      syncVisibleFromDom();
       const msg = root.querySelector("#lvMsg");
       msg.textContent = "กำลังบันทึก…";
       msg.classList.remove("ok");
@@ -187,8 +239,7 @@ export async function renderLevels(root, { user }) {
       });
       if (r.res.ok && r.data && r.data.config) {
         config = r.data.config;
-        msg.textContent = "บันทึกแล้ว";
-        msg.classList.add("ok");
+        clampPage();
         paint();
         const m = root.querySelector("#lvMsg");
         if (m) {
