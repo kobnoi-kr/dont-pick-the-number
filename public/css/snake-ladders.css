@@ -56,8 +56,8 @@ body.sl-mock-page .sl-board-wrap {
 
 .sl-live {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 270px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+  gap: 12px;
   align-items: start;
 }
 
@@ -65,16 +65,17 @@ body.sl-mock-page .sl-board-wrap {
   min-width: 0;
 }
 
-/* /play: full board-game table */
+/* /play: fit board to viewport */
 body.snake-play .stage {
-  width: min(1220px, 100%);
+  width: min(100vw - 16px, 1180px);
   align-items: stretch;
+  max-height: 100vh;
 }
 
 body.snake-play main.card {
   max-width: none;
   flex: 1 1 auto;
-  padding: 12px 14px 16px;
+  padding: 8px 10px 10px;
   border-color: #463266;
   color: var(--sl-text);
   background:
@@ -82,6 +83,8 @@ body.snake-play main.card {
     repeating-radial-gradient(circle at 10px 10px, rgba(110, 70, 170, 0.16) 0 2px, transparent 2px 16px),
     linear-gradient(180deg, #1f1340 0%, #120a26 100%);
   box-shadow: 0 16px 40px rgba(20, 8, 40, 0.35);
+  overflow: auto;
+  max-height: calc(100vh - 8px);
 }
 
 body.snake-play #snakeGame .snake-mode-line {
@@ -89,17 +92,17 @@ body.snake-play #snakeGame .snake-mode-line {
 }
 
 body.snake-play #snakeLeave {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 body.snake-play .roombar.in-game {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 #snakeGame .sl-board-wrap {
-  max-height: none;
-  width: 100%;
-  max-width: min(94vw, 940px);
+  /* Fit shorter side of the screen so the board stays fully visible */
+  width: min(100%, calc(100dvh - 110px), calc(100vh - 110px), 780px);
+  max-width: none;
   margin-inline: auto;
   aspect-ratio: 1;
   background: transparent;
@@ -107,13 +110,20 @@ body.snake-play .roombar.in-game {
   padding: 0;
 }
 
+body.snake-play #snakeGame .sl-board-frame {
+  transform: rotateX(5deg) rotateZ(-1deg);
+  padding: 10px;
+}
+
 #snakeGame .sl-panel {
   background: var(--sl-panel);
   border: 1px solid var(--sl-border);
   color: var(--sl-text);
   position: sticky;
-  top: 10px;
+  top: 8px;
   backdrop-filter: blur(8px);
+  max-height: calc(100vh - 100px);
+  overflow: auto;
 }
 
 .snake-spectate-note {
@@ -151,11 +161,22 @@ body.snake-play .roombar.in-game {
   }
 
   #snakeGame .sl-board-wrap {
-    max-width: min(96vw, 740px);
+    width: min(100%, calc(100vh - 260px), 720px);
   }
 
   #snakeGame .sl-panel {
     position: static;
+    max-height: none;
+  }
+}
+
+@media (max-height: 760px) {
+  #snakeGame .sl-board-wrap {
+    width: min(100%, calc(100vh - 100px), 700px);
+  }
+
+  .sl-board-frame {
+    transform: rotateX(4deg) rotateZ(-0.8deg);
   }
 }
 
@@ -303,6 +324,72 @@ body.snake-play .roombar.in-game {
 .sl-cell.is-goal {
   background: linear-gradient(160deg, #ffe9a0, var(--sl-cell-goal));
   color: #3a2500;
+}
+
+/* Footstep glow on board floor while a token walks */
+.sl-cell.is-lit,
+.sl-cell.is-lit-trail,
+.sl-cell.is-lit-portal {
+  z-index: 1;
+  isolation: isolate;
+}
+
+.sl-cell.is-lit::before,
+.sl-cell.is-lit-trail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.sl-cell.is-lit::before {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 250, 200, 0.95) 0%, rgba(255, 210, 60, 0.72) 42%, rgba(255, 180, 40, 0.2) 72%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 244, 160, 0.95),
+    0 0 18px rgba(255, 220, 70, 0.85);
+  animation: sl-cell-lit-pulse 0.34s ease;
+}
+
+.sl-cell.is-lit-trail::before {
+  background: radial-gradient(circle at 50% 55%, rgba(255, 230, 120, 0.55), rgba(255, 200, 60, 0.18) 60%, transparent 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 230, 140, 0.55);
+  opacity: 0.75;
+}
+
+.sl-cell.is-lit > *,
+.sl-cell.is-lit-trail > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sl-cell.is-lit-ladder::before {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 220, 160, 0.95) 0%, rgba(214, 162, 90, 0.7) 50%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 200, 120, 0.95),
+    0 0 18px rgba(214, 162, 90, 0.8);
+}
+
+.sl-cell.is-lit-snake::before {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 180, 190, 0.95) 0%, rgba(244, 63, 94, 0.7) 50%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 140, 160, 0.95),
+    0 0 18px rgba(244, 63, 94, 0.8);
+}
+
+@keyframes sl-cell-lit-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .sl-cell-tag {

@@ -98,6 +98,7 @@ export function createLiveBoard(opts) {
     for (let cell = 1; cell <= size; cell++) {
       const div = document.createElement("div");
       div.className = "sl-cell";
+      div.dataset.cell = String(cell);
       div.textContent = String(cell);
       const g = cellToGrid(cell, size);
       if (g) {
@@ -245,6 +246,38 @@ export function createLiveBoard(opts) {
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function clearCellLights(hard) {
+    const sel = hard
+      ? ".sl-cell.is-lit, .sl-cell.is-lit-portal, .sl-cell.is-lit-ladder, .sl-cell.is-lit-snake, .sl-cell.is-lit-trail"
+      : ".sl-cell.is-lit, .sl-cell.is-lit-portal, .sl-cell.is-lit-ladder, .sl-cell.is-lit-snake";
+    els.board.querySelectorAll(sel).forEach((n) => {
+      n.classList.remove("is-lit", "is-lit-portal", "is-lit-ladder", "is-lit-snake");
+      if (hard) n.classList.remove("is-lit-trail");
+    });
+  }
+
+  function lightCell(cell, kind) {
+    // Keep a short trail so the floor glow is easy to see while walking
+    els.board.querySelectorAll(".sl-cell.is-lit, .sl-cell.is-lit-portal").forEach((n) => {
+      n.classList.remove("is-lit", "is-lit-portal", "is-lit-ladder", "is-lit-snake");
+      n.classList.add("is-lit-trail");
+    });
+    const trails = els.board.querySelectorAll(".sl-cell.is-lit-trail");
+    if (trails.length > 3) {
+      for (let i = 0; i < trails.length - 3; i++) trails[i].classList.remove("is-lit-trail");
+    }
+    const node = els.board.querySelector(`.sl-cell[data-cell="${cell}"]`);
+    if (!node) return;
+    node.classList.remove("is-lit-trail");
+    if (kind === "ladder") {
+      node.classList.add("is-lit", "is-lit-portal", "is-lit-ladder");
+    } else if (kind === "snake") {
+      node.classList.add("is-lit", "is-lit-portal", "is-lit-snake");
+    } else {
+      node.classList.add("is-lit");
+    }
+  }
+
   async function animateLastMove(state) {
     const move = state.lastMove;
     if (!move || !move.steps || !move.steps.length) return;
@@ -256,10 +289,14 @@ export function createLiveBoard(opts) {
     if (el) el.classList.add("is-moving");
     animating = true;
     renderPanel(state);
+    clearCellLights(true);
     for (const step of move.steps) {
+      lightCell(step.cell, step.kind);
       placeTokens(state, { userId, cell: step.cell });
-      await sleep(step.kind === "step" ? 140 : 380);
+      await sleep(step.kind === "step" ? 170 : 460);
     }
+    await sleep(320);
+    clearCellLights(true);
     if (el) el.classList.remove("is-moving");
     animating = false;
   }

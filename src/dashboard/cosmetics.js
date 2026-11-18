@@ -213,7 +213,7 @@ async function ensureCosmeticsCatalog(prisma, opts) {
               kind: item.kind,
               name: item.name,
               description: item.description,
-              shopPrice: item.shopPrice,
+              // Keep admin shopPrice; only seed creates with catalog default
               cssClass: item.cssClass,
               meta: item.meta
             },
@@ -771,6 +771,224 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       },
       ...result
     });
+    return true;
+  }
+
+  function canManageShop(user, userHasPermission) {
+    return (
+      userHasPermission(user, "cosmetics.gift") ||
+      userHasPermission(user, "users.ban") ||
+      userHasPermission(user, "settings.view") ||
+      userHasPermission(user, "settings.manage")
+    );
+  }
+
+  // List shop-listed items + frame/effect catalog for admin shop manager
+  if (pathname === "/api/v1/admin/cosmetics/shop" && method(req) === "GET") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canManageShop(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    await ensureCosmeticsCatalog(prisma);
+    const items = await prisma.cosmetic.findMany({
+      where: { kind: { in: ["frame", "effect"] } },
+      orderBy: [{ kind: "asc" }, { name: "asc" }]
+    });
+    const listed = items.filter((c) => c.shopPrice != null).map(publicCosmetic);
+    const catalog = items
+      .filter((c) => c.id !== "frame.basic" && c.id !== "effect.none")
+      .map(publicCosmetic);
+    sendJson(res, 200, { listed, catalog });
+    return true;
+  }
+
+  // Create frame/effect (optional shop listing via shopPrice)
+  if (pathname === "/api/v1/admin/cosmetics" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canManageShop(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const kind = String((body && body.kind) || "").trim();
+    if (kind !== "frame" && kind !== "effect") {
+      sendJson(res, 400, { error: "invalid_kind" });
+      return true;
+    }
+    const name = String((body && body.name) || "").trim().slice(0, 64);
+    if (!name) {
+      sendJson(res, 400, { error: "invalid_name" });
+      return true;
+    }
+    const description = String((body && body.description) || "").trim().slice(0, 255) || null;
+    let cssClass = String((body && body.cssClass) || "").trim().slice(0, 64);
+    const colorRaw = String((body && body.color) || "").trim();
+    const color = /^#[0-9a-fA-F]{6}$/.test(colorRaw) ? colorRaw.toLowerCase() : null;
+    let shopPrice = null;
+    if (body && body.shopPrice != null && body.shopPrice !== "") {
+      const n = Number(body.shopPrice);
+      if (!Number.isFinite(n) || n < 0 || n > 1000000 || Math.floor(n) !== n) {
+        sendJson(res, 400, { error: "invalid_shop_price" });
+        return true;
+      }
+      shopPrice = n;
+    }
+    let id = String((body && body.id) || "").trim().slice(0, 64);
+    if (!id) {
+      const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ".")
+        .replace(/^\.+|\.+$/g, "")
+        .slice(0, 40) || "custom";
+      id = `${kind}.${slug}.${Date.now().toString(36).slice(-6)}`;
+    }
+    if (!/^[a-z][a-z0-9._-]{1,63}$/i.test(id)) {
+      sendJson(res, 400, { error: "invalid_id" });
+      return true;
+    }
+    if (!id.startsWith(kind + ".")) {
+      id = `${kind}.${id}`;
+      if (id.length > 64) {
+        sendJson(res, 400, { error: "invalid_id" });
+        return true;
+      }
+    }
+    if (!cssClass) {
+      cssClass = id.replace(/\./g, "-");
+    }
+    const existing = await prisma.cosmetic.findUnique({ where: { id } });
+    if (existing) {
+      sendJson(res, 409, { error: "cosmetic_exists" });
+      return true;
+    }
+    const meta = Object.assign({}, color ? { color } : {}, { adminCreated: true });
+    const created = await prisma.cosmetic.create({
+      data: {
+        id,
+        kind,
+        name,
+        description,
+        shopPrice,
+        cssClass,
+        meta
+      }
+    });
+    cosmeticsEnsuredAt = 0;
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.create",
+      targetId: null,
+      metadata: {
+        cosmeticId: created.id,
+        kind: created.kind,
+        name: created.name,
+        shopPrice: created.shopPrice
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, { ok: true, item: publicCosmetic(created) });
+    return true;
+  }
+
+  // PATCH shop price / listing fields for an existing cosmetic
+  if (pathname === "/api/v1/admin/cosmetics/shop" && method(req) === "PATCH") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canManageShop(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || (body && body.id) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    if (!cosmetic) {
+      sendJson(res, 404, { error: "cosmetic_not_found" });
+      return true;
+    }
+    if (cosmetic.kind !== "frame" && cosmetic.kind !== "effect") {
+      sendJson(res, 400, { error: "invalid_kind" });
+      return true;
+    }
+    if (cosmetic.id === "frame.basic" || cosmetic.id === "effect.none") {
+      sendJson(res, 400, { error: "protected_cosmetic" });
+      return true;
+    }
+    const data = {};
+    if (body && Object.prototype.hasOwnProperty.call(body, "shopPrice")) {
+      if (body.shopPrice === null || body.shopPrice === "") {
+        data.shopPrice = null;
+      } else {
+        const n = Number(body.shopPrice);
+        if (!Number.isFinite(n) || n < 0 || n > 1000000 || Math.floor(n) !== n) {
+          sendJson(res, 400, { error: "invalid_shop_price" });
+          return true;
+        }
+        data.shopPrice = n;
+      }
+    }
+    if (body && body.name != null) {
+      const name = String(body.name).trim().slice(0, 64);
+      if (!name) {
+        sendJson(res, 400, { error: "invalid_name" });
+        return true;
+      }
+      data.name = name;
+    }
+    if (body && Object.prototype.hasOwnProperty.call(body, "description")) {
+      data.description = String(body.description || "").trim().slice(0, 255) || null;
+    }
+    if (body && body.color != null) {
+      const colorRaw = String(body.color || "").trim();
+      if (colorRaw === "") {
+        const meta = Object.assign({}, cosmetic.meta || {});
+        delete meta.color;
+        data.meta = meta;
+      } else if (/^#[0-9a-fA-F]{6}$/.test(colorRaw)) {
+        data.meta = Object.assign({}, cosmetic.meta || {}, { color: colorRaw.toLowerCase() });
+      } else {
+        sendJson(res, 400, { error: "invalid_color" });
+        return true;
+      }
+    }
+    if (!Object.keys(data).length) {
+      sendJson(res, 400, { error: "no_changes" });
+      return true;
+    }
+    const updated = await prisma.cosmetic.update({ where: { id: cosmeticId }, data });
+    cosmeticsEnsuredAt = 0;
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.shop",
+      targetId: null,
+      metadata: {
+        cosmeticId: updated.id,
+        kind: updated.kind,
+        name: updated.name,
+        shopPrice: updated.shopPrice,
+        changes: Object.keys(data)
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, { ok: true, item: publicCosmetic(updated) });
     return true;
   }
 
