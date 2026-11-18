@@ -56,9 +56,53 @@ export async function renderGift(root, { user }) {
   let selectedUser = null;
   let selectedCosmeticId = "";
   let kindFilter = "all";
+  let itemQuery = "";
+  let itemSort = "level"; // level | name | kind | id
   let owned = [];
   let equipped = { titleId: null, frameId: null, effectId: null };
   let ownedLoading = false;
+
+  function levelOf(it) {
+    const n = it && it.meta && Number(it.meta.level);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  function filterAndSort(list) {
+    const q = itemQuery.trim().toLowerCase();
+    let out = Array.isArray(list) ? list.slice() : [];
+    if (q) {
+      out = out.filter((it) => {
+        const hay = [it.id, it.name, it.description, it.kind, KIND_LABEL[it.kind], levelOf(it)]
+          .filter((x) => x != null && x !== "")
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    out.sort((a, b) => {
+      if (itemSort === "name") {
+        return String(a.name || "").localeCompare(String(b.name || ""), "th", { sensitivity: "base" });
+      }
+      if (itemSort === "kind") {
+        const k = String(a.kind || "").localeCompare(String(b.kind || ""));
+        if (k) return k;
+        return String(a.name || "").localeCompare(String(b.name || ""), "th", { sensitivity: "base" });
+      }
+      if (itemSort === "id") {
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      }
+      // level (default): level titles by level, then name; non-level titles after / before by name
+      const la = levelOf(a);
+      const lb = levelOf(b);
+      if (la != null && lb != null) return la - lb;
+      if (la != null) return -1;
+      if (lb != null) return 1;
+      if (a.kind === "title" && b.kind !== "title") return -1;
+      if (b.kind === "title" && a.kind !== "title") return 1;
+      return String(a.name || "").localeCompare(String(b.name || ""), "th", { sensitivity: "base" });
+    });
+    return out;
+  }
 
   async function loadOwned() {
     owned = [];
@@ -83,7 +127,7 @@ export async function renderGift(root, { user }) {
       kindFilter === "all" ? items : items.filter((it) => it.kind === kindFilter);
     const ownedFiltered =
       kindFilter === "all" ? owned : owned.filter((it) => it.kind === kindFilter);
-    const list = mode === "gift" ? catalogFiltered : ownedFiltered;
+    const list = filterAndSort(mode === "gift" ? catalogFiltered : ownedFiltered);
     const selected =
       mode === "gift"
         ? items.find((it) => it.id === selectedCosmeticId) || null
@@ -136,6 +180,24 @@ export async function renderGift(root, { user }) {
               })
               .join("")}
           </div>
+          <div class="gift-item-toolbar">
+            <input class="input" id="giftItemQ" type="search" placeholder="ค้นหายศ / ชื่อของ / id เช่น Elite, มือใหม่, title.level.10" value="${esc(itemQuery)}" />
+            <label class="gift-sort-label">จัดเรียง
+              <select class="input" id="giftItemSort">
+                <option value="level"${itemSort === "level" ? " selected" : ""}>เลเวลยศ</option>
+                <option value="name"${itemSort === "name" ? " selected" : ""}>ชื่อ A–Z</option>
+                <option value="kind"${itemSort === "kind" ? " selected" : ""}>ประเภท</option>
+                <option value="id"${itemSort === "id" ? " selected" : ""}>รหัสของ</option>
+              </select>
+            </label>
+          </div>
+          <p class="tiny muted" id="giftItemCount" style="margin:8px 0 0">${
+            mode === "revoke" && !selectedUser
+              ? ""
+              : ownedLoading
+                ? ""
+                : `แสดง ${list.length} รายการ`
+          }</p>
           <div class="gift-item-grid" id="giftItems">
             ${
               mode === "revoke" && !selectedUser
@@ -151,11 +213,13 @@ export async function renderGift(root, { user }) {
                             (equipped.frameId && equipped.frameId === it.id) ||
                             (equipped.effectId && equipped.effectId === it.id);
                           const locked = mode === "revoke" && PROTECTED_IDS.has(it.id);
+                          const lv = levelOf(it);
+                          const kindLine = lv != null ? `ยศ · Lv.${lv}` : KIND_LABEL[it.kind] || it.kind;
                           return `<button type="button" class="gift-item-card${on ? " on" : ""}${
                             locked ? " locked" : ""
                           }" data-id="${esc(it.id)}" ${locked ? "disabled" : ""}>
                             <div class="gift-item-thumb">${thumb(it)}</div>
-                            <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
+                            <span class="tiny">${esc(kindLine)}</span>
                             <b>${esc(it.name)}</b>
                             <span class="tiny muted">${esc(
                               mode === "revoke"
@@ -166,7 +230,11 @@ export async function renderGift(root, { user }) {
                         })
                         .join("")
                     : `<div class="empty">${
-                        mode === "revoke" ? "ผู้เล่นยังไม่มีของในคลัง" : "ไม่มีของในหมวดนี้"
+                        itemQuery.trim()
+                          ? "ไม่พบของที่ตรงคำค้น"
+                          : mode === "revoke"
+                            ? "ผู้เล่นยังไม่มีของในคลัง"
+                            : "ไม่มีของในหมวดนี้"
                       }</div>`
             }
           </div>
@@ -274,6 +342,33 @@ export async function renderGift(root, { user }) {
         paint();
       };
     });
+
+    const itemQ = root.querySelector("#giftItemQ");
+    if (itemQ) {
+      itemQ.oninput = () => {
+        itemQuery = itemQ.value || "";
+        // Refresh list without stealing focus mid-type
+        const start = itemQ.selectionStart;
+        const end = itemQ.selectionEnd;
+        paint();
+        const again = root.querySelector("#giftItemQ");
+        if (again) {
+          again.focus();
+          try {
+            again.setSelectionRange(start, end);
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+    }
+    const itemSortEl = root.querySelector("#giftItemSort");
+    if (itemSortEl) {
+      itemSortEl.onchange = () => {
+        itemSort = itemSortEl.value || "level";
+        paint();
+      };
+    }
 
     root.querySelectorAll("#giftItems [data-id]").forEach((btn) => {
       btn.onclick = () => {

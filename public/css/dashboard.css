@@ -2950,12 +2950,35 @@ body.modal-open {
   border-color: color-mix(in srgb, #6b88ff 55%, transparent);
   background: rgba(107, 136, 255, 0.16);
 }
+.gift-item-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 4px;
+}
+.gift-sort-label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--nv-muted, #8b9bb0);
+  min-width: 140px;
+}
+.gift-sort-label .input {
+  min-width: 140px;
+}
+@media (max-width: 640px) {
+  .gift-item-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
 .gift-item-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
-  max-height: 420px;
+  max-height: 460px;
   overflow: auto;
+  margin-top: 10px;
 }
 .gift-item-card {
   display: flex;
