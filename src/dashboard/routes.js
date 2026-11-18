@@ -42,6 +42,18 @@ const GAME_CATALOG = [
     description: "หมุนวงล้อสุ่มเลข ใครโดนเลขของตัวเองจะออกจากเกม",
     howTo: "ผู้เล่นได้รับเลขของตัวเอง หมุนวงล้อทีละครั้ง ถ้าวงล้อชี้เลขของคุณจะตกรอบ คนสุดท้ายที่เหลือชนะ",
     popular: true
+  },
+  {
+    id: "snake",
+    slug: "snake",
+    name: "งูและบันได",
+    nameEn: "Snake & Ladders",
+    category: "board",
+    categoryLabel: "กระดาน",
+    maxPlayers: 6,
+    description: "ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ใครถึงช่อง 100 ก่อนชนะ",
+    howTo: "ผลัดกันทอยลูกเต๋า 1–6 เดินตามกระดาน เจอบันไดขึ้น เจองูลง ต้องทอยได้พอดีถึง 100",
+    popular: true
   }
 ];
 
@@ -306,7 +318,7 @@ async function handleDashboardApi(req, res, pathname) {
       items: rows.map((r) => ({
         title: r.game.roomName,
         subtitle:
-          (r.game.gameMode === "wheel" ? "วงล้อ" : "หาเลข") +
+          (r.game.gameMode === "wheel" ? "วงล้อ" : r.game.gameMode === "snake" ? "งูและบันได" : "หาเลข") +
           " · " +
           (r.won ? "ชนะ" : "เล่น") +
           " · #" +

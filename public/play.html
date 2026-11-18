@@ -8,6 +8,7 @@
 <link rel="icon" href="/images/n-logo.png" type="image/png">
 <link rel="apple-touch-icon" href="/images/n-logo.png">
 <link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/snake-ladders.css">
 </head>
 <body>
 <div class="stage">
@@ -143,6 +144,16 @@
     <button class="btn ghost" type="button" id="pickLeave">เปลี่ยนโหมด</button>
   </section>
 
+  <section id="snakeGame" class="hidden">
+    <div class="brand compact" aria-label="NUMVERSE">
+      <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
+    </div>
+    <h1 class="sr-only">งูและบันได</h1>
+    <p class="sub" id="snakeMode">ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ</p>
+    <div id="snakeRoot" class="snake-root"></div>
+    <button class="btn ghost" type="button" id="snakeLeave">กลับห้อง</button>
+  </section>
+
   <section id="wheelGame" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
       <img class="brand-logo" src="/images/numverse.png" alt="NUMVERSE" width="640" height="360" decoding="async">
@@ -241,32 +252,38 @@
       <div id="cats" class="hidden" aria-hidden="true">
         <button type="button" class="game-pick-card on" data-cat="secret" aria-pressed="true" tabindex="-1"></button>
         <button type="button" class="game-pick-card" data-cat="wheel" aria-pressed="false" tabindex="-1"></button>
+        <button type="button" class="game-pick-card" data-cat="snake" aria-pressed="false" tabindex="-1"></button>
       </div>
-      <p class="label">เลือกช่วงตัวเลข</p>
-      <div class="modes" id="modes">
-        <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
-        <button type="button" class="mode" data-min="1" data-max="999" aria-pressed="false">1–999</button>
-        <button type="button" class="mode" data-min="1" data-max="9999" aria-pressed="false">1–9999</button>
-        <button type="button" class="mode" data-custom="1" aria-pressed="false">กำหนดเอง</button>
-      </div>
-      <div id="custom" class="custom hidden">
-        <label>ต่ำสุด<input id="cmin" type="number" inputmode="numeric" value="1"></label>
-        <label>สูงสุด<input id="cmax" type="number" inputmode="numeric" value="50"></label>
-      </div>
-      <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
-      <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
-      <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
-      <p class="hint">0 = ปิด · หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</p>
-      <div id="wheelOnly" class="hidden">
-        <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
-      </div>
-      <div id="secretOnly">
-        <div class="row count-row"><label for="secretCount">จำนวนเลขลับ</label><input id="secretCount" type="number" inputmode="numeric" value="1"></div>
-        <p class="label">ถ้าเลขลับหมด แต่ยังเหลือมากกว่า 1 คน</p>
-        <div class="modes restmodes" id="restModes">
-          <button type="button" class="mode on" data-rest="all" aria-pressed="true">ทุกคน ยกเว้นคนที่โดน</button>
-          <button type="button" class="mode" data-rest="last" aria-pressed="false">คนสุดท้ายที่เหลือ</button>
+      <div id="numberSetup">
+        <p class="label">เลือกช่วงตัวเลข</p>
+        <div class="modes" id="modes">
+          <button type="button" class="mode on" data-min="1" data-max="99" aria-pressed="true">1–99</button>
+          <button type="button" class="mode" data-min="1" data-max="999" aria-pressed="false">1–999</button>
+          <button type="button" class="mode" data-min="1" data-max="9999" aria-pressed="false">1–9999</button>
+          <button type="button" class="mode" data-custom="1" aria-pressed="false">กำหนดเอง</button>
         </div>
+        <div id="custom" class="custom hidden">
+          <label>ต่ำสุด<input id="cmin" type="number" inputmode="numeric" value="1"></label>
+          <label>สูงสุด<input id="cmax" type="number" inputmode="numeric" value="50"></label>
+        </div>
+        <div class="row"><div><small>ช่วงที่เลือก</small><span id="rangeLabel">1–99</span></div></div>
+        <div class="row count-row"><label for="winScore">แต้มที่ชนะ</label><input id="winScore" type="number" inputmode="numeric" value="3"></div>
+        <div class="row count-row"><label for="turnSec">นับถอยหลังต่อตา (วินาที)</label><input id="turnSec" type="number" inputmode="numeric" value="0" min="0" max="120"></div>
+        <p class="hint">0 = ปิด · หมดเวลาแล้วระบบสุ่มเลขให้อัตโนมัติ</p>
+        <div id="wheelOnly" class="hidden">
+          <div class="row count-row"><label for="pickEach">จำนวนเลขต่อคน</label><input id="pickEach" type="number" inputmode="numeric" value="1" min="1"></div>
+        </div>
+        <div id="secretOnly">
+          <div class="row count-row"><label for="secretCount">จำนวนเลขลับ</label><input id="secretCount" type="number" inputmode="numeric" value="1"></div>
+          <p class="label">ถ้าเลขลับหมด แต่ยังเหลือมากกว่า 1 คน</p>
+          <div class="modes restmodes" id="restModes">
+            <button type="button" class="mode on" data-rest="all" aria-pressed="true">ทุกคน ยกเว้นคนที่โดน</button>
+            <button type="button" class="mode" data-rest="last" aria-pressed="false">คนสุดท้ายที่เหลือ</button>
+          </div>
+        </div>
+      </div>
+      <div id="snakeOnly" class="hidden">
+        <p class="hint">งูและบันได · ผู้เล่น 2–6 คน · ทอยลูกเต๋าถึงช่อง 100 · ไม่ต้องตั้งช่วงตัวเลข</p>
       </div>
       <button class="btn" type="submit">บันทึกการตั้งค่า</button>
     </form>
@@ -419,6 +436,8 @@
     // If auth/session works, drop any stale ban overlay left after unban.
     clearBanNotice();
     loadAnnouncementToasts().catch(() => {});
+    const { createLiveBoard } = await import("/js/snake-ladders/live-board.js");
+    window.NVSnake = { createLiveBoard };
     const s = document.createElement("script");
     s.src = "/js/game.js";
     document.body.appendChild(s);

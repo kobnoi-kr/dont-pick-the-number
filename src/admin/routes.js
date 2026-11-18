@@ -630,7 +630,8 @@ async function handleAdminApi(req, res, pathname) {
       if (!auth) return true;
       const catalog = await getSetting(prisma, "game_catalog", {
         secret: { enabled: true, name: "หาเลข" },
-        wheel: { enabled: true, name: "วงล้อ" }
+        wheel: { enabled: true, name: "วงล้อ" },
+        snake: { enabled: true, name: "งูและบันได" }
       });
       sendJson(res, 200, { catalog });
       return true;
@@ -644,11 +645,12 @@ async function handleAdminApi(req, res, pathname) {
         return true;
       }
       const next = {};
-      for (const id of ["secret", "wheel"]) {
+      const defaults = { secret: "หาเลข", wheel: "วงล้อ", snake: "งูและบันได" };
+      for (const id of ["secret", "wheel", "snake"]) {
         const row = body.catalog[id] || {};
         next[id] = {
           enabled: row.enabled !== false,
-          name: String(row.name || (id === "wheel" ? "วงล้อ" : "หาเลข")).slice(0, 64)
+          name: String(row.name || defaults[id]).slice(0, 64)
         };
       }
       await setSetting(prisma, "game_catalog", next);

@@ -24,6 +24,16 @@ const FALLBACK = [
     description: "หมุนวงล้อสุ่มเลข ใครโดนเลขของตัวเองจะออกจากเกม",
     howTo: "หมุนวงล้อทีละครั้ง ถ้าวงล้อชี้เลขของคุณจะตกรอบ",
     popular: true
+  },
+  {
+    id: "snake",
+    name: "งูและบันได",
+    category: "board",
+    categoryLabel: "กระดาน",
+    maxPlayers: 6,
+    description: "ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ใครถึงช่อง 100 ก่อนชนะ",
+    howTo: "ผลัดกันทอยลูกเต๋า เดินตามกระดาน เจอบันไดขึ้น เจองูลง ต้องทอยพอดีถึง 100",
+    popular: true
   }
 ];
 
@@ -68,7 +78,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
       .map(
         (g) => `
       <article class="lib-card" data-id="${esc(g.id)}">
-        <div class="lib-thumb">${g.id === "wheel" ? "🎡" : "🔢"}</div>
+        <div class="lib-thumb">${g.id === "wheel" ? "🎡" : g.id === "snake" ? "🐍" : "🔢"}</div>
         <div class="lib-body">
           <div class="lib-top">
             <h3>${esc(g.name)}</h3>

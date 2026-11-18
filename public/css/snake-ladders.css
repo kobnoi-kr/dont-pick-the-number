@@ -44,6 +44,32 @@ body {
   gap: 16px;
 }
 
+.snake-root,
+.sl-live {
+  width: 100%;
+}
+
+.sl-live {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .sl-live {
+    grid-template-columns: 1fr;
+  }
+}
+
+#snakeGame .sl-board-wrap {
+  max-height: min(70vh, 640px);
+}
+
+#snakeGame .brand.compact {
+  margin-bottom: 8px;
+}
+
 .sl-header {
   display: flex;
   flex-wrap: wrap;

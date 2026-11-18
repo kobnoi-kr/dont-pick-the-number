@@ -47,7 +47,7 @@ async function persistFinishedGame(room, scoreOf) {
       data: {
         roomCode: room.code,
         roomName: room.title || ("Room " + room.code),
-        gameMode: room.cat === "wheel" ? "wheel" : "secret",
+        gameMode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret",
         visibility: room.visibility === "private" ? "private" : "public",
         status: "finished",
         playerCount: players.length,
@@ -96,7 +96,7 @@ async function persistFinishedGame(room, scoreOf) {
           bestWinStreak: curStreak,
           currentWinStreak: curStreak,
           rankSum: sumRank,
-          favoriteMode: room.cat === "wheel" ? "wheel" : "secret"
+          favoriteMode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret"
         },
         update: {
           totalGames,
@@ -107,7 +107,7 @@ async function persistFinishedGame(room, scoreOf) {
           bestWinStreak: Math.max(bestStreak, curStreak),
           currentWinStreak: curStreak,
           rankSum: sumRank,
-          favoriteMode: room.cat === "wheel" ? "wheel" : "secret"
+          favoriteMode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret"
         }
       });
 
@@ -141,7 +141,7 @@ async function persistFinishedGame(room, scoreOf) {
             metadata: {
               gameId: game.id,
               code: room.code,
-              mode: room.cat === "wheel" ? "wheel" : "secret",
+              mode: room.cat === "wheel" ? "wheel" : room.cat === "snake" ? "snake" : "secret",
               won: winners.has(r.token),
               points: r.points,
               winTarget: room.winTarget

@@ -10,7 +10,9 @@ function statusPill(room) {
   return '<span class="pill busy">กำลังเล่น</span>';
 }
 function modeLabel(mode) {
-  return mode === "wheel" ? "วงล้อ" : "หาเลข";
+  if (mode === "wheel") return "วงล้อ";
+  if (mode === "snake") return "งูและบันได";
+  return "หาเลข";
 }
 
 function ensureJoinCodeModal() {

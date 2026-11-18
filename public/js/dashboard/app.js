@@ -28,7 +28,7 @@ const state = {
 };
 
 function setCreateCat(cat) {
-  const next = cat === "wheel" ? "wheel" : "secret";
+  const next = cat === "wheel" ? "wheel" : cat === "snake" ? "snake" : "secret";
   state.pendingCat = next;
   const hidden = document.getElementById("crCat");
   if (hidden) hidden.value = next;
@@ -86,7 +86,8 @@ async function createRoomFromModal() {
     (state.user && (state.user.displayName || state.user.username)) ||
     "Player";
   const catEl = document.getElementById("crCat");
-  const cat = (catEl && catEl.value === "wheel") || state.pendingCat === "wheel" ? "wheel" : "secret";
+  const raw = (catEl && catEl.value) || state.pendingCat || "secret";
+  const cat = raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : "secret";
   state.pendingCat = cat;
   localStorage.setItem("nv-last-game", cat);
   const body = {

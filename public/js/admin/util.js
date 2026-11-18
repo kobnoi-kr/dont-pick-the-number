@@ -31,5 +31,7 @@ export function hasPerm(user, perm) {
 }
 
 export function modeLabel(mode) {
-  return mode === "wheel" ? "วงล้อ" : "หาเลข";
+  if (mode === "wheel") return "วงล้อ";
+  if (mode === "snake") return "งูและบันได";
+  return "หาเลข";
 }

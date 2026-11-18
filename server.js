@@ -29,6 +29,7 @@ const {
   getMaintenanceState,
   userBypassesMaintenance
 } = require("./src/system/public-settings");
+const snakeBridge = require("./src/games/snake-ladders/room-bridge");
 
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
@@ -49,6 +50,9 @@ const PUBLIC_DASHBOARD =
     (!(ADMIN_PORT > 0) || !!process.env.RENDER));
 const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
+function roomMaxPlayers(room) {
+  return snakeBridge.roomCap(room, MAX_PLAYERS);
+}
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
 /** Keep mid-game rooms longer so players can refresh and rejoin with scores. */
@@ -360,6 +364,7 @@ function liveCount(room) {
 }
 function yourTurn(room, player) {
   if (!player || !canTakeTurn(player)) return false;
+  if (room.phase === "snake") return snakeBridge.snakeYourTurn(room, player);
   if (room.phase === "play") return currentName(room) === player.name;
   if (room.phase === "pick") {
     const each = Math.max(room.pickEach, 1);
@@ -370,6 +375,7 @@ function yourTurn(room, player) {
   return false;
 }
 function turnPlayer(room) {
+  if (room.phase === "snake") return snakeBridge.snakeCurrentSeat(room);
   if (room.phase === "play") return byName(room, currentName(room));
   if (room.phase === "pick") {
     const each = Math.max(room.pickEach, 1);
@@ -494,12 +500,20 @@ function blankRoom(code, visibility, host) {
     emptyTimer: null,
     spectators: [],
     startedAt: null,
-    _persisted: false
+    _persisted: false,
+    snake: null
   };
 }
 function applyRoomSetup(room, setup) {
   if (!setup || typeof setup !== "object") return;
-  if (setup.cat === "wheel" || setup.cat === "secret") room.cat = setup.cat;
+  const nextCat = snakeBridge.normalizeCat(setup.cat);
+  if (nextCat) {
+    if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
+      /* keep previous cat — too many seated for snake */
+    } else {
+      room.cat = nextCat;
+    }
+  }
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
     room.min = 1;
@@ -561,8 +575,9 @@ function snap(room, player, opts) {
     secretCount: room.secretCount,
     pickEach: room.pickEach,
     pointAll: room.pointAll,
-    maxPlayers: MAX_PLAYERS,
+    maxPlayers: roomMaxPlayers(room),
     spectatorCount: Array.isArray(room.spectators) ? room.spectators.length : 0,
+    snake: snakeBridge.snapSnake(room),
     players: room.players.map((item) => ({
       id: item.id,
       name: item.name,
@@ -593,7 +608,7 @@ function snap(room, player, opts) {
     secretsLeft: room.secrets.length,
     secretTotal: room.secretTotal,
     picked: room.picked.map((item) => ({ n: item.n, who: item.who, hit: !!item.hit })),
-    revealed: room.phase === "over" && room.cat !== "wheel" ? room.secretAll.slice() : [],
+    revealed: room.phase === "over" && room.cat !== "wheel" && room.cat !== "snake" ? room.secretAll.slice() : [],
     wheelMin: room.wheelMin,
     wheelMax: room.wheelMax,
     wheelOrder: room.wheelOrder,
@@ -626,10 +641,10 @@ function lobbyMsg(opts = {}) {
       title: roomLabel(room),
       host: host ? host.name : "",
       count,
-      max: MAX_PLAYERS,
+      max: roomMaxPlayers(room),
       cat: room.cat,
       phase: room.phase,
-      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+      joinable: room.phase === "lobby" && room.players.length < roomMaxPlayers(room),
       created: room.created || 0
     });
   }
@@ -853,11 +868,20 @@ function armTurnTimer(room) {
     const each = Math.max(room.pickEach, 1);
     const total = room.wheelOrder.length * each;
     if (room.pickCursor >= total) return;
+  } else if (room.phase === "snake") {
+    if (!room.snake || room.snake.status !== "playing") return;
   } else return;
   const player = turnPlayer(room);
   if (!player || !canTakeTurn(player)) return;
   const autoNow = !!(player.auto || player.bot);
-  const sec = autoNow ? 0.4 : (Number.isInteger(room.turnSec) && room.turnSec > 0 ? room.turnSec : 0);
+  // Snake: bots/auto always tick; humans only if turnSec > 0
+  const sec = autoNow
+    ? room.phase === "snake"
+      ? 0.55
+      : 0.4
+    : Number.isInteger(room.turnSec) && room.turnSec > 0
+      ? room.turnSec
+      : 0;
   if (sec < 0.1) return;
   const until = Date.now() + Math.round(sec * 1000);
   room.turnUntil = until;
@@ -870,6 +894,17 @@ function onTurnTimeout(room, markAuto) {
   clearTurnTimer(room);
   const player = turnPlayer(room);
   if (markAuto && player && !isBot(player)) player.auto = true;
+  if (room.phase === "snake") {
+    if (!player || !room.snake) return;
+    const { result, error } = snakeBridge.applySnakeRoll(room, player.id, {
+      commandId: "auto-" + Date.now()
+    });
+    if (error) return;
+    if (result.finished) finishSnakeMatch(room, result.state.winnerId);
+    else armTurnTimer(room);
+    broadcast(room);
+    return;
+  }
   if (room.phase === "play") {
     const who = currentName(room);
     if (!who) return;
@@ -1190,7 +1225,13 @@ function onSetup(ws, msg) {
   if (ctx.room.phase !== "lobby" || ctx.room.activeSpin) return;
   const patch = msg.patch && typeof msg.patch === "object" ? msg.patch : {};
   const room = ctx.room;
-  if (patch.cat === "wheel" || patch.cat === "secret") room.cat = patch.cat;
+  const nextCat = snakeBridge.normalizeCat(patch.cat);
+  if (nextCat) {
+    if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
+      return fail(ws, "งูและบันไดรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
+    }
+    room.cat = nextCat;
+  }
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
     room.rangeMode = patch.rangeMode;
     if (patch.rangeMode === "99") { room.min = 1; room.max = 99; }
@@ -1222,6 +1263,30 @@ function onSpinOrder(ws) {
   if (liveCount(room) < 2) return fail(ws, "ต้องมีผู้เล่นอย่างน้อย 2 คน");
   beginOrderSpin(room);
 }
+function finishSnakeMatch(room, winnerId) {
+  clearTurnTimer(room);
+  const winner = room.players.find((p) => p.id === winnerId);
+  const name = winner ? winner.name : "ผู้เล่น";
+  if (winner) addPoint(room, name);
+  setChampions(room, [name]);
+  room.phase = "over";
+  room.activeSpin = null;
+  room.over = {
+    title: name + " ชนะ!",
+    note: "ขึ้นถึงช่อง 100",
+    outOrder: [],
+    secretLabel: "",
+    secretText: "",
+    many: false,
+    hist: null,
+    again: "เล่นอีกครั้ง",
+    reset: true,
+    winners: [name],
+    winTarget: 1,
+    mode: "snake"
+  };
+}
+
 function onStart(ws) {
   const ctx = seat(ws);
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เริ่มเกมได้");
@@ -1230,6 +1295,23 @@ function onStart(ws) {
   if (liveCount(room) < 2) return fail(ws, "ต้องมีผู้เล่นอย่างน้อย 2 คน");
   if (room.players.some((item) => !isBot(item) && !item.connected)) return fail(ws, "มีผู้เล่นที่หลุดอยู่ รอให้กลับหรือเอาออกก่อน");
   if (!orderReady(room)) return fail(ws, "กดสุ่มลำดับก่อนเริ่มเกม");
+  if (room.cat === "snake") {
+    if (room.players.length > snakeBridge.MAX_PLAYERS) {
+      return fail(ws, "งูและบันไดรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
+    }
+    if (room.players.length < snakeBridge.MIN_PLAYERS) {
+      return fail(ws, "ต้องมีผู้เล่นอย่างน้อย " + snakeBridge.MIN_PLAYERS + " คน");
+    }
+    try {
+      clearChampions(room);
+      snakeBridge.startSnake(room);
+    } catch (err) {
+      return fail(ws, err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่มเกมงูและบันไดไม่สำเร็จ");
+    }
+    armTurnTimer(room);
+    broadcast(room);
+    return;
+  }
   const rangeErr = checkRange(room.min, room.max);
   const winErr = checkWin(room.winTarget);
   if (room.cat === "wheel") {
@@ -1245,6 +1327,25 @@ function onStart(ws) {
   const err = rangeErr || checkCount(room.min, room.max, room.secretCount) || winErr;
   if (err) return fail(ws, err);
   begin(room);
+  broadcast(room);
+}
+
+function onRoll(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "snake") return;
+  const room = ctx.room;
+  if (!room.snake || room.snake.status !== "playing") return;
+  if (!yourTurn(room, ctx.player)) return fail(ws, "ยังไม่ถึงตาคุณ");
+  const commandId = msg && msg.commandId != null ? String(msg.commandId).slice(0, 64) : null;
+  const { result, error } = snakeBridge.applySnakeRoll(room, ctx.player.id, { commandId });
+  if (error) {
+    const code = error.code || "";
+    if (code === "not_your_turn") return fail(ws, "ยังไม่ถึงตาคุณ");
+    if (code === "duplicate_command") return;
+    return fail(ws, "ทอยลูกเต๋าไม่สำเร็จ");
+  }
+  if (result.finished) finishSnakeMatch(room, result.state.winnerId);
+  else armTurnTimer(room);
   broadcast(room);
 }
 function taken(room) {
@@ -1350,7 +1451,18 @@ function onAgain(ws) {
   // Continue match: wipe scores only after someone hit winTarget.
   if (room.over.reset) clearPoints(room);
   if (room.over.mode === "wheel") startPick(room);
-  else begin(room);
+  else if (room.over.mode === "snake" || room.cat === "snake") {
+    try {
+      clearChampions(room);
+      snakeBridge.startSnake(room);
+      armTurnTimer(room);
+    } catch (err) {
+      room.phase = "lobby";
+      room.over = null;
+      snakeBridge.clearSnake(room);
+      return fail(ws, "เริ่มงูและบันไดรอบใหม่ไม่สำเร็จ");
+    }
+  } else begin(room);
   broadcast(room);
 }
 function onAbort(ws) {
@@ -1375,6 +1487,7 @@ function onAbort(ws) {
   room.wheelOrder = [];
   room.picks = {};
   room.pickCursor = 0;
+  snakeBridge.clearSnake(room);
   room.players.forEach((player) => {
     if (!isBot(player)) player.auto = false;
   });
@@ -1385,7 +1498,7 @@ function onClear(ws) {
   const ctx = seat(ws);
   if (!hostOnly(ctx)) return;
   const room = ctx.room;
-  if (room.phase === "play" || room.phase === "pick" || room.phase === "wheel") return;
+  if (room.phase === "play" || room.phase === "pick" || room.phase === "wheel" || room.phase === "snake") return;
   clearPoints(room);
   broadcast(room);
 }
@@ -1450,7 +1563,7 @@ function onAddBot(ws) {
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่เพิ่มบอทได้");
   const room = ctx.room;
   if (room.phase !== "lobby" || room.activeSpin) return fail(ws, "เพิ่มบอทได้เฉพาะตอนอยู่ในล็อบบี้");
-  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (room.players.length >= roomMaxPlayers(room)) return fail(ws, "ห้องเต็ม");
   room.players.push(makeBot(room));
   cancelSpin(room);
   room.order = [];
@@ -1649,7 +1762,7 @@ async function onJoin(ws, msg) {
   if (!(await assertNotMaintenance(ws, msg))) return;
   if (!name) return fail(ws, "ใส่ชื่อก่อน");
   if (room.phase !== "lobby") return fail(ws, "ห้องนี้เริ่มเกมแล้ว");
-  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (room.players.length >= roomMaxPlayers(room)) return fail(ws, "ห้องเต็ม");
   if (room.players.some((player) => player.name.toLowerCase() === name.toLowerCase())) return fail(ws, "มีชื่อนี้ในห้องแล้ว");
   const old = findSeat(token);
   if (old) takeOut(old.room, old.player, ws);
@@ -1749,7 +1862,7 @@ async function onInviteFriend(ws, msg) {
   if (!friendUserId) return fail(ws, "ไม่พบเพื่อน");
   if (friendUserId === fromUserId) return fail(ws, "เชิญตัวเองไม่ได้");
   if (ctx.room.players.some((p) => p.id === friendUserId)) return fail(ws, "เพื่อนอยู่ในห้องแล้ว");
-  if (ctx.room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (ctx.room.players.length >= roomMaxPlayers(ctx.room)) return fail(ws, "ห้องเต็ม");
   if (!isUserOnline(friendUserId)) return fail(ws, "เพื่อนออฟไลน์อยู่");
   if (findSeat(friendUserId)) return fail(ws, "เพื่อนอยู่ในห้องอื่นอยู่");
 
@@ -1824,7 +1937,7 @@ function onAcceptInvite(ws, msg) {
   purgeInvite(inviteId);
   if (!room) return fail(ws, "ห้องนี้ไม่มีแล้ว");
   if (room.phase !== "lobby") return fail(ws, "ห้องนี้เริ่มเกมแล้ว");
-  if (room.players.length >= MAX_PLAYERS) return fail(ws, "ห้องเต็ม");
+  if (room.players.length >= roomMaxPlayers(room)) return fail(ws, "ห้องเต็ม");
   onJoin(ws, {
     t: "join",
     code: inv.code,
@@ -1852,6 +1965,7 @@ function onMessage(ws, raw) {
   if (msg.t === "setup") return onSetup(ws, msg);
   if (msg.t === "spinOrder") return onSpinOrder(ws);
   if (msg.t === "start") return onStart(ws);
+  if (msg.t === "roll") return onRoll(ws, msg);
   if (msg.t === "pick") return onPick(ws, msg);
   if (msg.t === "pickNum") return onPickNum(ws, msg);
   if (msg.t === "undo") return onUndo(ws);
@@ -2061,10 +2175,10 @@ function lobbyRoomRow(room, opts = {}) {
     title: roomLabel(room),
     host: host ? host.name : "",
     count,
-    max: MAX_PLAYERS,
+    max: roomMaxPlayers(room),
     cat: room.cat,
     phase: room.phase,
-    joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+    joinable: room.phase === "lobby" && room.players.length < roomMaxPlayers(room),
     spectators: Array.isArray(room.spectators) ? room.spectators.length : 0,
     created: room.created || 0,
     startedAt: room.startedAt || null
@@ -2080,10 +2194,10 @@ function adminRoomRow(room) {
     host: host ? host.name : "",
     hostId: room.hostId || "",
     count: room.players.filter((item) => item.connected).length,
-    max: MAX_PLAYERS,
+    max: roomMaxPlayers(room),
     cat: room.cat,
     phase: room.phase,
-    joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS,
+    joinable: room.phase === "lobby" && room.players.length < roomMaxPlayers(room),
     spectators: Array.isArray(room.spectators) ? room.spectators.length : 0,
     created: room.created || 0,
     startedAt: room.startedAt || null,
@@ -2262,7 +2376,7 @@ attachGameApi({
     for (const room of rooms.values()) {
       if (room.visibility !== "public") continue;
       if (room.phase !== "lobby") continue;
-      if (room.players.length >= MAX_PLAYERS) continue;
+      if (room.players.length >= roomMaxPlayers(room)) continue;
       if (!room.players.some((p) => p.connected)) continue;
       return { code: room.code, title: roomLabel(room) };
     }
@@ -2275,7 +2389,7 @@ attachGameApi({
       code: room.code,
       title: roomLabel(room),
       phase: room.phase,
-      joinable: room.phase === "lobby" && room.players.length < MAX_PLAYERS
+      joinable: room.phase === "lobby" && room.players.length < roomMaxPlayers(room)
     };
   },
   async createRoomHttp({ visibility, title, token, name, avatarUrl, setup }) {

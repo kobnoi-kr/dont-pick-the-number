@@ -38,14 +38,24 @@ public/js/snake-ladders/
 └── mock-app.js  # board / dice / panel / animations
 ```
 
-Open `/snake-ladders` — no WS or DB. Phase 3 will replace the browser engine with server-authoritative state.
+Open `/snake-ladders` — no WS or DB (Phase 2 mock remains).
 
-## Integration plan (later phases)
+### Phase 3 multiplayer
 
-1. Add catalog mode `snake` without breaking `secret` / `wheel`
-2. Room capacity override 2–6 for this mode only
-3. Server-authoritative roll via WS command → engine → broadcast state
-4. Replace mock page wiring with play-flow board overlay
+```text
+src/games/snake-ladders/room-bridge.js
+public/js/snake-ladders/live-board.js   # mounted in /play #snakeGame
+WS: t:"roll" (+ optional commandId)
+snap.snake = publicState(room.snake)
+phase: "snake" while playing
+```
+
+Catalog id `snake`, capacity 2–6 via `roomMaxPlayers(room)`.
+
+## Remaining
+
+- Phase 4 spectator UX on snake board
+- Phase 5 polish
 
 ## Guardrails
 

@@ -6,6 +6,30 @@ let players=[], scores={}, order=[], alive=[], roundOrder=[], turn=0, nextOrder=
 let lastWinners=[]; // offline: champion names; online uses playerMeta.champion
 let gameCat="secret", wheelMin=1, wheelMax=99, wheelOrder=[], picks={}, pickEach=1, pickCursor=0, pickFrom=1;
 let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
+let snakeLive=null;
+let snakeSnapSeq=0;
+function ensureSnakeBoard(){
+  if(snakeLive) return snakeLive;
+  const root=$("snakeRoot");
+  if(!root||!window.NVSnake||typeof window.NVSnake.createLiveBoard!=="function") return null;
+  snakeLive=window.NVSnake.createLiveBoard({
+    root,
+    onRoll:()=>{
+      if(!onlineMode||!myTurn) return;
+      send({t:"roll",commandId:"roll-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)});
+    }
+  });
+  return snakeLive;
+}
+function updateSnakeBoard(s){
+  const board=ensureSnakeBoard();
+  if(!board) return;
+  const seq=++snakeSnapSeq;
+  Promise.resolve(board.update(s&&s.snake?s.snake:null,{youId:s&&s.youId||myId||""})).then(()=>{
+    /* ignore stale animation completions */
+    void seq;
+  });
+}
 const $=id=>document.getElementById(id);
 const POP_SOUND="/audio/pop-sound-effect_AsEdnw2.mp3";
 const SPIN_SOUND="/audio/spinner-sound.mp3";
@@ -1751,24 +1775,30 @@ function spinNumber(){
   wheelAnim=requestAnimationFrame(frame);
 }
 function paintGameModeBadge(cat){
-  const wheel=cat==="wheel";
   const ico=$("gameModeIco");
   const name=$("gameModeName");
   const hint=$("gameModeHint");
-  if(ico) ico.textContent=wheel?"🎡":"🔢";
-  if(name) name.textContent=wheel?"วงล้อ":"หาเลข";
-  if(hint) hint.textContent=wheel?"วงล้อสุ่มเลข":"ห้ามโดนเลขลับ";
+  if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":"🔢";
+  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"งูและบันได":"หาเลข";
+  if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":"ห้ามโดนเลขลับ";
+}
+function normalizeCat(next){
+  if(next==="wheel"||next==="snake"||next==="secret") return next;
+  return "secret";
 }
 function applyCat(next){
-  const cat=next==="wheel"?"wheel":"secret";
+  const cat=normalizeCat(next);
   const changed=cat!==gameCat;
   if(changed){
     saveScores();
     gameCat=cat;
   }
   const wheel=cat==="wheel";
-  $("secretOnly").classList.toggle("hidden", wheel);
-  $("wheelOnly").classList.toggle("hidden", !wheel);
+  const snake=cat==="snake";
+  if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake);
+  if($("wheelOnly")) $("wheelOnly").classList.toggle("hidden", !wheel);
+  if($("snakeOnly")) $("snakeOnly").classList.toggle("hidden", !snake);
+  if($("numberSetup")) $("numberSetup").classList.toggle("hidden", snake);
   const cats=$("cats");
   if(cats){
     for(const x of cats.querySelectorAll("[data-cat]")){
@@ -1778,7 +1808,13 @@ function applyCat(next){
     }
   }
   paintGameModeBadge(cat);
-  if($("startSub")) $("startSub").textContent=wheel?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น":"ทายเลข… แต่ห้ามโดนเลขนั้น!";
+  if($("startSub")){
+    $("startSub").textContent=wheel
+      ?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น"
+      :snake
+        ?"ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ถึงช่อง 100 ชนะ"
+        :"ทายเลข… แต่ห้ามโดนเลขนั้น!";
+  }
   if(changed){
     loadScores();
     renderPlayers();
@@ -1838,7 +1874,7 @@ $("cats").onclick=e=>{
     x.setAttribute("aria-pressed",on?"true":"false");
   }
   applyCat(b.dataset.cat||"secret");
-  if(onlineMode&&!applying&&isHost()) send({t:"setup",patch:{cat:b.dataset.cat==="wheel"?"wheel":"secret"}});
+  if(onlineMode&&!applying&&isHost()) send({t:"setup",patch:{cat:normalizeCat(b.dataset.cat)}});
 };
 function requestStartGame(){
   if(onlineMode){
@@ -1914,6 +1950,7 @@ $("pickNext").onclick=()=>{ pickFrom+=PAGE; renderPick(); };
 $("pickGo").onclick=openWheel;
 $("pickUndo").onclick=undoPick;
 $("pickLeave").onclick=leaveGame;
+if($("snakeLeave")) $("snakeLeave").onclick=leaveGame;
 $("doSpin").onclick=spinNumber;
 $("wheelRepick").onclick=repickNumbers;
 $("wheelLeave").onclick=leaveGame;
@@ -2687,7 +2724,7 @@ function hostLocks(){
     setupSubmit.disabled=!canSetup;
     setupSubmit.textContent="บันทึกการตั้งค่า";
   }
-  ["leave","back","wheelLeave","pickLeave"].forEach(id=>{
+  ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{
     const el=$(id);
     if(!el) return;
     el.classList.toggle("hidden",!host);
@@ -2833,6 +2870,11 @@ function applySnap(s){
     const lastName=pickCursor>0?wheelOrder[Math.floor((pickCursor-1)/each)]:"";
     $("pickUndo").disabled=pickCursor<=0||(lastName!==myName()&&!isHost());
     $("pickGo").disabled=!isHost();
+    renderPlayers();
+  }else if(s.phase==="snake"){
+    show("snakeGame");
+    if($("snakeMode")) $("snakeMode").textContent="ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6);
+    updateSnakeBoard(s);
     renderPlayers();
   }else if(s.phase==="wheel"){
     show("wheelGame");
@@ -3366,7 +3408,7 @@ async function bootOnline(){
   if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
     if(e.target===$("winnerModal")) closeWinnerModal();
   });
-  ["leave","back","wheelLeave","pickLeave"].forEach(id=>{ $(id).onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
+  ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };

@@ -5,7 +5,9 @@ function esc(s) {
 }
 
 function modeLabel(mode) {
-  return mode === "wheel" ? "วงล้อ" : "หาเลข";
+  if (mode === "wheel") return "วงล้อ";
+  if (mode === "snake") return "งูและบันได";
+  return "หาเลข";
 }
 
 export async function renderOverview(root, { user, openCreate, openRooms, summaryData }) {
@@ -100,7 +102,15 @@ export async function renderOverview(root, { user, openCreate, openRooms, summar
         <button type="button" class="btn sm" id="ovPlayAgain">เล่นเกมนี้อีก</button>
       </div>`;
     lastBox.querySelector("#ovPlayAgain").onclick = () =>
-      openCreate && openCreate({ cat: lastGame.gameMode === "wheel" ? "wheel" : "secret" });
+      openCreate &&
+        openCreate({
+          cat:
+            lastGame.gameMode === "wheel"
+              ? "wheel"
+              : lastGame.gameMode === "snake"
+                ? "snake"
+                : "secret"
+        });
   }
 
   const topBox = root.querySelector("#ovTopRank");

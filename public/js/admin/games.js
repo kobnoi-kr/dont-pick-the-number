@@ -13,12 +13,19 @@ const GAMES = [
     defaultName: "วงล้อ",
     en: "Number Wheel",
     blurb: "เกมหมุนวงล้อ — ใครโดนเลขตัวเองตกรอบ"
+  },
+  {
+    id: "snake",
+    defaultName: "งูและบันได",
+    en: "Snake & Ladders",
+    blurb: "เกมกระดาน — ทอยลูกเต๋าถึงช่อง 100 (สูงสุด 6 คน)"
   }
 ];
 
 function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "secret") return "หาเลข";
+  if (mode === "snake") return "งูและบันได";
   return mode || "—";
 }
 

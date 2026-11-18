@@ -25,6 +25,7 @@ function publicState(state) {
     currentTurn: state.currentTurn,
     lastDice: state.lastDice,
     lastMove: state.lastMove || null,
+    lastMoverId: state.lastMoverId || null,
     winnerId: state.winnerId,
     turnNumber: state.turnNumber,
     version: state.version,
@@ -78,6 +79,7 @@ function createGame(opts) {
     currentTurn: 0,
     lastDice: null,
     lastMove: null,
+    lastMoverId: null,
     lastCommandId: null,
     rollInFlight: false,
     winnerId: null,
@@ -105,6 +107,7 @@ function startGame(state) {
     turnNumber: 1,
     lastDice: null,
     lastMove: null,
+    lastMoverId: null,
     winnerId: null,
     rollInFlight: false,
     version: Number(state.version || 0) + 1
@@ -135,6 +138,7 @@ function roll(state, userId, opts) {
     players,
     lastDice: dice,
     lastMove: move,
+    lastMoverId: player.userId,
     lastCommandId: commandId,
     rollInFlight: false,
     version: Number(state.version || 0) + 1
