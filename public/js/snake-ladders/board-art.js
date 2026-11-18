@@ -47,7 +47,7 @@ function normalize(v) {
   return { x: v.x / len, y: v.y / len };
 }
 
-/** Wooden ladder with rails + rungs */
+/** Wooden ladder with rails + rungs — colors via CSS vars per map theme */
 export function ladderSvg(a, b, key) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -67,22 +67,22 @@ export function ladderSvg(a, b, key) {
     const t = i / count;
     const p = { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
     rungs.push(
-      `<line x1="${p.x + px * half}" y1="${p.y + py * half}" x2="${p.x - px * half}" y2="${p.y - py * half}" stroke="#a86b34" stroke-width="0.85" stroke-linecap="round"/>`,
-      `<line x1="${p.x + px * half}" y1="${p.y + py * half}" x2="${p.x - px * half}" y2="${p.y - py * half}" stroke="#e6b983" stroke-width="0.35" stroke-linecap="round"/>`
+      `<line class="sl-lad-rung" x1="${p.x + px * half}" y1="${p.y + py * half}" x2="${p.x - px * half}" y2="${p.y - py * half}" stroke-width="0.85" stroke-linecap="round"/>`,
+      `<line class="sl-lad-rung-hi" x1="${p.x + px * half}" y1="${p.y + py * half}" x2="${p.x - px * half}" y2="${p.y - py * half}" stroke-width="0.35" stroke-linecap="round"/>`
     );
   }
   return `
     <g class="sl-art-ladder" data-key="${key}">
-      <line x1="${a1.x}" y1="${a1.y}" x2="${b1.x}" y2="${b1.y}" stroke="#6b3f14" stroke-width="1.15" stroke-linecap="round"/>
-      <line x1="${a2.x}" y1="${a2.y}" x2="${b2.x}" y2="${b2.y}" stroke="#6b3f14" stroke-width="1.15" stroke-linecap="round"/>
-      <line x1="${a1.x}" y1="${a1.y}" x2="${b1.x}" y2="${b1.y}" stroke="#d4a574" stroke-width="0.45" stroke-linecap="round"/>
-      <line x1="${a2.x}" y1="${a2.y}" x2="${b2.x}" y2="${b2.y}" stroke="#d4a574" stroke-width="0.45" stroke-linecap="round"/>
+      <line class="sl-lad-rail" x1="${a1.x}" y1="${a1.y}" x2="${b1.x}" y2="${b1.y}" stroke-width="1.15" stroke-linecap="round"/>
+      <line class="sl-lad-rail" x1="${a2.x}" y1="${a2.y}" x2="${b2.x}" y2="${b2.y}" stroke-width="1.15" stroke-linecap="round"/>
+      <line class="sl-lad-rail-hi" x1="${a1.x}" y1="${a1.y}" x2="${b1.x}" y2="${b1.y}" stroke-width="0.45" stroke-linecap="round"/>
+      <line class="sl-lad-rail-hi" x1="${a2.x}" y1="${a2.y}" x2="${b2.x}" y2="${b2.y}" stroke-width="0.45" stroke-linecap="round"/>
       ${rungs.join("")}
     </g>
   `;
 }
 
-/** Cartoon snake: thick S-curve body + head with eyes */
+/** Cartoon snake: thick S-curve body + head with eyes — colors via CSS vars */
 export function snakeSvg(a, b, key) {
   // a = head (higher cell / start), b = tail
   const side = a.x < b.x ? 1 : -1;
@@ -103,15 +103,15 @@ export function snakeSvg(a, b, key) {
   const eye2 = { x: a.x - nx * 0.85 - tan.x * 0.2, y: a.y - ny * 0.85 - tan.y * 0.2 };
   return `
     <g class="sl-art-snake" data-key="${key}">
-      <path d="${d}" fill="none" stroke="#7f1d1d" stroke-width="3.6" stroke-linecap="round" opacity="0.35"/>
-      <path d="${d}" fill="none" stroke="#e11d48" stroke-width="2.7" stroke-linecap="round"/>
-      <path d="${d}" fill="none" stroke="#fb7185" stroke-width="1.05" stroke-linecap="round" stroke-dasharray="1.2 1.6" opacity="0.85"/>
-      <circle cx="${a.x}" cy="${a.y}" r="2.35" fill="#be123c" stroke="#7f1d1d" stroke-width="0.35"/>
+      <path class="sl-snk-shadow" d="${d}" fill="none" stroke-width="3.6" stroke-linecap="round" opacity="0.35"/>
+      <path class="sl-snk-body" d="${d}" fill="none" stroke-width="2.7" stroke-linecap="round"/>
+      <path class="sl-snk-dash" d="${d}" fill="none" stroke-width="1.05" stroke-linecap="round" stroke-dasharray="1.2 1.6" opacity="0.85"/>
+      <circle class="sl-snk-head" cx="${a.x}" cy="${a.y}" r="2.35" stroke-width="0.35"/>
       <circle cx="${eye1.x}" cy="${eye1.y}" r="0.55" fill="#fff"/>
       <circle cx="${eye2.x}" cy="${eye2.y}" r="0.55" fill="#fff"/>
       <circle cx="${eye1.x}" cy="${eye1.y}" r="0.22" fill="#111"/>
       <circle cx="${eye2.x}" cy="${eye2.y}" r="0.22" fill="#111"/>
-      <circle cx="${b.x}" cy="${b.y}" r="1.15" fill="#9f1239"/>
+      <circle class="sl-snk-tail" cx="${b.x}" cy="${b.y}" r="1.15"/>
       <circle cx="${mid.x}" cy="${mid.y}" r="0.01" fill="none"/>
     </g>
   `;

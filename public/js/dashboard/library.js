@@ -8,6 +8,7 @@ const FALLBACK = [
   {
     id: "secret",
     name: "หาเลข",
+    nameEn: "Don't Get The Secret",
     category: "numbers",
     categoryLabel: "ตัวเลข",
     maxPlayers: 12,
@@ -18,6 +19,7 @@ const FALLBACK = [
   {
     id: "wheel",
     name: "วงล้อ",
+    nameEn: "Number Wheel",
     category: "wheel",
     categoryLabel: "วงล้อ",
     maxPlayers: 12,
@@ -28,6 +30,7 @@ const FALLBACK = [
   {
     id: "snake",
     name: "งูและบันได",
+    nameEn: "Snake & Ladders",
     category: "board",
     categoryLabel: "กระดาน",
     maxPlayers: 6,
@@ -38,10 +41,27 @@ const FALLBACK = [
   }
 ];
 
-export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
+function rememberLastGame(id) {
+  const mode = id === "wheel" ? "wheel" : id === "snake" ? "snake" : id === "secret" ? "secret" : "";
+  if (!mode) return;
+  try {
+    localStorage.setItem("nv-last-game", mode);
+  } catch (_) {}
+}
+
+export async function renderLibrary(root, { openCreate, lastPlayedMode } = {}) {
   const catRes = await api("/api/v1/games/catalog", { method: "GET" });
   const games = (catRes.data && catRes.data.games) || FALLBACK;
-  const lastMode = favoriteMode || localStorage.getItem("nv-last-game") || "";
+  // Prefer explicit last-played (local + last finished match) — not favoriteMode
+  const lastMode =
+    lastPlayedMode ||
+    (() => {
+      try {
+        return localStorage.getItem("nv-last-game") || "";
+      } catch (_) {
+        return "";
+      }
+    })();
 
   root.innerHTML = `
     <section class="page-head">
@@ -63,10 +83,17 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
 
   function filtered() {
     const qq = q.trim().toLowerCase();
-    if (!qq) return games.slice();
-    return games.filter((g) =>
-      [g.name, g.nameEn, g.description, g.categoryLabel].join(" ").toLowerCase().includes(qq)
-    );
+    let list = games.slice();
+    if (qq) {
+      list = list.filter((g) =>
+        [g.name, g.nameEn, g.description, g.categoryLabel].join(" ").toLowerCase().includes(qq)
+      );
+    }
+    // Pin recently played to the front
+    if (lastMode) {
+      list.sort((a, b) => Number(b.id === lastMode) - Number(a.id === lastMode));
+    }
+    return list;
   }
 
   function paint() {
@@ -78,14 +105,14 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
     grid.innerHTML = list
       .map(
         (g) => `
-      <article class="lib-card" data-id="${esc(g.id)}">
+      <article class="lib-card${g.id === lastMode ? " is-recent" : ""}" data-id="${esc(g.id)}">
         <div class="lib-thumb">${g.id === "wheel" ? "🎡" : g.id === "snake" ? "🐍" : "🔢"}</div>
         <div class="lib-body">
           <div class="lib-top">
             <h3>${esc(g.name)}</h3>
             <div class="lib-pills">
               ${g.beta ? `<span class="pill warn">Beta</span>` : ""}
-              ${g.id === lastMode ? `<span class="pill busy">เล่นล่าสุด</span>` : ""}
+              ${g.id === lastMode ? `<span class="pill recent">เล่นล่าสุด</span>` : ""}
             </div>
           </div>
           <p class="muted">${esc(g.description)}</p>
@@ -102,7 +129,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
     grid.querySelectorAll("[data-play]").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.getAttribute("data-play");
-        localStorage.setItem("nv-last-game", id);
+        rememberLastGame(id);
         if (openCreate) openCreate({ cat: id, lockCat: true });
         else location.href = playUrl({ create: "public", setup: { cat: id } });
       };
@@ -121,7 +148,7 @@ export async function renderLibrary(root, { openCreate, favoriteMode } = {}) {
             <button type="button" class="btn" data-play2="${esc(g.id)}">สร้างห้องเกมนี้</button>
           </div>`;
         detail.querySelector("[data-play2]").onclick = () => {
-          localStorage.setItem("nv-last-game", g.id);
+          rememberLastGame(g.id);
           if (openCreate) openCreate({ cat: g.id, lockCat: true });
         };
         detail.scrollIntoView({ behavior: "smooth", block: "nearest" });

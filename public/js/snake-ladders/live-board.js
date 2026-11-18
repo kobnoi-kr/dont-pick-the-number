@@ -391,6 +391,12 @@ export function createLiveBoard(opts) {
     els.wait.classList.remove("is-visible");
     root.classList.remove("hidden");
 
+    const mapId = String(state.mapId || "classic");
+    root.dataset.map = mapId;
+    try {
+      document.body.dataset.snakeMap = mapId;
+    } catch (_) {}
+
     const session = String(state.sessionId || state.roomId || "");
     if (session && session !== lastSession) {
       lastSession = session;
@@ -400,7 +406,7 @@ export function createLiveBoard(opts) {
       if (spectator) log("เริ่มชมแมตช์");
     }
 
-    const key = `${state.boardSize}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
+    const key = `${mapId}:${state.boardSize}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
     if (key !== builtFor) buildBoard(state);
     ensureTokens(state.players);
 
@@ -460,6 +466,9 @@ export function createLiveBoard(opts) {
     tokenEls.clear();
     tokenSig = "";
     lastTurnSoundKey = "";
+    try {
+      delete document.body.dataset.snakeMap;
+    } catch (_) {}
   }
 
   return { update, destroy, root };

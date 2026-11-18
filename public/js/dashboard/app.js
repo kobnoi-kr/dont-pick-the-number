@@ -24,7 +24,8 @@ import { applyBanNotice, restoreBanNotice, clearBanNotice } from "/js/ban-gate.j
 const state = {
   user: null,
   view: "overview",
-  favoriteMode: null
+  favoriteMode: null,
+  lastPlayedMode: null
 };
 
 function setCreateCat(cat) {
@@ -125,7 +126,15 @@ async function navigate(view) {
     user: state.user,
     openCreate: openCreateModal,
     openRooms: () => navigate("rooms"),
-    favoriteMode: state.favoriteMode || localStorage.getItem("nv-last-game"),
+    lastPlayedMode:
+      state.lastPlayedMode ||
+      (() => {
+        try {
+          return localStorage.getItem("nv-last-game") || "";
+        } catch (_) {
+          return "";
+        }
+      })(),
     summaryData: state.view === "overview" ? state.summaryData : null,
     onSaved: (user) => {
       state.user = user;
@@ -250,6 +259,28 @@ onDashboardMessage((msg) => {
     summaryData = summary.data;
     if (summary.data.stats && summary.data.stats.favoriteMode) {
       state.favoriteMode = summary.data.stats.favoriteMode;
+    }
+    // "เล่นล่าสุด" follows last finished match; fall back to local create/play pick
+    const fromServer = summary.data.lastGame && summary.data.lastGame.gameMode;
+    const normalized =
+      fromServer === "wheel"
+        ? "wheel"
+        : fromServer === "snake"
+          ? "snake"
+          : fromServer === "secret"
+            ? "secret"
+            : "";
+    try {
+      const local = localStorage.getItem("nv-last-game") || "";
+      const localOk = local === "wheel" || local === "snake" || local === "secret" ? local : "";
+      if (normalized) {
+        state.lastPlayedMode = normalized;
+        localStorage.setItem("nv-last-game", normalized);
+      } else if (localOk) {
+        state.lastPlayedMode = localOk;
+      }
+    } catch (_) {
+      if (normalized) state.lastPlayedMode = normalized;
     }
     if (summary.data.user && summary.data.user.roles) {
       state.user = Object.assign({}, state.user || {}, { roles: summary.data.user.roles });

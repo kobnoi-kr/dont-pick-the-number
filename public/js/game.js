@@ -365,6 +365,9 @@ function show(n){
   const inGame=inRoom&&!lobby;
   document.body.classList.toggle("snake-play", snakePlay);
   document.body.classList.toggle("in-game", inGame);
+  if(!snakePlay){
+    try{ delete document.body.dataset.snakeMap; }catch(e){}
+  }
   const side=document.querySelector(".side");
   // Snake board needs width — player list lives in the snake panel.
   if(side) side.classList.toggle("hidden",!inRoom||lobby||snakePlay);
@@ -2006,6 +2009,7 @@ function applyCat(next){
     saveScores();
     gameCat=cat;
   }
+  try{ localStorage.setItem("nv-last-game", cat); }catch(e){}
   const wheel=cat==="wheel";
   const snake=cat==="snake";
   if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake);

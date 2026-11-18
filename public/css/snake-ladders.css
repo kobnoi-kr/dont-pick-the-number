@@ -10,10 +10,34 @@
   --sl-ladder: #c68a4a;
   --sl-snake: #e11d48;
   --sl-cell-a: #f6edd8;
+  --sl-cell-a-hi: #fff8ea;
   --sl-cell-b: #2b6fe3;
+  --sl-cell-b-hi: #4d8ef0;
   --sl-cell-ink-a: #3b2a16;
   --sl-cell-ink-b: #f3f8ff;
   --sl-cell-goal: #ffd34d;
+  --sl-cell-dark-border: rgba(0, 40, 120, 0.18);
+  --sl-frame-0: #7a4e22;
+  --sl-frame-1: #5a3414;
+  --sl-frame-2: #3d220c;
+  --sl-frame-3: #2a1608;
+  --sl-frame-ring: #c08a4a;
+  --sl-frame-inner: #5c3514;
+  --sl-board-gap: #1a1030;
+  --sl-lad-rail: #6b3f14;
+  --sl-lad-rail-hi: #d4a574;
+  --sl-lad-rung: #a86b34;
+  --sl-lad-rung-hi: #e6b983;
+  --sl-snk-shadow: #7f1d1d;
+  --sl-snk-body: #e11d48;
+  --sl-snk-dash: #fb7185;
+  --sl-snk-head: #be123c;
+  --sl-snk-tail: #9f1239;
+  --sl-room-glow: rgba(150, 85, 230, 0.32);
+  --sl-room-dot: rgba(110, 70, 170, 0.16);
+  --sl-room-top: #1f1340;
+  --sl-room-bot: #120a26;
+  --sl-room-border: #463266;
   --sl-radius: 16px;
   --sl-font: "Segoe UI", system-ui, sans-serif;
   --sl-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -76,12 +100,12 @@ body.snake-play main.card {
   max-width: none;
   flex: 1 1 auto;
   padding: 8px 10px 10px;
-  border-color: #463266;
+  border-color: var(--sl-room-border);
   color: var(--sl-text);
   background:
-    radial-gradient(1000px 520px at 50% -8%, rgba(150, 85, 230, 0.32), transparent 58%),
-    repeating-radial-gradient(circle at 10px 10px, rgba(110, 70, 170, 0.16) 0 2px, transparent 2px 16px),
-    linear-gradient(180deg, #1f1340 0%, #120a26 100%);
+    radial-gradient(1000px 520px at 50% -8%, var(--sl-room-glow), transparent 58%),
+    repeating-radial-gradient(circle at 10px 10px, var(--sl-room-dot) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, var(--sl-room-top) 0%, var(--sl-room-bot) 100%);
   box-shadow: 0 16px 40px rgba(20, 8, 40, 0.35);
   overflow: auto;
   max-height: calc(100vh - 8px);
@@ -255,11 +279,11 @@ body.snake-play #snakeGame .sl-board-frame {
   padding: 14px;
   border-radius: 22px;
   background:
-    linear-gradient(160deg, #7a4e22 0%, #5a3414 35%, #3d220c 70%, #2a1608 100%);
+    linear-gradient(160deg, var(--sl-frame-0) 0%, var(--sl-frame-1) 35%, var(--sl-frame-2) 70%, var(--sl-frame-3) 100%);
   box-shadow:
     0 22px 48px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 4px #c08a4a,
-    inset 0 0 0 8px #5c3514;
+    inset 0 0 0 4px var(--sl-frame-ring),
+    inset 0 0 0 8px var(--sl-frame-inner);
   transform: rotateX(10deg) rotateZ(-2deg);
   transform-style: preserve-3d;
 }
@@ -274,7 +298,7 @@ body.snake-play #snakeGame .sl-board-frame {
   gap: 0;
   border-radius: 12px;
   overflow: hidden;
-  background: #1a1030;
+  background: var(--sl-board-gap);
   box-shadow:
     inset 0 0 0 3px rgba(255, 255, 255, 0.18),
     inset 0 0 28px rgba(0, 0, 0, 0.25);
@@ -297,15 +321,15 @@ body.snake-play #snakeGame .sl-board-frame {
 
 .sl-cell.is-light {
   background:
-    linear-gradient(160deg, #fff8ea, var(--sl-cell-a) 55%);
+    linear-gradient(160deg, var(--sl-cell-a-hi), var(--sl-cell-a) 55%);
   color: var(--sl-cell-ink-a);
 }
 
 .sl-cell.is-dark {
   background:
-    linear-gradient(160deg, #4d8ef0, var(--sl-cell-b) 60%);
+    linear-gradient(160deg, var(--sl-cell-b-hi), var(--sl-cell-b) 60%);
   color: var(--sl-cell-ink-b);
-  border-color: rgba(0, 40, 120, 0.18);
+  border-color: var(--sl-cell-dark-border);
 }
 
 .sl-cell.is-ladder-start::after,
@@ -318,12 +342,26 @@ body.snake-play #snakeGame .sl-board-frame {
 }
 
 .sl-cell.is-ladder-start::after {
-  box-shadow: inset 0 0 0 2px rgba(168, 107, 52, 0.75);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sl-lad-rung) 80%, transparent);
 }
 
 .sl-cell.is-snake-start::after {
-  box-shadow: inset 0 0 0 2px rgba(225, 29, 72, 0.8);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sl-snk-body) 85%, transparent);
 }
+
+/* Ladder / snake SVG strokes follow map theme */
+.sl-art-ladder .sl-lad-rail { stroke: var(--sl-lad-rail); }
+.sl-art-ladder .sl-lad-rail-hi { stroke: var(--sl-lad-rail-hi); }
+.sl-art-ladder .sl-lad-rung { stroke: var(--sl-lad-rung); }
+.sl-art-ladder .sl-lad-rung-hi { stroke: var(--sl-lad-rung-hi); }
+.sl-art-snake .sl-snk-shadow { stroke: var(--sl-snk-shadow); }
+.sl-art-snake .sl-snk-body { stroke: var(--sl-snk-body); }
+.sl-art-snake .sl-snk-dash { stroke: var(--sl-snk-dash); }
+.sl-art-snake .sl-snk-head {
+  fill: var(--sl-snk-head);
+  stroke: var(--sl-snk-shadow);
+}
+.sl-art-snake .sl-snk-tail { fill: var(--sl-snk-tail); }
 
 .sl-cell.is-start,
 .sl-cell.is-goal {
@@ -768,4 +806,118 @@ img.sl-token-face {
       radial-gradient(circle at 32% 28%, #fff 0 14%, transparent 15%),
       var(--token);
   }
+}
+
+/* ─── Per-map board palettes ─── */
+/* Classic: cream + blue (defaults above) */
+
+/* Jungle: moss & leaf */
+.snake-root[data-map="jungle"],
+.sl-live[data-map="jungle"],
+body[data-snake-map="jungle"] {
+  --sl-cell-a: #e7f2d8;
+  --sl-cell-a-hi: #f4fbea;
+  --sl-cell-b: #2f6b3a;
+  --sl-cell-b-hi: #3f8a4c;
+  --sl-cell-ink-a: #1f3320;
+  --sl-cell-ink-b: #f3fff4;
+  --sl-cell-goal: #c8e86a;
+  --sl-cell-dark-border: rgba(20, 60, 28, 0.28);
+  --sl-frame-0: #5c7a2e;
+  --sl-frame-1: #3f5620;
+  --sl-frame-2: #2a3c16;
+  --sl-frame-3: #18240c;
+  --sl-frame-ring: #a3c76b;
+  --sl-frame-inner: #31481a;
+  --sl-board-gap: #142016;
+  --sl-lad-rail: #3f2a12;
+  --sl-lad-rail-hi: #c4a06a;
+  --sl-lad-rung: #6b4a22;
+  --sl-lad-rung-hi: #e0c08a;
+  --sl-snk-shadow: #14532d;
+  --sl-snk-body: #16a34a;
+  --sl-snk-dash: #86efac;
+  --sl-snk-head: #15803d;
+  --sl-snk-tail: #166534;
+  --sl-panel: rgba(16, 36, 22, 0.94);
+  --sl-border: #3d6b48;
+  --sl-room-glow: rgba(74, 180, 90, 0.28);
+  --sl-room-dot: rgba(60, 120, 70, 0.16);
+  --sl-room-top: #14301c;
+  --sl-room-bot: #0a1810;
+  --sl-room-border: #2f5a3a;
+}
+
+/* Volcano: ash & lava */
+.snake-root[data-map="volcano"],
+.sl-live[data-map="volcano"],
+body[data-snake-map="volcano"] {
+  --sl-cell-a: #f3e2d0;
+  --sl-cell-a-hi: #fbf0e4;
+  --sl-cell-b: #c2410c;
+  --sl-cell-b-hi: #ea580c;
+  --sl-cell-ink-a: #3b1d12;
+  --sl-cell-ink-b: #fff7ed;
+  --sl-cell-goal: #fbbf24;
+  --sl-cell-dark-border: rgba(120, 30, 0, 0.28);
+  --sl-frame-0: #7c2d12;
+  --sl-frame-1: #5c1d0c;
+  --sl-frame-2: #3b1208;
+  --sl-frame-3: #1c0a04;
+  --sl-frame-ring: #fb923c;
+  --sl-frame-inner: #7c2d12;
+  --sl-board-gap: #1c0c08;
+  --sl-lad-rail: #44403c;
+  --sl-lad-rail-hi: #a8a29e;
+  --sl-lad-rung: #78716c;
+  --sl-lad-rung-hi: #d6d3d1;
+  --sl-snk-shadow: #7f1d1d;
+  --sl-snk-body: #ef4444;
+  --sl-snk-dash: #fdba74;
+  --sl-snk-head: #dc2626;
+  --sl-snk-tail: #b91c1c;
+  --sl-panel: rgba(40, 16, 10, 0.94);
+  --sl-border: #9a3412;
+  --sl-room-glow: rgba(249, 115, 22, 0.32);
+  --sl-room-dot: rgba(180, 50, 20, 0.18);
+  --sl-room-top: #3b140c;
+  --sl-room-bot: #140806;
+  --sl-room-border: #9a3412;
+}
+
+/* Sky Bridge: cloud & sky */
+.snake-root[data-map="skybridge"],
+.sl-live[data-map="skybridge"],
+body[data-snake-map="skybridge"] {
+  --sl-cell-a: #eef6ff;
+  --sl-cell-a-hi: #f8fbff;
+  --sl-cell-b: #0284c7;
+  --sl-cell-b-hi: #38bdf8;
+  --sl-cell-ink-a: #0c4a6e;
+  --sl-cell-ink-b: #f0f9ff;
+  --sl-cell-goal: #fde68a;
+  --sl-cell-dark-border: rgba(3, 105, 161, 0.28);
+  --sl-frame-0: #7dd3fc;
+  --sl-frame-1: #38bdf8;
+  --sl-frame-2: #0284c7;
+  --sl-frame-3: #0c4a6e;
+  --sl-frame-ring: #e0f2fe;
+  --sl-frame-inner: #0369a1;
+  --sl-board-gap: #0b2740;
+  --sl-lad-rail: #94a3b8;
+  --sl-lad-rail-hi: #f1f5f9;
+  --sl-lad-rung: #cbd5e1;
+  --sl-lad-rung-hi: #ffffff;
+  --sl-snk-shadow: #5b21b6;
+  --sl-snk-body: #8b5cf6;
+  --sl-snk-dash: #c4b5fd;
+  --sl-snk-head: #7c3aed;
+  --sl-snk-tail: #6d28d9;
+  --sl-panel: rgba(10, 28, 48, 0.94);
+  --sl-border: #1d4f7a;
+  --sl-room-glow: rgba(56, 189, 248, 0.3);
+  --sl-room-dot: rgba(14, 116, 180, 0.16);
+  --sl-room-top: #0c2a44;
+  --sl-room-bot: #061422;
+  --sl-room-border: #1d4f7a;
 }
