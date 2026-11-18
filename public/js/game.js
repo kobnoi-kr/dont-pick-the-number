@@ -2365,8 +2365,10 @@ async function openPlayerProfileModal(userId){
   const profileCard=modal.querySelector(".player-profile-card");
   function setProfileCosmetics(u){
     const eq=(u&&u.equipped)||{};
-    const frameCls=(eq.frame&&eq.frame.cssClass)?String(eq.frame.cssClass):"";
-    const effectCls=(eq.effect&&eq.effect.cssClass)?String(eq.effect.cssClass):"";
+    const frameUseFx=!(eq.frame&&(eq.frame.useSystemEffect===false||(eq.frame.meta&&eq.frame.meta.useSystemEffect===false)));
+    const effectUseFx=!(eq.effect&&(eq.effect.useSystemEffect===false||(eq.effect.meta&&eq.effect.meta.useSystemEffect===false)));
+    const frameCls=(frameUseFx&&eq.frame&&eq.frame.cssClass)?String(eq.frame.cssClass):"";
+    const effectCls=(effectUseFx&&eq.effect&&eq.effect.cssClass)?String(eq.effect.cssClass):"";
     const frameImg=(eq.frame&&(eq.frame.imageUrl||(eq.frame.meta&&eq.frame.meta.imageUrl)))?String(eq.frame.imageUrl||eq.frame.meta.imageUrl):"";
     const effectImg=(eq.effect&&(eq.effect.imageUrl||(eq.effect.meta&&eq.effect.meta.imageUrl)))?String(eq.effect.imageUrl||eq.effect.meta.imageUrl):"";
     if(profileCard){

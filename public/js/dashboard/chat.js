@@ -44,6 +44,7 @@ function when(iso) {
 
 let activePeerId = null;
 let conversations = [];
+let listFilter = "";
 
 function paintUnread(n) {
   const dot = document.getElementById("chatDot");
@@ -58,33 +59,52 @@ function avatarHtml(user) {
   return `<div class="chat-av ph">${esc(name.slice(0, 1).toUpperCase())}</div>`;
 }
 
-async function loadConversations() {
+function closeChatPanel() {
+  const panel = document.getElementById("chatPanel");
+  if (panel) panel.classList.add("hidden");
+  setChatEmojiPanel(false);
+}
+
+function filteredConversations() {
+  const q = listFilter.trim().toLowerCase();
+  if (!q) return conversations;
+  return conversations.filter((c) => {
+    const u = c.user || {};
+    const hay = `${u.displayName || ""} ${u.username || ""} ${u.friendCode || ""}`.toLowerCase();
+    const preview = c.lastMessage && c.lastMessage.body ? String(c.lastMessage.body) : "";
+    return hay.includes(q) || preview.toLowerCase().includes(q);
+  });
+}
+
+function paintConversationList() {
   const list = document.getElementById("chatConvList");
   const empty = document.getElementById("chatEmpty");
+  const filterEl = document.getElementById("chatListFilter");
   if (!list) return;
-  list.innerHTML = `<div class="loading">Loading…</div>`;
-  const { res, data } = await api("/api/v1/chat/conversations", { method: "GET" });
-  if (!res.ok) {
-    list.innerHTML = "";
-    if (empty) {
-      empty.classList.remove("hidden");
-      empty.textContent = res.status === 403 ? "เข้าสู่ระบบด้วยบัญชีจริงเพื่อแชทกับเพื่อน" : "โหลดแชทไม่ได้";
-    }
-    paintUnread(0);
-    return;
-  }
-  conversations = data.conversations || [];
-  paintUnread(data.unread || 0);
+
   if (!conversations.length) {
     list.innerHTML = "";
+    if (filterEl) filterEl.classList.add("hidden");
     if (empty) {
       empty.classList.remove("hidden");
       empty.textContent = "ยังไม่มีเพื่อน — ไปเพิ่มเพื่อนก่อน";
     }
     return;
   }
+
+  if (filterEl) filterEl.classList.remove("hidden");
+  const rows = filteredConversations();
+  if (!rows.length) {
+    list.innerHTML = "";
+    if (empty) {
+      empty.classList.remove("hidden");
+      empty.textContent = "ไม่พบเพื่อนตามคำค้น";
+    }
+    return;
+  }
+
   if (empty) empty.classList.add("hidden");
-  list.innerHTML = conversations
+  list.innerHTML = rows
     .map((c) => {
       const u = c.user || {};
       const preview = c.lastMessage ? c.lastMessage.body : "เริ่มแชท…";
@@ -101,6 +121,27 @@ async function loadConversations() {
   list.querySelectorAll("[data-peer]").forEach((btn) => {
     btn.onclick = () => openThread(btn.getAttribute("data-peer"));
   });
+}
+
+async function loadConversations() {
+  const list = document.getElementById("chatConvList");
+  const empty = document.getElementById("chatEmpty");
+  if (!list) return;
+  list.innerHTML = `<div class="loading">Loading…</div>`;
+  const { res, data } = await api("/api/v1/chat/conversations", { method: "GET" });
+  if (!res.ok) {
+    list.innerHTML = "";
+    conversations = [];
+    if (empty) {
+      empty.classList.remove("hidden");
+      empty.textContent = res.status === 403 ? "เข้าสู่ระบบด้วยบัญชีจริงเพื่อแชทกับเพื่อน" : "โหลดแชทไม่ได้";
+    }
+    paintUnread(0);
+    return;
+  }
+  conversations = data.conversations || [];
+  paintUnread(data.unread || 0);
+  paintConversationList();
 }
 
 async function openThread(peerId) {
@@ -274,6 +315,8 @@ export function wireChat(user) {
     if (willOpen) {
       backToList();
       await loadConversations();
+    } else {
+      setChatEmojiPanel(false);
     }
   });
 
@@ -281,8 +324,31 @@ export function wireChat(user) {
     if (panel.classList.contains("hidden")) return;
     if (btn.contains(e.target) || panel.contains(e.target)) return;
     if (e.target && e.target.isConnected === false) return;
-    panel.classList.add("hidden");
+    closeChatPanel();
   });
+
+  const closeBtn = document.getElementById("chatCloseBtn");
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      closeChatPanel();
+    };
+  }
+  const threadClose = document.getElementById("chatThreadCloseBtn");
+  if (threadClose) {
+    threadClose.onclick = (e) => {
+      e.stopPropagation();
+      closeChatPanel();
+    };
+  }
+
+  const filterEl = document.getElementById("chatListFilter");
+  if (filterEl) {
+    filterEl.oninput = () => {
+      listFilter = filterEl.value || "";
+      paintConversationList();
+    };
+  }
 
   const back = document.getElementById("chatThreadBack");
   if (back) back.onclick = (e) => {

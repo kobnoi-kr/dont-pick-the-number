@@ -66,6 +66,26 @@ function cosmeticImageOf(c) {
   return url ? String(url) : null;
 }
 
+function metaFlag(meta, key, defaultValue) {
+  if (!meta || typeof meta !== "object") return defaultValue;
+  if (!Object.prototype.hasOwnProperty.call(meta, key)) return defaultValue;
+  return !!meta[key];
+}
+
+function cosmeticUsesSystemColor(c) {
+  return metaFlag(c && c.meta, "useSystemColor", true);
+}
+
+function cosmeticUsesSystemEffect(c) {
+  return metaFlag(c && c.meta, "useSystemEffect", true);
+}
+
+function isAdminCreatedCosmetic(c) {
+  return !!(c && c.meta && typeof c.meta === "object" && c.meta.adminCreated);
+}
+
+const PROTECTED_COSMETIC_IDS = new Set(["frame.basic", "effect.none"]);
+
 const RANK_TITLE_IDS = {
   weekly: ["title.weekly.1", "title.weekly.2", "title.weekly.3"],
   monthly: ["title.monthly.1", "title.monthly.2", "title.monthly.3"]
@@ -236,6 +256,10 @@ function publicCosmetic(c) {
   const meta = c.meta && typeof c.meta === "object" ? Object.assign({}, c.meta) : {};
   const imageUrl = cosmeticImageOf(c);
   if (imageUrl) meta.imageUrl = imageUrl;
+  const useSystemColor = cosmeticUsesSystemColor(c);
+  const useSystemEffect = cosmeticUsesSystemEffect(c);
+  meta.useSystemColor = useSystemColor;
+  meta.useSystemEffect = useSystemEffect;
   return {
     id: c.id,
     kind: c.kind,
@@ -244,6 +268,9 @@ function publicCosmetic(c) {
     shopPrice: c.shopPrice == null ? null : c.shopPrice,
     cssClass: c.cssClass || null,
     imageUrl,
+    useSystemColor,
+    useSystemEffect,
+    adminCreated: isAdminCreatedCosmetic(c),
     meta: Object.keys(meta).length ? meta : null
   };
 }
@@ -279,9 +306,8 @@ async function ensureCosmeticsCatalog(prisma, opts) {
               kind: item.kind,
               name: item.name,
               description: item.description,
-              // Keep admin shopPrice; only seed creates with catalog default
-              cssClass: item.cssClass,
-              meta: item.meta
+              // Keep admin shopPrice / meta (image, toggles); only sync cssClass label styles
+              cssClass: item.cssClass
             },
             create: item
           })
@@ -966,11 +992,23 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       sendJson(res, 400, { error: imageRes.error || "invalid_image" });
       return true;
     }
+    const useSystemColor =
+      body && Object.prototype.hasOwnProperty.call(body, "useSystemColor")
+        ? !!body.useSystemColor
+        : true;
+    const useSystemEffect =
+      body && Object.prototype.hasOwnProperty.call(body, "useSystemEffect")
+        ? !!body.useSystemEffect
+        : true;
     const meta = Object.assign(
       {},
       color ? { color } : {},
       imageRes.url ? { imageUrl: imageRes.url } : {},
-      { adminCreated: true }
+      {
+        adminCreated: true,
+        useSystemColor,
+        useSystemEffect
+      }
     );
     const created = await prisma.cosmetic.create({
       data: {
@@ -979,7 +1017,7 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
         name,
         description,
         shopPrice,
-        cssClass,
+        cssClass: useSystemEffect ? cssClass : cssClass || id.replace(/\./g, "-"),
         meta
       }
     });
@@ -1080,6 +1118,18 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       if (!imageRes.url) delete metaPatch.imageUrl;
       else metaPatch.imageUrl = imageRes.url;
     }
+    if (body && Object.prototype.hasOwnProperty.call(body, "useSystemColor")) {
+      metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
+      metaPatch.useSystemColor = !!body.useSystemColor;
+    }
+    if (body && Object.prototype.hasOwnProperty.call(body, "useSystemEffect")) {
+      metaPatch = Object.assign({}, metaPatch || cosmetic.meta || {});
+      metaPatch.useSystemEffect = !!body.useSystemEffect;
+    }
+    if (body && Object.prototype.hasOwnProperty.call(body, "cssClass")) {
+      const nextCss = String(body.cssClass || "").trim().slice(0, 64);
+      data.cssClass = nextCss || null;
+    }
     if (metaPatch) data.meta = metaPatch;
     if (!Object.keys(data).length) {
       sendJson(res, 400, { error: "no_changes" });
@@ -1101,6 +1151,61 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
       ipAddress: clientIp(req)
     });
     sendJson(res, 200, { ok: true, item: publicCosmetic(updated) });
+    return true;
+  }
+
+  // Hard-delete frame/effect (admin-created only; starters are protected)
+  if (pathname === "/api/v1/admin/cosmetics/shop" && method(req) === "DELETE") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canManageShop(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || (body && body.id) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    if (PROTECTED_COSMETIC_IDS.has(cosmeticId)) {
+      sendJson(res, 400, { error: "protected_cosmetic" });
+      return true;
+    }
+    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    if (!cosmetic) {
+      sendJson(res, 404, { error: "cosmetic_not_found" });
+      return true;
+    }
+    if (cosmetic.kind !== "frame" && cosmetic.kind !== "effect") {
+      sendJson(res, 400, { error: "invalid_kind" });
+      return true;
+    }
+    const isStarter = STARTER_COSMETICS.some((x) => x.id === cosmeticId);
+    if (isStarter && !isAdminCreatedCosmetic(cosmetic)) {
+      sendJson(res, 400, { error: "starter_cosmetic" });
+      return true;
+    }
+    await prisma.cosmetic.delete({ where: { id: cosmeticId } });
+    cosmeticsEnsuredAt = 0;
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.delete",
+      targetId: null,
+      metadata: {
+        cosmeticId: cosmetic.id,
+        kind: cosmetic.kind,
+        name: cosmetic.name
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, { ok: true, deletedId: cosmeticId });
     return true;
   }
 

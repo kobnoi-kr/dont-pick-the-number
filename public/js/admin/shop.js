@@ -19,8 +19,23 @@ const PRESET_CSS = {
   ]
 };
 
+function usesSystemColor(item) {
+  if (!item) return true;
+  if (typeof item.useSystemColor === "boolean") return item.useSystemColor;
+  if (item.meta && typeof item.meta.useSystemColor === "boolean") return item.meta.useSystemColor;
+  return true;
+}
+
+function usesSystemEffect(item) {
+  if (!item) return true;
+  if (typeof item.useSystemEffect === "boolean") return item.useSystemEffect;
+  if (item.meta && typeof item.meta.useSystemEffect === "boolean") return item.meta.useSystemEffect;
+  return true;
+}
+
 function itemColor(item) {
   if (!item) return "#94a3b8";
+  if (!usesSystemColor(item)) return "#94a3b8";
   if (item.meta && item.meta.color) return String(item.meta.color);
   if (String(item.cssClass || "").startsWith("frame-")) return "#fbbf24";
   if (String(item.cssClass || "").startsWith("effect-")) return "#a78bfa";
@@ -42,7 +57,7 @@ function mediaHtml(url, kind) {
 
 function thumb(item) {
   const color = itemColor(item);
-  const cls = item.cssClass ? " " + item.cssClass : "";
+  const cls = usesSystemEffect(item) && item.cssClass ? " " + item.cssClass : "";
   const img = itemImage(item);
   if (item.kind === "frame") {
     return `<div class="dec-card-thumb${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
@@ -52,6 +67,19 @@ function thumb(item) {
   return `<div class="dec-effect-shell"><div class="dec-av-core${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
     color
   )}">${mediaHtml(img, "effect")}<span class="dec-av-letter">N</span></div></div>`;
+}
+
+function flagTogglesHtml(item) {
+  const colorOn = usesSystemColor(item);
+  const fxOn = usesSystemEffect(item);
+  return `<div class="shop-flags">
+    <label class="shop-flag"><input type="checkbox" data-flag-color ${colorOn ? "checked" : ""}> ใช้สีระบบ</label>
+    <label class="shop-flag"><input type="checkbox" data-flag-effect ${fxOn ? "checked" : ""}> ใช้เอฟเฟกต์ระบบ</label>
+  </div>`;
+}
+
+function canHardDelete(item) {
+  return !!(item && item.adminCreated);
 }
 
 function readImageFile(file) {
@@ -166,6 +194,11 @@ export async function renderShopAdmin(root, { user }) {
             <input class="input" id="shopImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
             <p class="tiny muted" style="margin:6px 0 0">รองรับ PNG · JPG · WEBP · GIF (สูงสุด ~1.4MB) — กรอบวางบนการ์ด · เอฟเฟกต์วางรอบรูปโปรไฟล์</p>
           </label>
+          <div class="shop-flags" style="grid-column:1/-1">
+            <label class="shop-flag"><input type="checkbox" id="shopUseColor" checked> ใช้สีระบบ</label>
+            <label class="shop-flag"><input type="checkbox" id="shopUseEffect" checked> ใช้เอฟเฟกต์ระบบ</label>
+          </div>
+          <p class="tiny muted" style="grid-column:1/-1;margin:0">ปิดได้เมื่ออยากโชว์แค่รูป/GIF โดยไม่ติดขอบสีหรือแอนิเมชัน CSS ของระบบ</p>
           <div id="shopMediaPreview" style="grid-column:1/-1"></div>
         </form>
         <div class="row-actions" style="margin-top:12px">
@@ -195,13 +228,19 @@ export async function renderShopAdmin(root, { user }) {
                       it.shopPrice != null ? it.shopPrice : 0
                     }" style="width:96px">
                   </label>
+                  ${flagTogglesHtml(it)}
                   <label class="tiny" style="display:block;margin-top:8px">เปลี่ยนรูป/GIF
                     <input class="input" data-image-file type="file" accept="image/png,image/jpeg,image/webp,image/gif">
                   </label>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-                    <button type="button" class="btn sm" data-save-price>บันทึกราคา</button>
+                    <button type="button" class="btn sm" data-save-item>บันทึก</button>
                     <button type="button" class="btn ghost sm" data-clear-image>ลบรูป</button>
                     <button type="button" class="btn ghost sm" data-unlist>เอาออกจาก Shop</button>
+                    ${
+                      canHardDelete(it)
+                        ? `<button type="button" class="btn ghost sm danger-outline" data-delete>ลบถาวร</button>`
+                        : ""
+                    }
                   </div>
                 </div>`
                 )
@@ -212,7 +251,7 @@ export async function renderShopAdmin(root, { user }) {
 
       <div class="card" style="margin-top:14px">
         <h3 style="margin-top:0">ยังไม่ลง Shop (${unlisted.length})</h3>
-        <p class="tiny muted">กรอบ/เอฟเฟกต์ที่มีในระบบแต่ยังไม่มีราคา</p>
+        <p class="tiny muted">กรอบ/เอฟเฟกต์ที่มีในระบบแต่ยังไม่มีราคา · ของที่สร้างเองลบถาวรได้</p>
         ${
           unlisted.length
             ? `<div class="dec-grid" style="margin-top:12px">${unlisted
@@ -225,8 +264,15 @@ export async function renderShopAdmin(root, { user }) {
                   <label class="tiny" style="display:flex;gap:6px;align-items:center;margin-top:6px">ราคา
                     <input class="input" data-price-input type="number" min="0" max="1000000" step="1" value="100" style="width:96px">
                   </label>
-                  <div style="margin-top:8px">
+                  ${flagTogglesHtml(it)}
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
                     <button type="button" class="btn sm" data-list>ใส่ Shop</button>
+                    <button type="button" class="btn ghost sm" data-save-flags>บันทึกตั้งค่า</button>
+                    ${
+                      canHardDelete(it)
+                        ? `<button type="button" class="btn ghost sm danger-outline" data-delete>ลบถาวร</button>`
+                        : ""
+                    }
                   </div>
                 </div>`
                 )
@@ -292,6 +338,8 @@ export async function renderShopAdmin(root, { user }) {
         setMsg("ราคาไม่ถูกต้อง", false);
         return;
       }
+      const useSystemColor = !!(root.querySelector("#shopUseColor") && root.querySelector("#shopUseColor").checked);
+      const useSystemEffect = !!(root.querySelector("#shopUseEffect") && root.querySelector("#shopUseEffect").checked);
       const body = {
         kind,
         name,
@@ -300,7 +348,9 @@ export async function renderShopAdmin(root, { user }) {
         cssClass: cssClass || undefined,
         color: color || undefined,
         id: id || undefined,
-        imageUrl: pendingImage || undefined
+        imageUrl: pendingImage || undefined,
+        useSystemColor,
+        useSystemEffect
       };
       const { res, data } = await api("/api/v1/admin/cosmetics", {
         method: "POST",
@@ -327,7 +377,30 @@ export async function renderShopAdmin(root, { user }) {
       paint();
     };
 
-    root.querySelectorAll("[data-save-price]").forEach((btn) => {
+    async function patchItem(cosmeticId, patch, okText) {
+      const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
+        method: "PATCH",
+        body: JSON.stringify(Object.assign({ cosmeticId }, patch))
+      });
+      if (!res.ok) {
+        setMsg(((data && data.error) || "บันทึกไม่สำเร็จ") + "", false);
+        return false;
+      }
+      msg = okText || "บันทึกแล้ว";
+      msgOk = true;
+      await load();
+      paint();
+      return true;
+    }
+
+    function readFlags(card) {
+      return {
+        useSystemColor: !!(card && card.querySelector("[data-flag-color]") && card.querySelector("[data-flag-color]").checked),
+        useSystemEffect: !!(card && card.querySelector("[data-flag-effect]") && card.querySelector("[data-flag-effect]").checked)
+      };
+    }
+
+    root.querySelectorAll("[data-save-item]").forEach((btn) => {
       btn.onclick = async () => {
         const card = btn.closest("[data-id]");
         const cosmeticId = card && card.getAttribute("data-id");
@@ -337,15 +410,40 @@ export async function renderShopAdmin(root, { user }) {
           setMsg("ราคาไม่ถูกต้อง", false);
           return;
         }
-        const { res } = await api("/api/v1/admin/cosmetics/shop", {
-          method: "PATCH",
-          body: JSON.stringify({ cosmeticId, shopPrice })
+        await patchItem(cosmeticId, Object.assign({ shopPrice }, readFlags(card)), "บันทึกราคาและตั้งค่าแล้ว");
+      };
+    });
+
+    root.querySelectorAll("[data-save-flags]").forEach((btn) => {
+      btn.onclick = async () => {
+        const card = btn.closest("[data-id]");
+        const cosmeticId = card && card.getAttribute("data-id");
+        if (!cosmeticId) return;
+        await patchItem(cosmeticId, readFlags(card), "บันทึกตั้งค่าแล้ว");
+      };
+    });
+
+    root.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.onclick = async () => {
+        const card = btn.closest("[data-id]");
+        const cosmeticId = card && card.getAttribute("data-id");
+        if (!cosmeticId) return;
+        if (!confirm("ลบถาวรรายการนี้? ผู้เล่นที่สวมอยู่จะถูกถอดออก และกู้คืนไม่ได้")) return;
+        const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
+          method: "DELETE",
+          body: JSON.stringify({ cosmeticId })
         });
         if (!res.ok) {
-          setMsg("บันทึกราคาไม่สำเร็จ", false);
+          const err = (data && data.error) || "";
+          setMsg(
+            err === "starter_cosmetic" || err === "protected_cosmetic"
+              ? "ของระบบลบถาวรไม่ได้ — เอาออกจาก Shop ได้"
+              : "ลบไม่สำเร็จ",
+            false
+          );
           return;
         }
-        msg = "อัปเดตราคาแล้ว";
+        msg = "ลบถาวรแล้ว";
         msgOk = true;
         await load();
         paint();
@@ -437,18 +535,11 @@ export async function renderShopAdmin(root, { user }) {
           setMsg("ราคาไม่ถูกต้อง", false);
           return;
         }
-        const { res } = await api("/api/v1/admin/cosmetics/shop", {
-          method: "PATCH",
-          body: JSON.stringify({ cosmeticId, shopPrice })
-        });
-        if (!res.ok) {
-          setMsg("ใส่ Shop ไม่สำเร็จ", false);
-          return;
-        }
-        msg = "ใส่ Shop แล้ว";
-        msgOk = true;
-        await load();
-        paint();
+        await patchItem(
+          cosmeticId,
+          Object.assign({ shopPrice }, readFlags(card)),
+          "ใส่ Shop แล้ว"
+        );
       };
     });
   }

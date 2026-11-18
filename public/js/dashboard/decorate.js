@@ -8,8 +8,28 @@ function esc(s) {
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
 
+function usesSystemColor(item) {
+  if (!item) return true;
+  if (typeof item.useSystemColor === "boolean") return item.useSystemColor;
+  if (item.meta && typeof item.meta.useSystemColor === "boolean") return item.meta.useSystemColor;
+  return true;
+}
+
+function usesSystemEffect(item) {
+  if (!item) return true;
+  if (typeof item.useSystemEffect === "boolean") return item.useSystemEffect;
+  if (item.meta && typeof item.meta.useSystemEffect === "boolean") return item.meta.useSystemEffect;
+  return true;
+}
+
+function itemCssClass(item) {
+  if (!item || !usesSystemEffect(item)) return "";
+  return item.cssClass ? String(item.cssClass) : "";
+}
+
 function itemColor(item) {
   if (!item) return "#94a3b8";
+  if (!usesSystemColor(item)) return "#94a3b8";
   if (item.meta && item.meta.color) return String(item.meta.color);
   if (item.cssClass === "title-weekly-1" || item.cssClass === "title-monthly-1") return "#fbbf24";
   if (item.cssClass === "title-weekly-2" || item.cssClass === "title-monthly-2") return "#cbd5e1";
@@ -68,16 +88,16 @@ function thumbHtml(item, user) {
     return titlePillHtml(item, "dec-title-pill-sm");
   }
   if (kind === "frame") {
-    const cls = item && item.cssClass ? " " + item.cssClass : "";
+    const cls = itemCssClass(item);
     // กรอบ = การ์ดสี่เหลี่ยม (ไม่ใช่รอบรูป)
-    return `<div class="dec-card-thumb${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(color)}">
+    return `<div class="dec-card-thumb${cls ? " " + cls : ""}${img ? " has-media" : ""}" style="--dec-accent:${esc(color)}">
       ${mediaHtml(img, "frame")}
       <div class="dec-av-core">${avHtml(user, letter)}</div>
     </div>`;
   }
   if (kind === "effect") {
-    const cls = item && item.cssClass ? " " + item.cssClass : "";
-    return `<div class="dec-effect-shell"><div class="dec-av-core${cls}${img ? " has-media" : ""}" style="--dec-accent:${esc(
+    const cls = itemCssClass(item);
+    return `<div class="dec-effect-shell"><div class="dec-av-core${cls ? " " + cls : ""}${img ? " has-media" : ""}" style="--dec-accent:${esc(
       color
     )}">${mediaHtml(img, "effect")}${avHtml(user, letter)}</div></div>`;
   }
@@ -91,18 +111,18 @@ function previewHtml(user, eq) {
   const title = eq.title;
   const frame = eq.frame;
   const effect = eq.effect;
-  const frameCls = frame && frame.cssClass ? " " + frame.cssClass : "";
-  const effectCls = effect && effect.cssClass ? " " + effect.cssClass : "";
+  const frameCls = itemCssClass(frame);
+  const effectCls = itemCssClass(effect);
   const frameImg = itemImage(frame);
   const effectImg = itemImage(effect);
   return `
-    <div class="dec-preview-card dec-profile-card${frameCls}${frameImg ? " has-media" : ""}" style="--dec-accent:${esc(
+    <div class="dec-preview-card dec-profile-card${frameCls ? " " + frameCls : ""}${frameImg ? " has-media" : ""}" style="--dec-accent:${esc(
       itemColor(frame)
     )}">
       ${mediaHtml(frameImg, "frame")}
       <div class="dec-preview-head">
         <div class="dec-effect-shell dec-preview-av">
-          <div class="dec-av-core${effectCls}${effectImg ? " has-media" : ""}">
+          <div class="dec-av-core${effectCls ? " " + effectCls : ""}${effectImg ? " has-media" : ""}">
             ${mediaHtml(effectImg, "effect")}
             ${avHtml(user, letter)}
           </div>

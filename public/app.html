@@ -90,7 +90,9 @@
         <h3 class="chat-title">แชทเพื่อน</h3>
         <p class="chat-sub">เฉพาะเพื่อนที่ยอมรับแล้ว · เก็บ 3 วัน</p>
       </div>
+      <button type="button" class="btn ghost sm" id="chatCloseBtn" aria-label="ปิด">✕</button>
     </div>
+    <input id="chatListFilter" class="input chat-list-filter" type="search" maxlength="64" placeholder="ค้นหาเพื่อนในแชท…" autocomplete="off" aria-label="ค้นหาเพื่อนในแชท">
     <div id="chatConvList" class="chat-conv-list"></div>
     <p class="empty tiny chat-empty" id="chatEmpty">ยังไม่มีเพื่อน — ไปเพิ่มเพื่อนก่อน</p>
   </div>
@@ -98,6 +100,7 @@
     <div class="chat-head chat-thread-head">
       <button type="button" class="btn ghost sm" id="chatThreadBack" aria-label="กลับ">←</button>
       <h3 class="chat-title" id="chatThreadTitle">แชท</h3>
+      <button type="button" class="btn ghost sm" id="chatThreadCloseBtn" aria-label="ปิด">✕</button>
     </div>
     <div id="chatThreadMsgs" class="chat-thread-msgs"></div>
     <form id="chatThreadForm" class="chat-thread-form" autocomplete="off">

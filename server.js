@@ -1672,12 +1672,20 @@ async function hydratePlayerProfile(player) {
     player.roles = (u.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean);
     player.title = (u.equippedTitle && u.equippedTitle.name) || null;
     player.titleClass = (u.equippedTitle && u.equippedTitle.cssClass) || null;
-    player.frameClass = (u.equippedFrame && u.equippedFrame.cssClass) || null;
-    player.effectClass = (u.equippedEffect && u.equippedEffect.cssClass) || null;
-    player.frameImage =
-      (u.equippedFrame && u.equippedFrame.meta && u.equippedFrame.meta.imageUrl) || null;
-    player.effectImage =
-      (u.equippedEffect && u.equippedEffect.meta && u.equippedEffect.meta.imageUrl) || null;
+    const frameMeta = (u.equippedFrame && u.equippedFrame.meta) || null;
+    const effectMeta = (u.equippedEffect && u.equippedEffect.meta) || null;
+    const frameUseFx = !(frameMeta && frameMeta.useSystemEffect === false);
+    const effectUseFx = !(effectMeta && effectMeta.useSystemEffect === false);
+    player.frameClass =
+      frameUseFx && u.equippedFrame && u.equippedFrame.cssClass
+        ? u.equippedFrame.cssClass
+        : null;
+    player.effectClass =
+      effectUseFx && u.equippedEffect && u.equippedEffect.cssClass
+        ? u.equippedEffect.cssClass
+        : null;
+    player.frameImage = (frameMeta && frameMeta.imageUrl) || null;
+    player.effectImage = (effectMeta && effectMeta.imageUrl) || null;
   } catch (_) {
     /* ignore */
   }
