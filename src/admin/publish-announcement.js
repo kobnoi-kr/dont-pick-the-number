@@ -75,15 +75,26 @@ async function publishAnnouncement(prisma, announcementId) {
   if (ann.startsAt && ann.startsAt > now) return null;
   if (ann.endsAt && ann.endsAt < now) return null;
 
-  const recipientIds = await resolveRecipientIds(prisma, ann);
+  let recipientIds = await resolveRecipientIds(prisma, ann);
+  const kind = ann.kind || "info";
+  // Personal urgent kinds always deliver; general announcements respect prefs.
+  if (kind !== "danger" && kind !== "alert") {
+    const { userWantsNotification } = require("../dashboard/notify");
+    const filtered = [];
+    for (const userId of recipientIds) {
+      if (await userWantsNotification(prisma, userId, "announcement")) filtered.push(userId);
+    }
+    recipientIds = filtered;
+  }
   const type = "announcement";
   const title = String(ann.title).slice(0, 160);
   const body = String(ann.body || "").slice(0, 8000);
-  const payload = { announcementId: ann.id, kind: ann.kind || "info" };
+  const payload = { announcementId: ann.id, kind };
 
   const BATCH = 200;
   for (let i = 0; i < recipientIds.length; i += BATCH) {
     const chunk = recipientIds.slice(i, i + BATCH);
+    if (!chunk.length) continue;
     await prisma.notification.createMany({
       data: chunk.map((userId) => ({
         userId,

@@ -804,7 +804,12 @@ async function handleDashboardApi(req, res, pathname) {
           data: { userId: auth.user.id, language: "th", theme: "dark", preferences: {} }
         });
       }
-      sendJson(res, 200, { settings });
+      const { normalizeNotifPrefs } = require("./notify");
+      const preferences = Object.assign({}, settings.preferences || {});
+      preferences.notifications = normalizeNotifPrefs(preferences.notifications);
+      sendJson(res, 200, {
+        settings: Object.assign({}, settings, { preferences })
+      });
       return true;
     }
     if (method(req) === "PATCH") {
@@ -817,7 +822,14 @@ async function handleDashboardApi(req, res, pathname) {
       }
       const current = await prisma.userSettings.findUnique({ where: { userId: auth.user.id } });
       const prevPref = (current && current.preferences) || {};
-      const nextPref = Object.assign({}, prevPref, body.preferences || {});
+      const incoming = (body && body.preferences) || {};
+      const { normalizeNotifPrefs } = require("./notify");
+      const nextPref = Object.assign({}, prevPref, incoming);
+      if (incoming.notifications && typeof incoming.notifications === "object") {
+        nextPref.notifications = normalizeNotifPrefs(
+          Object.assign({}, prevPref.notifications || {}, incoming.notifications)
+        );
+      }
       const settings = await prisma.userSettings.upsert({
         where: { userId: auth.user.id },
         create: {

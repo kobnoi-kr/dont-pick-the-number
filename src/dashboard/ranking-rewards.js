@@ -2,7 +2,6 @@
 
 const { getPrisma, authEnabled } = require("../db");
 const { previousRankingWindow } = require("./ranking-period");
-const { getGameApi } = require("./bridge");
 const {
   ensureCosmeticsCatalog,
   grantCosmetic,
@@ -29,32 +28,23 @@ async function notifyRankingReward(prisma, { userId, period, rank, cosmeticId, w
     (windowLabel ? ` (${windowLabel})` : "") +
     `\n\nรางวัล: ยศ「${titleName}」\nสามารถดูและสวมใส่ได้ที่เมนู ตกแต่ง ใน Dashboard`;
 
-  await prisma.notification.create({
-    data: {
-      userId,
-      type: "ranking_reward",
-      title: String(title).slice(0, 160),
-      body: String(body).slice(0, 500),
-      payload: {
-        kind: "reward",
-        period,
-        rank,
-        cosmeticId,
-        windowLabel: windowLabel || null,
-        fullBody,
-        href: "/app#decorate"
-      }
-    }
+  const { createUserNotification } = require("./notify");
+  await createUserNotification(prisma, {
+    userId,
+    type: "ranking_reward",
+    title: String(title).slice(0, 160),
+    body: String(body).slice(0, 500),
+    payload: {
+      kind: "reward",
+      period,
+      rank,
+      cosmeticId,
+      windowLabel: windowLabel || null,
+      fullBody,
+      href: "/app#decorate"
+    },
+    push: { href: "/app#decorate" }
   });
-
-  const game = getGameApi();
-  if (game && typeof game.notifyUser === "function") {
-    try {
-      game.notifyUser(userId, { type: "ranking_reward" });
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 async function topUsersForWindow(prisma, since, until) {

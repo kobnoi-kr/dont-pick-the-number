@@ -1932,18 +1932,17 @@ async function onInviteFriend(ws, msg) {
   }
   send(ws, { t: "inviteSent", friendUserId, inviteId });
   getPrisma()
-    .then((prisma) =>
-      prisma.notification.create({
-        data: {
-          userId: friendUserId,
-          type: "room_invitation",
-          title: "Room invitation",
-          body: (inv.fromName || "Friend") + " invited you to " + inv.roomTitle,
-          payload: { inviteId, code: inv.code }
-        }
-      })
-    )
-    .then(() => sendToUser(friendUserId, { t: "notification:new" }))
+    .then(async (prisma) => {
+      const { createUserNotification } = require("./src/dashboard/notify");
+      await createUserNotification(prisma, {
+        userId: friendUserId,
+        type: "room_invitation",
+        title: "เชิญเข้าห้อง",
+        body: (inv.fromName || "เพื่อน") + " เชิญคุณเข้า " + inv.roomTitle,
+        payload: { inviteId, code: inv.code },
+        push: { inviteId, code: inv.code }
+      });
+    })
     .catch(() => {});
 }
 function onDeclineInvite(ws, msg) {

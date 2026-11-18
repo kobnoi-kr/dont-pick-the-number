@@ -111,15 +111,20 @@ async function persistFinishedGame(room, scoreOf) {
         }
       });
 
-      await prisma.notification.create({
-        data: {
+      try {
+        const { createUserNotification } = require("./notify");
+        const won = !!gp.won;
+        await createUserNotification(prisma, {
           userId: gp.userId,
           type: "game_finished",
-          title: "Game finished",
-          body: (room.over && room.over.title) || ("Room " + room.code + " ended"),
-          payload: { gameId: game.id, roomCode: room.code, rank: gp.rank, won: gp.won }
-        }
-      }).catch(() => {});
+          title: won ? "ชนะเกมแล้ว!" : "เกมจบแล้ว",
+          body: (room.over && room.over.title) || ("ห้อง " + room.code + " จบแล้ว"),
+          payload: { gameId: game.id, roomCode: room.code, rank: gp.rank, won },
+          push: { won }
+        });
+      } catch {
+        /* ignore */
+      }
 
       try {
         const { awardExp } = require("./levels");

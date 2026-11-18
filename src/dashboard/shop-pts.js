@@ -47,7 +47,6 @@ async function loadShopPtsConfig(prisma) {
   try {
     const row = await prisma.systemSetting.findUnique({ where: { key: "shop_pts" } });
     if (!row) {
-      // First boot: persist defaults so admin UI + player shop stay in sync (enabled).
       return saveShopPtsConfig(prisma, DEFAULT_SHOP_PTS);
     }
     return normalizeShopPtsConfig(row.value);
@@ -83,7 +82,6 @@ function randomIntInclusive(min, max) {
  * Win reward:
  * - random: uniform integer in [randomMin, randomMax]
  * - formula: baseWin + perHumanOpponent * min(humans-1, maxBonusHumans)
- * Bots do not count toward lobby size. Needs at least 1 human.
  */
 function computeWinShopPts(config, humanCount) {
   const cfg = normalizeShopPtsConfig(config);
@@ -111,27 +109,26 @@ async function awardShopPts(prisma, userId, amount, meta) {
     where: { id: userId },
     data: { shopPts: next }
   });
-  // Guests earn/hold pts too; buying still requires a registered account.
+
   const modeNote =
     meta && meta.modePts === "random"
       ? " (สุ่ม)"
       : meta && meta.humans
         ? " (ล็อบบี้ " + meta.humans + " คนจริง)"
         : "";
-  await prisma.notification
-    .create({
-      data: {
-        userId,
-        type: "shop_pts",
-        title: "ได้รับ " + gain + " pts",
-        body: "ชนะเกมแล้วได้ " + gain + " pts สำหรับ Shop" + modeNote,
-        payload: Object.assign(
-          { gain, balance: next, href: "/app#shop" },
-          meta || {}
-        )
-      }
-    })
-    .catch(() => {});
+  const title = "ได้รับ " + gain + " pts";
+  const body = "ชนะเกมแล้วได้ " + gain + " pts สำหรับ Shop" + modeNote;
+
+  const { createUserNotification } = require("./notify");
+  await createUserNotification(prisma, {
+    userId,
+    type: "shop_pts",
+    title,
+    body,
+    payload: Object.assign({ gain, balance: next, href: "/app#shop" }, meta || {}),
+    push: { gain, balance: next, href: "/app#shop" }
+  });
+
   return { gain, balance: next };
 }
 

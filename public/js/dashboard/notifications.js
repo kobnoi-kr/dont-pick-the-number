@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { isAdminNotifMuted, playAdminNotifPing, toggleAdminNotifMuted } from "./sfx.js";
+import { showSystemToast } from "./toasts.js";
 
 const CATS = [
   { id: "all", label: "ทั้งหมด" },
@@ -37,15 +38,9 @@ function catOf(n) {
   const type = String(n.type || "");
   if (type === "announcement") return "announce";
   if (type === "room_invitation") return "invite";
-  if (type === "game_finished") return "game";
+  if (type === "game_finished" || type === "shop_pts" || type === "level_up") return "game";
   if (type === "friend_request" || type === "friend") return "friend";
-  if (
-    type === "admin_reply" ||
-    type === "ranking_reward" ||
-    type === "level_up" ||
-    type === "system_grant" ||
-    type === "shop_pts"
-  ) {
+  if (type === "admin_reply" || type === "ranking_reward" || type === "system_grant") {
     return "other";
   }
   return "other";
@@ -332,9 +327,30 @@ function paintNotifSoundToggle() {
   btn.innerHTML = `<i class="fi fi-rr-bell" aria-hidden="true"></i>`;
 }
 
-/** Live WS: play ping for admin-style messages. */
+/** Live WS: toast + ping for reward / admin messages. */
 export function onNotificationPush(msg) {
   const type = msg ? String(msg.type || "") : "";
+  if (type === "shop_pts") {
+    const gain = msg.gain != null ? msg.gain : null;
+    showSystemToast({
+      id: msg.notificationId ? "shop-pts-" + msg.notificationId : undefined,
+      kicker: "Shop pts",
+      title: msg.title || (gain != null ? "ได้รับ " + gain + " pts" : "ได้รับ pts"),
+      body: msg.body || "ชนะเกมแล้ว ได้ pts สำหรับ Shop",
+      kind: "info"
+    });
+    return;
+  }
+  if (type === "level_up") {
+    showSystemToast({
+      id: msg.notificationId ? "level-" + msg.notificationId : undefined,
+      kicker: "Level up",
+      title: msg.title || "ขึ้นเลเวลแล้ว!",
+      body: msg.body || "",
+      kind: "info"
+    });
+    return;
+  }
   if (type === "admin_reply" || type === "ranking_reward" || type === "system_grant") {
     playAdminNotifPing();
   }

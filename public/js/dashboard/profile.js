@@ -48,6 +48,7 @@ export async function renderProfile(root, { user, onSaved }) {
     preferences: {}
   };
   const pref = s.preferences || {};
+  const notif = pref.notifications || {};
   const providersRes = await api("/api/v1/account/providers", { method: "GET" });
   const providers = ((providersRes.data && providersRes.data.providers) || []).filter(
     (p) => p && (p.provider === "google" || p.provider === "discord")
@@ -139,6 +140,49 @@ export async function renderProfile(root, { user, onSaved }) {
             <button class="btn ghost" type="submit">บันทึกความเป็นส่วนตัว</button>
           </form>
           <p class="msg" id="privMsg"></p>
+        </div>
+        <div class="card">
+          <h3>การแจ้งเตือน</h3>
+          <p class="tiny muted" style="margin:0 0 10px">เลือกว่าต้องการรับข้อความในกระดิ่ง / ป็อปอัปประเภทใด</p>
+          <form id="notifPrefForm" class="switch-stack">
+            <label class="switch-row">
+              <span>ได้ pts เมื่อชนะเกม</span>
+              <input id="nfShopPts" type="checkbox" class="switch-input" ${notif.shop_pts !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>เกมจบ</span>
+              <input id="nfGame" type="checkbox" class="switch-input" ${notif.game_finished !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>ขึ้นเลเวล</span>
+              <input id="nfLevel" type="checkbox" class="switch-input" ${notif.level_up !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>เชิญเข้าห้อง (ในกระดิ่ง)</span>
+              <input id="nfInvite" type="checkbox" class="switch-input" ${notif.room_invitation !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>รางวัล Ranking</span>
+              <input id="nfRank" type="checkbox" class="switch-input" ${notif.ranking_reward !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>ประกาศทั่วไป</span>
+              <input id="nfAnnounce" type="checkbox" class="switch-input" ${notif.announcement !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span>ข้อความจากแอดมิน / ของรางวัลระบบ</span>
+              <input id="nfAdmin" type="checkbox" class="switch-input" ${notif.admin !== false ? "checked" : ""}>
+              <span class="switch-ui" aria-hidden="true"></span>
+            </label>
+            <button class="btn ghost" type="submit">บันทึกการแจ้งเตือน</button>
+          </form>
+          <p class="msg" id="notifPrefMsg"></p>
         </div>
         <div class="card">
           <h3>Sessions</h3>
@@ -313,6 +357,29 @@ export async function renderProfile(root, { user, onSaved }) {
           publicStats: root.querySelector("#privStats").checked,
           publicHistory: root.querySelector("#privHistory").checked,
           allowInvites: root.querySelector("#privInvites").checked
+        }
+      })
+    });
+    msg.textContent = res.ok ? "บันทึกแล้ว" : (data && data.error) || "failed";
+    msg.classList.toggle("ok", res.ok);
+  };
+
+  root.querySelector("#notifPrefForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = root.querySelector("#notifPrefMsg");
+    const { res, data } = await api("/api/v1/settings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        preferences: {
+          notifications: {
+            shop_pts: root.querySelector("#nfShopPts").checked,
+            game_finished: root.querySelector("#nfGame").checked,
+            level_up: root.querySelector("#nfLevel").checked,
+            room_invitation: root.querySelector("#nfInvite").checked,
+            ranking_reward: root.querySelector("#nfRank").checked,
+            announcement: root.querySelector("#nfAnnounce").checked,
+            admin: root.querySelector("#nfAdmin").checked
+          }
         }
       })
     });

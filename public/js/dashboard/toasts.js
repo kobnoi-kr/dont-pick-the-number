@@ -88,39 +88,65 @@ function ensureHost() {
   return host;
 }
 
-export function showAnnouncementToast(ann) {
-  if (!ann || !ann.id) return;
+function mountToast({ id, kicker, title, body, cls, autoMs, onClose }) {
   ensureToastStyles();
   const host = ensureHost();
-  if ([...host.children].some((n) => n.dataset && n.dataset.annId === ann.id)) return;
-  const meta = kindMeta(ann.kind);
+  if (id && [...host.children].some((n) => n.dataset && n.dataset.annId === id)) return null;
   const el = document.createElement("div");
-  el.className = `toast-popup ${meta.cls}`;
-  el.dataset.annId = ann.id;
+  el.className = `toast-popup ${cls || "toast-info"}`;
+  if (id) el.dataset.annId = id;
   el.innerHTML = `
     <div class="toast-accent" aria-hidden="true"></div>
     <div class="toast-body">
-      <div class="toast-kicker">${esc(meta.label)}</div>
-      <div class="toast-title">${esc(ann.title)}</div>
-      <div class="toast-text">${esc(ann.body)}</div>
+      <div class="toast-kicker">${esc(kicker || "แจ้งเตือน")}</div>
+      <div class="toast-title">${esc(title || "")}</div>
+      <div class="toast-text">${esc(body || "")}</div>
     </div>
     <button type="button" class="toast-close" aria-label="ปิด">×</button>
   `;
   const close = () => {
-    markSeen(ann.id);
+    if (typeof onClose === "function") onClose();
     el.classList.add("out");
     setTimeout(() => el.remove(), 220);
   };
   el.querySelector(".toast-close").onclick = close;
   host.appendChild(el);
-  playAnnouncementBell();
   requestAnimationFrame(() => el.classList.add("in"));
-  // Auto-dismiss general/info after 12s; personal stay until closed
-  if (ann.kind === "info" || ann.kind === "warning") {
+  if (autoMs > 0) {
     setTimeout(() => {
       if (document.body.contains(el)) close();
-    }, 12000);
+    }, autoMs);
   }
+  return el;
+}
+
+export function showAnnouncementToast(ann) {
+  if (!ann || !ann.id) return;
+  const meta = kindMeta(ann.kind);
+  mountToast({
+    id: ann.id,
+    kicker: meta.label,
+    title: ann.title,
+    body: ann.body,
+    cls: meta.cls,
+    autoMs: ann.kind === "info" || ann.kind === "warning" ? 12000 : 0,
+    onClose: () => markSeen(ann.id)
+  });
+  playAnnouncementBell();
+}
+
+/** Live system toast (shop pts, level up, etc.) */
+export function showSystemToast({ id, kicker, title, body, kind }) {
+  const meta = kindMeta(kind || "info");
+  mountToast({
+    id: id || undefined,
+    kicker: kicker || meta.label,
+    title,
+    body,
+    cls: meta.cls,
+    autoMs: 8000
+  });
+  playAnnouncementBell();
 }
 
 export async function loadAnnouncementToasts() {

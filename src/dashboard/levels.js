@@ -282,23 +282,25 @@ async function applyExpGain(prisma, userId, gain, { notifyLevelUp = true } = {})
   }
 
   if (notifyLevelUp && after.level > before.level) {
-    await prisma.notification
-      .create({
-        data: {
-          userId,
-          type: "level_up",
-          title: `ขึ้นเลเวล ${after.level} แล้ว!`,
-          body: `ได้ยศ「${after.title}」เก็บเข้าคลังแล้ว — สวมใส่ได้ที่เมนู ตกแต่ง`,
-          payload: {
-            kind: "level",
-            level: after.level,
-            title: after.title,
-            color: after.color,
-            href: "/app#decorate"
-          }
-        }
-      })
-      .catch(() => {});
+    try {
+      const { createUserNotification } = require("./notify");
+      await createUserNotification(prisma, {
+        userId,
+        type: "level_up",
+        title: `ขึ้นเลเวล ${after.level} แล้ว!`,
+        body: `ได้ยศ「${after.title}」เก็บเข้าคลังแล้ว — สวมใส่ได้ที่เมนู ตกแต่ง`,
+        payload: {
+          kind: "level",
+          level: after.level,
+          title: after.title,
+          color: after.color,
+          href: "/app#decorate"
+        },
+        push: { level: after.level, href: "/app#decorate" }
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   return { gain: amount, before, after, exp: nextExp };
