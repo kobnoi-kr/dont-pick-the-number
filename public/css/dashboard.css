@@ -434,12 +434,23 @@ textarea:focus {
 }
 .content-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
   gap: 18px;
   align-items: start;
 }
 .content-grid.single { grid-template-columns: 1fr; }
-.panel-right { display: flex; flex-direction: column; gap: 14px; }
+.panel-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+.panel-right > .card {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
 
 .card {
   background: var(--nv-card);
@@ -2279,17 +2290,24 @@ body.modal-open {
   gap: 6px;
   margin: 8px 0;
   grid-template-columns: 1fr;
-}
-@media (min-width: 520px) {
-  .switch-stack.compact {
-    grid-template-columns: 1fr 1fr;
-  }
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .switch-stack.compact .switch-row {
   padding: 8px 10px;
   border-radius: 10px;
   gap: 8px;
   font-size: 0.84rem;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.switch-stack.compact .switch-row > span:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 .switch-stack.compact .switch-ui {
   width: 38px;
@@ -2316,6 +2334,8 @@ body.modal-open {
   cursor: pointer;
   color: var(--nv-text);
   font-size: 0.92rem;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .switch-input {
   position: absolute;
