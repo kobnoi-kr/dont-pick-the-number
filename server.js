@@ -454,7 +454,10 @@ function clearTurnTimer(room) {
 }
 function clearAngelGuards(room) {
   (room.players || []).forEach((player) => {
-    if (player) player.angelGuard = false;
+    if (!player) return;
+    player.angelGuard = false;
+    player.angelCardUsed = false;
+    player.angelSnakeCharges = 0;
   });
 }
 function blankRoom(code, visibility, host) {
@@ -608,11 +611,13 @@ function snap(room, player, opts) {
       host: item.id === room.hostId,
       bot: !!item.bot,
       auto: !!(item.auto || item.bot),
-      angelGuard: !!item.angelGuard,
+      angelGuard: !!(item.angelGuard || (item.angelSnakeCharges | 0) > 0),
+      angelSnakeCharges: Math.max(0, Number(item.angelSnakeCharges) || 0),
       champion: Array.isArray(room.lastWinners) && room.lastWinners.includes(item.id)
     })),
     youAuto: !!(player && (player.auto || player.bot)),
-    youAngelGuard: !!(player && player.angelGuard),
+    youAngelGuard: !!(player && (player.angelGuard || (player.angelSnakeCharges | 0) > 0)),
+    youAngelSnakeCharges: player ? Math.max(0, Number(player.angelSnakeCharges) || 0) : 0,
     order: room.order,
     alive: room.alive,
     roundOrder: room.roundOrder,
@@ -2121,7 +2126,9 @@ async function onUseHelper(ws, msg) {
   }
   const itemId = String((msg && msg.itemId) || "").trim();
   if (itemId !== "item.angel") return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
-  if (ctx.player.angelGuard) return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
+  if (ctx.player.angelCardUsed || ctx.player.angelGuard || (ctx.player.angelSnakeCharges | 0) > 0) {
+    return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
+  }
   try {
     const { getPrisma, authEnabled } = require("./src/db");
     if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
@@ -2129,7 +2136,9 @@ async function onUseHelper(ws, msg) {
     const { consumeItem, ANGEL_ITEM_ID } = require("./src/dashboard/inventory");
     const used = await consumeItem(prisma, ctx.player.id, itemId || ANGEL_ITEM_ID);
     if (!used || !used.ok) return fail(ws, "ไม่มีการ์ดนางฟ้าในกระเป๋า");
+    ctx.player.angelCardUsed = true;
     ctx.player.angelGuard = true;
+    ctx.player.angelSnakeCharges = 3;
     broadcast(ctx.room);
     send(ws, { t: "helperUsed", itemId: ANGEL_ITEM_ID, quantity: used.quantity });
   } catch (err) {

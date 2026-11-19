@@ -116,11 +116,12 @@ function snakeCurrentSeat(room) {
 function applySnakeRoll(room, userId, opts) {
   try {
     const seat = (room.players || []).find((p) => p && p.id === userId);
-    const ignoreSnakes = !!(seat && seat.angelGuard);
+    const snakeCharges = seat ? Math.max(0, Number(seat.angelSnakeCharges) || 0) : 0;
+    const ignoreSnakes = snakeCharges > 0;
     const result = roll(room.snake, userId, Object.assign({}, opts || {}, { ignoreSnakes }));
     room.snake = result.state;
     if (result.move && result.move.angelBlockedSnake && seat) {
-      seat.angelGuard = false;
+      seat.angelSnakeCharges = Math.max(0, snakeCharges - 1);
     }
     return { result };
   } catch (err) {
