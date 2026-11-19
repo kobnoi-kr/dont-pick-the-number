@@ -1,7 +1,7 @@
 import { api } from "/js/dashboard/api.js";
 import { esc, hasPerm } from "./util.js";
 
-const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์" };
+const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์", helper: "ไอเทม" };
 const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.rookie"]);
 const RANKING_TITLE_IDS = new Set([
   "title.weekly.1",
@@ -33,6 +33,12 @@ function itemColor(item) {
 }
 
 function thumb(item) {
+  if (item && item.kind === "helper") {
+    const url = item.imageUrl ? String(item.imageUrl) : "";
+    return url
+      ? `<img class="gift-helper-thumb" src="${esc(url)}" alt="" decoding="async" loading="lazy">`
+      : `<div class="gift-helper-thumb gift-helper-fallback">?</div>`;
+  }
   const color = itemColor(item);
   if (item.kind === "title") {
     return `<span class="dec-title-pill dec-title-pill-sm" style="--title-color:${esc(color)};border-color:${esc(
@@ -58,21 +64,29 @@ export async function renderGift(root, { user }) {
   }
 
   root.innerHTML = `<div class="loading">Loading…</div>`;
-  const cat = await api("/api/v1/admin/cosmetics", { method: "GET" });
+  const [cat, invCat] = await Promise.all([
+    api("/api/v1/admin/cosmetics", { method: "GET" }),
+    api("/api/v1/admin/inventory", { method: "GET" })
+  ]);
   if (!cat.res.ok) {
     root.innerHTML = `<div class="empty">โหลดแคตตาล็อกไม่ได้</div>`;
     return;
   }
   // กันมือใหม่ซ้ำ + ยศ Ranking ต้องได้จากแต้มสูงสุดเท่านั้น (Gift มอบไม่ได้)
-  let items = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
+  let cosmeticItems = (Array.isArray(cat.data && cat.data.items) ? cat.data.items : []).filter((it) => {
     if (it.id === "title.rookie") return false;
     if (RANKING_TITLE_IDS.has(it.id)) return false;
     return true;
   });
+  let helperItems = Array.isArray(invCat.data && invCat.data.items)
+    ? invCat.data.items.map((it) => Object.assign({}, it, { kind: "helper" }))
+    : [];
+  let items = cosmeticItems.concat(helperItems);
 
   let mode = "gift"; // gift | revoke
   let selectedUser = null;
   let selectedCosmeticId = "";
+  let giftQty = 1;
   let kindFilter = "all";
   let itemQuery = "";
   let itemSort = "level"; // level | name | kind | id
@@ -130,15 +144,19 @@ export async function renderGift(root, { user }) {
     if (!selectedUser) return;
     ownedLoading = true;
     paint();
-    const { res, data } = await api(
-      "/api/v1/admin/cosmetics/owned?userId=" + encodeURIComponent(selectedUser.id),
-      { method: "GET" }
-    );
+    const uid = encodeURIComponent(selectedUser.id);
+    const [cos, inv] = await Promise.all([
+      api("/api/v1/admin/cosmetics/owned?userId=" + uid, { method: "GET" }),
+      api("/api/v1/admin/inventory/owned?userId=" + uid, { method: "GET" })
+    ]);
     ownedLoading = false;
-    if (res.ok && data) {
-      owned = Array.isArray(data.owned) ? data.owned : [];
-      equipped = data.equipped || equipped;
-    }
+    const cosOwned = cos.res.ok && cos.data && Array.isArray(cos.data.owned) ? cos.data.owned : [];
+    if (cos.res.ok && cos.data) equipped = cos.data.equipped || equipped;
+    const invOwned =
+      inv.res.ok && inv.data && Array.isArray(inv.data.items)
+        ? inv.data.items.map((it) => Object.assign({}, it, { kind: "helper" }))
+        : [];
+    owned = cosOwned.concat(invOwned);
     paint();
   }
 
@@ -166,7 +184,7 @@ export async function renderGift(root, { user }) {
       <section class="page-head">
         <div>
           <h2 style="margin:0">Gift</h2>
-          <p class="muted" style="margin:6px 0 0">มอบหรือดึงยศ · กรอบ · เอฟเฟกต์ — ยศเลเวลดึงคืนไม่ได้</p>
+          <p class="muted" style="margin:6px 0 0">มอบหรือดึงยศ · กรอบ · เอฟเฟกต์ · ไอเทมกระเป๋า — ยศเลเวลดึงคืนไม่ได้</p>
         </div>
       </section>
 
@@ -222,7 +240,7 @@ export async function renderGift(root, { user }) {
         <div class="card">
           <h3 style="margin-top:0">${mode === "gift" ? "2) เลือกของที่จะมอบ" : "2) เลือกของในคลังผู้เล่น"}</h3>
           <div class="gift-kind-tabs" id="giftKinds">
-            ${["all", "title", "frame", "effect"]
+            ${["all", "title", "frame", "effect", "helper"]
               .map((k) => {
                 const label = k === "all" ? "ทั้งหมด" : KIND_LABEL[k];
                 return `<button type="button" class="btn ghost sm${kindFilter === k ? " on" : ""}" data-kind="${k}">${label}</button>`;
@@ -267,7 +285,12 @@ export async function renderGift(root, { user }) {
                             (equipped.effectId && equipped.effectId === it.id);
                           const locked = mode === "revoke" && isRevokeProtected(it.id);
                           const lv = levelOf(it);
-                          const kindLine = lv != null ? `ยศ · Lv.${lv}` : KIND_LABEL[it.kind] || it.kind;
+                          const kindLine =
+                            it.kind === "helper"
+                              ? "ไอเทม" + (it.quantity != null ? ` · ×${it.quantity}` : "")
+                              : lv != null
+                                ? `ยศ · Lv.${lv}`
+                                : KIND_LABEL[it.kind] || it.kind;
                           return `<button type="button" class="gift-item-card${on ? " on" : ""}${
                             locked ? " locked" : ""
                           }" data-id="${esc(it.id)}" ${locked ? "disabled" : ""}>
@@ -276,7 +299,9 @@ export async function renderGift(root, { user }) {
                             <b>${esc(it.name)}</b>
                             <span class="tiny muted">${esc(
                               mode === "revoke"
-                                ? (it.source || "") + (isEq ? " · สวมอยู่" : "") + (locked ? " · ล็อก" : "")
+                                ? it.kind === "helper"
+                                  ? "ในกระเป๋า ×" + (Number(it.quantity) || 0)
+                                  : (it.source || "") + (isEq ? " · สวมอยู่" : "") + (locked ? " · ล็อก" : "")
                                 : it.description || it.id
                             )}</span>
                           </button>`;
@@ -310,6 +335,15 @@ export async function renderGift(root, { user }) {
             <b>${selected ? esc(KIND_LABEL[selected.kind] + " · " + selected.name) : "—"}</b>
           </div>
         </div>
+        ${
+          selected && selected.kind === "helper"
+            ? `<label style="display:block;margin-top:12px">จำนวน
+                 <input class="input" id="giftQty" type="number" min="1" max="99" value="${esc(
+                   String(giftQty || 1)
+                 )}" style="max-width:120px">
+               </label>`
+            : ""
+        }
         <label style="display:block;margin-top:12px">หมายเหตุถึงผู้เล่น (ถ้ามี)
           <input class="input" id="giftNote" maxlength="200" placeholder="${
             mode === "gift" ? "เช่น ชดเชยยศ Weekly ที่ระบบพลาด" : "เช่น ดึงของที่ให้ผิดคน"
@@ -317,11 +351,13 @@ export async function renderGift(root, { user }) {
         </label>
         ${
           mode === "gift"
-            ? `<label class="check-row" style="margin-top:10px">
+            ? selected && selected.kind === "helper"
+              ? `<p class="tiny muted" style="margin:10px 0 0">ไอเทมจะเข้ากระเป๋าผู้เล่นทันที — ใช้ก่อนเริ่มเกมในล็อบบี้</p>`
+              : `<label class="check-row" style="margin-top:10px">
                  <input type="checkbox" id="giftAutoEquip">
                  <span>สวมให้อัตโนมัติหลังมอบ</span>
                </label>`
-            : `<p class="tiny muted" style="margin:10px 0 0">ดึงได้: ยศตกแต่ง · กรอบ · เอฟเฟกต์ — ดึงไม่ได้: ยศเลเวลทั้งหมด · กรอบเรียบ · ไม่มีเอฟเฟกต์</p>`
+            : `<p class="tiny muted" style="margin:10px 0 0">ดึงได้: ยศตกแต่ง · กรอบ · เอฟเฟกต์ · ไอเทม — ดึงไม่ได้: ยศเลเวลทั้งหมด · กรอบเรียบ · ไม่มีเอฟเฟกต์</p>`
         }
         <div class="row-actions" style="margin-top:14px">
           <button type="button" class="btn${mode === "revoke" ? " danger" : ""}" id="giftSend" ${
@@ -409,7 +445,8 @@ export async function renderGift(root, { user }) {
         }
         const item = data && data.item;
         if (item) {
-          items = [item].concat(items.filter((x) => x.id !== item.id));
+          cosmeticItems = [item].concat(cosmeticItems.filter((x) => x.id !== item.id));
+          items = cosmeticItems.concat(helperItems);
           selectedCosmeticId = item.id;
           kindFilter = "title";
           mode = "gift";
@@ -544,7 +581,8 @@ export async function renderGift(root, { user }) {
           );
           return;
         }
-        items = items.filter((x) => x.id !== item.id);
+        cosmeticItems = cosmeticItems.filter((x) => x.id !== item.id);
+        items = cosmeticItems.concat(helperItems);
         owned = owned.filter((x) => x.id !== item.id);
         selectedCosmeticId = "";
         setMsg("ลบยศ「" + item.name + "」แล้ว", true);
@@ -552,11 +590,25 @@ export async function renderGift(root, { user }) {
       };
     }
 
+    const qtyEl = root.querySelector("#giftQty");
+    if (qtyEl) {
+      qtyEl.onchange = () => {
+        const n = Math.floor(Number(qtyEl.value) || 1);
+        giftQty = Math.min(99, Math.max(1, n));
+        qtyEl.value = String(giftQty);
+      };
+    }
+
     const sendBtn = root.querySelector("#giftSend");
     if (sendBtn) {
       sendBtn.onclick = async () => {
         if (!selectedUser || !selectedCosmeticId) return;
-        if (mode === "revoke" && isRevokeProtected(selectedCosmeticId)) {
+        const selectedItem =
+          mode === "gift"
+            ? items.find((it) => it.id === selectedCosmeticId)
+            : owned.find((it) => it.id === selectedCosmeticId);
+        const isHelper = !!(selectedItem && selectedItem.kind === "helper");
+        if (mode === "revoke" && !isHelper && isRevokeProtected(selectedCosmeticId)) {
           setMsg(
             isLevelTitleId(selectedCosmeticId) ? "ยศเลเวลดึงคืนไม่ได้" : "ของเริ่มต้นดึงไม่ได้",
             false
@@ -566,8 +618,73 @@ export async function renderGift(root, { user }) {
         sendBtn.disabled = true;
         setMsg(mode === "gift" ? "กำลังมอบ…" : "กำลังดึงกลับ…", true);
         const note = root.querySelector("#giftNote").value.trim();
+        const qtyInput = root.querySelector("#giftQty");
+        const quantity = Math.min(
+          99,
+          Math.max(1, Math.floor(Number(qtyInput && qtyInput.value) || giftQty || 1))
+        );
+        giftQty = quantity;
+
+        if (isHelper) {
+          const endpoint =
+            mode === "gift" ? "/api/v1/admin/inventory/gift" : "/api/v1/admin/inventory/revoke";
+          const r = await api(endpoint, {
+            method: "POST",
+            body: JSON.stringify({
+              userId: selectedUser.id,
+              itemId: selectedCosmeticId,
+              quantity,
+              note
+            })
+          });
+          sendBtn.disabled = false;
+          if (!r.res.ok) {
+            const err = (r.data && r.data.error) || "";
+            setMsg(
+              err === "max_quantity"
+                ? "ผู้เล่นมีไอเทมนี้ครบจำนวนสูงสุดแล้ว"
+                : err === "not_owned"
+                  ? "ผู้เล่นไม่มีไอเทมนี้"
+                  : mode === "gift"
+                    ? "มอบไม่สำเร็จ"
+                    : "ดึงไม่สำเร็จ",
+              false
+            );
+            return;
+          }
+          const name = r.data && r.data.item ? r.data.item.name : "ไอเทม";
+          if (mode === "gift") {
+            setMsg(
+              "มอบ「" +
+                name +
+                "」×" +
+                (r.data.added || quantity) +
+                " ให้ @" +
+                selectedUser.username +
+                " แล้ว (กระเป๋า ×" +
+                (r.data.quantity != null ? r.data.quantity : "?") +
+                ")",
+              true
+            );
+          } else {
+            selectedCosmeticId = "";
+            setMsg(
+              "ดึง「" +
+                name +
+                "」×" +
+                (r.data.removed || quantity) +
+                " จาก @" +
+                selectedUser.username +
+                " แล้ว",
+              true
+            );
+            await loadOwned();
+          }
+          return;
+        }
+
         if (mode === "gift") {
-          const autoEquip = root.querySelector("#giftAutoEquip").checked;
+          const autoEquip = !!(root.querySelector("#giftAutoEquip") || {}).checked;
           const r = await api("/api/v1/admin/cosmetics/gift", {
             method: "POST",
             body: JSON.stringify({

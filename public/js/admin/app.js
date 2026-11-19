@@ -14,7 +14,7 @@ import { renderLogs } from "./logs.js?v=users-page2";
 import { renderInbox } from "./inbox.js?v=users-page2";
 import { renderSettings } from "./settings.js?v=users-page2";
 import { renderLevels } from "./levels.js?v=users-page2";
-import { renderGift } from "./gift.js?v=users-page2";
+import { renderGift } from "./gift.js?v=inv-gift1";
 import { renderShopAdmin } from "./shop.js?v=users-page2";
 
 const TITLES = {

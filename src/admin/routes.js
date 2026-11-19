@@ -16,6 +16,7 @@ const { publishAnnouncement, isDueNow } = require("./publish-announcement");
 const { invalidatePublicSettingsCache } = require("../system/public-settings");
 const { handleAdminLevelsApi } = require("../dashboard/levels");
 const { handleAdminCosmeticsApi } = require("../dashboard/cosmetics");
+const { handleAdminInventoryApi } = require("../dashboard/inventory");
 
 function method(req) {
   return String(req.method || "GET").toUpperCase();
@@ -73,6 +74,7 @@ async function handleAdminApi(req, res, pathname) {
 
   if (await handleAdminLevelsApi(req, res, pathname)) return true;
   if (await handleAdminCosmeticsApi(req, res, pathname)) return true;
+  if (await handleAdminInventoryApi(req, res, pathname)) return true;
 
   // —— Overview ——
   if (pathname === "/api/v1/admin/overview") {

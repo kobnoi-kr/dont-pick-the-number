@@ -3391,6 +3391,20 @@ body.modal-open {
   display: flex;
   align-items: center;
 }
+.gift-helper-thumb {
+  width: 48px;
+  height: 68px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(8, 12, 24, 0.35);
+}
+.gift-helper-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--muted, #94a3b8);
+}
 .check-row {
   display: inline-flex;
   align-items: center;

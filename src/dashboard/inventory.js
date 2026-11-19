@@ -1,6 +1,6 @@
 "use strict";
 
-const { sendJson, readJsonBody } = require("../auth/http");
+const { sendJson, readJsonBody, clientIp } = require("../auth/http");
 const { requireAuth } = require("../auth/middleware");
 const { getPrisma, authEnabled } = require("../db");
 
@@ -82,6 +82,96 @@ async function listShopItems(prisma) {
     orderBy: [{ shopPrice: "asc" }, { name: "asc" }]
   });
   return rows.map((row) => publicItem(row));
+}
+
+/** Full catalog for admin gift (includes unsold helpers). */
+async function listCatalogItems(prisma) {
+  await ensureInventoryCatalog(prisma);
+  const rows = await prisma.inventoryItem.findMany({
+    orderBy: [{ name: "asc" }]
+  });
+  return rows.map((row) => publicItem(row));
+}
+
+/**
+ * Admin grant: add quantity (clamped to MAX_ITEM_QUANTITY).
+ * Returns { item, quantity, added }.
+ */
+async function grantItem(prisma, userId, itemId, quantity) {
+  await ensureInventoryCatalog(prisma);
+  const id = String(itemId || "").trim();
+  const add = Math.floor(Number(quantity) || 0);
+  if (!id || !Number.isFinite(add) || add < 1) {
+    const err = new Error("invalid_quantity");
+    err.code = "invalid_quantity";
+    throw err;
+  }
+  const item = await prisma.inventoryItem.findUnique({ where: { id } });
+  if (!item) {
+    const err = new Error("item_not_found");
+    err.code = "item_not_found";
+    throw err;
+  }
+  const current = await prisma.userInventoryItem.findUnique({
+    where: { userId_itemId: { userId, itemId: id } },
+    select: { quantity: true }
+  });
+  const before = current ? current.quantity : 0;
+  if (before >= MAX_ITEM_QUANTITY) {
+    const err = new Error("max_quantity");
+    err.code = "max_quantity";
+    throw err;
+  }
+  const next = Math.min(MAX_ITEM_QUANTITY, before + add);
+  const added = next - before;
+  const row = await prisma.userInventoryItem.upsert({
+    where: { userId_itemId: { userId, itemId: id } },
+    create: { userId, itemId: id, quantity: next },
+    update: { quantity: next }
+  });
+  return { item: publicItem(item, row.quantity), quantity: row.quantity, added };
+}
+
+/**
+ * Admin revoke: remove up to `quantity` units.
+ * Returns { item, quantity, removed } or throws not_owned.
+ */
+async function revokeItem(prisma, userId, itemId, quantity) {
+  const id = String(itemId || "").trim();
+  const want = Math.floor(Number(quantity) || 0);
+  if (!id || !Number.isFinite(want) || want < 1) {
+    const err = new Error("invalid_quantity");
+    err.code = "invalid_quantity";
+    throw err;
+  }
+  const item = await prisma.inventoryItem.findUnique({ where: { id } });
+  if (!item) {
+    const err = new Error("item_not_found");
+    err.code = "item_not_found";
+    throw err;
+  }
+  const current = await prisma.userInventoryItem.findUnique({
+    where: { userId_itemId: { userId, itemId: id } },
+    select: { quantity: true }
+  });
+  if (!current || current.quantity < 1) {
+    const err = new Error("not_owned");
+    err.code = "not_owned";
+    throw err;
+  }
+  const removed = Math.min(want, current.quantity);
+  const next = current.quantity - removed;
+  if (next <= 0) {
+    await prisma.userInventoryItem.delete({
+      where: { userId_itemId: { userId, itemId: id } }
+    });
+    return { item: publicItem(item, 0), quantity: 0, removed };
+  }
+  const row = await prisma.userInventoryItem.update({
+    where: { userId_itemId: { userId, itemId: id } },
+    data: { quantity: next }
+  });
+  return { item: publicItem(item, row.quantity), quantity: row.quantity, removed };
 }
 
 async function loadUserInventory(prisma, userId) {
@@ -275,16 +365,260 @@ async function handleInventoryApi(req, res, pathname) {
   return true;
 }
 
+async function resolveGiftTarget(prisma, body) {
+  const userId = String((body && body.userId) || "").trim();
+  const username = String((body && body.username) || "").trim();
+  if (userId) return prisma.user.findUnique({ where: { id: userId } });
+  if (username) {
+    return prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: "insensitive" },
+        status: { not: "deleted" }
+      }
+    });
+  }
+  return null;
+}
+
+function canGiftInventory(user, userHasPermission) {
+  return userHasPermission(user, "cosmetics.gift") || userHasPermission(user, "users.ban");
+}
+
+async function handleAdminInventoryApi(req, res, pathname) {
+  if (!String(pathname || "").startsWith("/api/v1/admin/inventory")) return false;
+  if (!authEnabled()) {
+    sendJson(res, 503, { error: "auth_disabled" });
+    return true;
+  }
+  const { requireAdmin, userHasPermission } = require("../auth/middleware");
+  const { writeAdminLog } = require("../admin/audit");
+  const { getGameApi } = require("./bridge");
+  const prisma = await getPrisma();
+  if (!prisma) {
+    sendJson(res, 503, { error: "db_unavailable" });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/inventory" && method(req) === "GET") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canGiftInventory(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    sendJson(res, 200, { items: await listCatalogItems(prisma) });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/inventory/owned" && method(req) === "GET") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canGiftInventory(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    const url = new URL(req.url || "/", "http://localhost");
+    const userId = String(url.searchParams.get("userId") || "").trim();
+    if (!userId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const data = await loadUserInventory(prisma, userId);
+    sendJson(res, 200, data);
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/inventory/gift" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canGiftInventory(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const itemId = String((body && body.itemId) || "").trim();
+    const quantity = Math.floor(Number(body && body.quantity) || 1);
+    if (!itemId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const target = await resolveGiftTarget(prisma, body || {});
+    if (!target || target.status === "deleted") {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    if (target.accountType !== "registered") {
+      sendJson(res, 400, { error: "registered_required" });
+      return true;
+    }
+    const note = String((body && body.note) || "").trim().slice(0, 200);
+    let result;
+    try {
+      result = await grantItem(prisma, target.id, itemId, quantity);
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "item_not_found") {
+        sendJson(res, 404, { error: "item_not_found" });
+        return true;
+      }
+      if (code === "max_quantity") {
+        sendJson(res, 409, { error: "max_quantity", max: MAX_ITEM_QUANTITY });
+        return true;
+      }
+      if (code === "invalid_quantity") {
+        sendJson(res, 400, { error: "invalid_quantity" });
+        return true;
+      }
+      throw err;
+    }
+    const title = "ได้รับไอเทมจากแอดมิน";
+    const bodyText =
+      `แอดมินมอบ「${result.item.name}」×${result.added} ให้คุณ` +
+      ` (ในกระเป๋าตอนนี้ ×${result.quantity})`;
+    await prisma.notification.create({
+      data: {
+        userId: target.id,
+        type: "system_grant",
+        title,
+        body: bodyText,
+        payload: {
+          kind: "admin_inventory_gift",
+          fullBody:
+            bodyText +
+            (note ? "\n\nข้อความจากแอดมิน: " + note : "") +
+            "\n\nเปิดเมนู กระเป๋า เพื่อดูไอเทม",
+          itemId: result.item.id,
+          itemName: result.item.name,
+          added: result.added,
+          quantity: result.quantity,
+          note: note || null,
+          href: "/app#inventory"
+        }
+      }
+    });
+    const gameApi = getGameApi();
+    if (gameApi && typeof gameApi.notifyUser === "function") {
+      try {
+        gameApi.notifyUser(target.id, { type: "system_grant" });
+      } catch {
+        /* ignore */
+      }
+    }
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "inventory.gift",
+      targetId: target.id,
+      metadata: {
+        itemId: result.item.id,
+        name: result.item.name,
+        added: result.added,
+        quantity: result.quantity,
+        note: note || null
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, {
+      ok: true,
+      item: result.item,
+      added: result.added,
+      quantity: result.quantity,
+      user: { id: target.id, username: target.username, displayName: target.displayName }
+    });
+    return true;
+  }
+
+  if (pathname === "/api/v1/admin/inventory/revoke" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!canGiftInventory(auth.user, userHasPermission)) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const itemId = String((body && body.itemId) || "").trim();
+    const quantity = Math.floor(Number(body && body.quantity) || 1);
+    if (!itemId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    const target = await resolveGiftTarget(prisma, body || {});
+    if (!target || target.status === "deleted") {
+      sendJson(res, 404, { error: "user_not_found" });
+      return true;
+    }
+    const note = String((body && body.note) || "").trim().slice(0, 200);
+    let result;
+    try {
+      result = await revokeItem(prisma, target.id, itemId, quantity);
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "item_not_found") {
+        sendJson(res, 404, { error: "item_not_found" });
+        return true;
+      }
+      if (code === "not_owned") {
+        sendJson(res, 404, { error: "not_owned" });
+        return true;
+      }
+      if (code === "invalid_quantity") {
+        sendJson(res, 400, { error: "invalid_quantity" });
+        return true;
+      }
+      throw err;
+    }
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "inventory.revoke",
+      targetId: target.id,
+      metadata: {
+        itemId: result.item.id,
+        name: result.item.name,
+        removed: result.removed,
+        quantity: result.quantity,
+        note: note || null
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, {
+      ok: true,
+      item: result.item,
+      removed: result.removed,
+      quantity: result.quantity,
+      user: { id: target.id, username: target.username, displayName: target.displayName }
+    });
+    return true;
+  }
+
+  sendJson(res, 404, { error: "not_found" });
+  return true;
+}
+
 module.exports = {
   ANGEL_ITEM_ID,
   MAX_ITEM_QUANTITY,
   CATALOG_ITEMS,
   ensureInventoryCatalog,
   listShopItems,
+  listCatalogItems,
   publicItem,
   loadUserInventory,
   getItemQuantity,
   buyItem,
   consumeItem,
-  handleInventoryApi
+  grantItem,
+  revokeItem,
+  handleInventoryApi,
+  handleAdminInventoryApi
 };
