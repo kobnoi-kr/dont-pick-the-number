@@ -1859,11 +1859,12 @@ body.modal-open {
 
 .invite-banner{
   position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: max(12px, env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  left: auto;
+  transform: none;
   z-index: 140;
-  width: min(440px, calc(100vw - 24px));
+  width: min(360px, calc(100vw - 24px));
   pointer-events: none;
 }
 .invite-banner.hidden{ display: none !important; }
@@ -1925,15 +1926,20 @@ body.modal-open {
 
 .toast-host {
   position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 120;
-  width: min(440px, calc(100vw - 24px));
+  top: max(12px, env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: 1400;
+  width: min(360px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   display: flex;
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
+  /* Keep above sidebar / scroll containers */
+  isolation: isolate;
 }
 .toast-popup {
   pointer-events: auto;

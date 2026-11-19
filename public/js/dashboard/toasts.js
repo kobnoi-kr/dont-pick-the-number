@@ -15,9 +15,17 @@ function ensureToastStyles() {
   style.id = "nvToastCss";
   style.textContent = `
     .toast-host{
-      position:fixed;top:16px;left:50%;transform:translateX(-50%);
-      z-index:130;width:min(440px,calc(100vw - 24px));
+      position:fixed !important;
+      top:max(12px, env(safe-area-inset-top, 0px)) !important;
+      right:max(12px, env(safe-area-inset-right, 0px)) !important;
+      left:auto !important;
+      bottom:auto !important;
+      transform:none !important;
+      z-index:1400 !important;
+      width:min(360px, calc(100vw - 24px));
+      max-width:calc(100vw - 24px);
       display:flex;flex-direction:column;gap:10px;pointer-events:none;
+      isolation:isolate;
     }
     .toast-popup{
       pointer-events:auto;display:grid;grid-template-columns:6px 1fr auto;
@@ -79,12 +87,17 @@ function kindMeta(kind) {
 
 function ensureHost() {
   let host = document.getElementById("toastHost");
-  if (host) return host;
-  host = document.createElement("div");
-  host.id = "toastHost";
-  host.className = "toast-host";
-  host.setAttribute("aria-live", "polite");
-  document.body.appendChild(host);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "toastHost";
+    host.className = "toast-host";
+    host.setAttribute("aria-live", "polite");
+  }
+  // Always pin under <body> so position:fixed tracks the viewport
+  // (not a transformed/scrolling ancestor).
+  if (host.parentElement !== document.body) {
+    document.body.appendChild(host);
+  }
   return host;
 }
 
