@@ -44,7 +44,7 @@ const CATALOG_ITEMS = [
       "ใช้ก่อนเริ่มเกม · เฉพาะงูและบันได\n" +
       "หลังใช้ จะมีปุ่ม คู่ / คี่ ระหว่างเกม\n" +
       "จำกัด 5 ครั้งต่อ 1 เกม",
-    shopPrice: 249,
+    shopPrice: 299,
     imageUrl: "/images/items/even-odd.png",
     effect: "even_odd"
   }
@@ -291,10 +291,22 @@ async function buyItem(prisma, userId, itemId) {
       update: { quantity: { increment: 1 } }
     });
     const user = await tx.user.findUnique({ where: { id: userId }, select: { shopPts: true } });
+    const bal = user && user.shopPts != null ? user.shopPts : 0;
+    if (price > 0) {
+      const { appendShopPtsLedger } = require("./shop-pts");
+      await appendShopPtsLedger(tx, {
+        userId,
+        delta: -price,
+        balance: bal,
+        kind: "buy_helper",
+        title: "ซื้อ " + (item.name || "ไอเทม") + " −" + price + " pts",
+        meta: { itemId: id, name: item.name, spent: price }
+      });
+    }
     return {
       item: publicItem(item, row.quantity),
       quantity: row.quantity,
-      shopPts: user && user.shopPts != null ? user.shopPts : 0,
+      shopPts: bal,
       spent: price
     };
   });

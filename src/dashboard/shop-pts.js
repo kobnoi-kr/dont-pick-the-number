@@ -95,6 +95,33 @@ function computeWinShopPts(config, humanCount) {
   return cfg.baseWin + cfg.perHumanOpponent * opponents;
 }
 
+/**
+ * Append a ledger row. `db` may be prisma or a transaction client.
+ */
+async function appendShopPtsLedger(db, entry) {
+  if (!db || !db.shopPtsLedger || !entry || !entry.userId) return null;
+  const delta = Math.floor(Number(entry.delta) || 0);
+  if (!delta) return null;
+  const balance = Math.max(0, Math.floor(Number(entry.balance) || 0));
+  const kind = String(entry.kind || "other").slice(0, 32);
+  const title = String(entry.title || (delta > 0 ? "ได้รับ pts" : "ใช้ pts")).slice(0, 120);
+  try {
+    return await db.shopPtsLedger.create({
+      data: {
+        userId: entry.userId,
+        delta,
+        balance,
+        kind,
+        title,
+        meta: entry.meta && typeof entry.meta === "object" ? entry.meta : undefined
+      }
+    });
+  } catch (err) {
+    console.warn("[shop-pts] ledger write failed", err && err.message ? err.message : err);
+    return null;
+  }
+}
+
 async function awardShopPts(prisma, userId, amount, meta) {
   if (!prisma || !userId) return null;
   const gain = Math.floor(Number(amount) || 0);
@@ -110,26 +137,58 @@ async function awardShopPts(prisma, userId, amount, meta) {
     data: { shopPts: next }
   });
 
+  const isAdmin = !!(meta && meta.reason === "admin_grant");
+  const kind = isAdmin ? "admin_grant" : "win";
+  const title = isAdmin ? "แอดมินเพิ่ม " + gain + " pts" : "ชนะเกม +" + gain + " pts";
   const modeNote =
     meta && meta.modePts === "random"
       ? " (สุ่ม)"
       : meta && meta.humans
         ? " (ล็อบบี้ " + meta.humans + " คนจริง)"
         : "";
-  const title = "ได้รับ " + gain + " pts";
-  const body = "ชนะเกมแล้วได้ " + gain + " pts สำหรับ Shop" + modeNote;
+  const body = isAdmin
+    ? "ได้รับ " + gain + " pts จากแอดมิน"
+    : "ชนะเกมแล้วได้ " + gain + " pts สำหรับ Shop" + modeNote;
+
+  await appendShopPtsLedger(prisma, {
+    userId,
+    delta: gain,
+    balance: next,
+    kind,
+    title,
+    meta: Object.assign({}, meta || {}, { gain })
+  });
 
   const { createUserNotification } = require("./notify");
   await createUserNotification(prisma, {
     userId,
     type: "shop_pts",
-    title,
+    title: isAdmin ? title : "ได้รับ " + gain + " pts",
     body,
-    payload: Object.assign({ gain, balance: next, href: "/app#shop" }, meta || {}),
-    push: { gain, balance: next, href: "/app#shop" }
+    payload: Object.assign({ gain, balance: next, href: "/app#pts-history" }, meta || {}),
+    push: { gain, balance: next, href: "/app#pts-history" }
   });
 
   return { gain, balance: next };
+}
+
+async function listShopPtsHistory(prisma, userId, opts) {
+  if (!prisma || !prisma.shopPtsLedger || !userId) return [];
+  const take = Math.min(100, Math.max(1, Math.floor(Number(opts && opts.limit) || 50)));
+  const rows = await prisma.shopPtsLedger.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    delta: row.delta,
+    balance: row.balance,
+    kind: row.kind,
+    title: row.title,
+    meta: row.meta || null,
+    createdAt: row.createdAt
+  }));
 }
 
 module.exports = {
@@ -139,5 +198,7 @@ module.exports = {
   saveShopPtsConfig,
   countHumanPlayers,
   computeWinShopPts,
-  awardShopPts
+  awardShopPts,
+  appendShopPtsLedger,
+  listShopPtsHistory
 };

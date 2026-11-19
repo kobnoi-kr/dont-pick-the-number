@@ -1148,6 +1148,17 @@ async function handleCosmeticsApi(req, res, pathname) {
             }
           }
         });
+        if (price > 0) {
+          const { appendShopPtsLedger } = require("./shop-pts");
+          await appendShopPtsLedger(tx, {
+            userId: me.id,
+            delta: -price,
+            balance: updated.shopPts == null ? 0 : updated.shopPts,
+            kind: "buy_username",
+            title: "เปลี่ยน username −" + price + " pts",
+            meta: { spent: price, before: me.username, after: username }
+          });
+        }
         return { user: updated, shopPts: updated.shopPts, spent: price, before: me.username };
       });
       sendJson(res, 200, {
@@ -1170,6 +1181,32 @@ async function handleCosmeticsApi(req, res, pathname) {
       }
       sendJson(res, 500, { error: "rename_failed" });
     }
+    return true;
+  }
+
+  if (pathname === "/api/v1/shop/pts-history") {
+    if (method(req) !== "GET") {
+      sendJson(res, 405, { error: "method_not_allowed" });
+      return true;
+    }
+    const auth = await requireAuth(req, res);
+    if (!auth) return true;
+    if (auth.user.accountType === "guest") {
+      sendJson(res, 403, { error: "registered_required" });
+      return true;
+    }
+    const { listShopPtsHistory } = require("./shop-pts");
+    const url = new URL(req.url || "/", "http://localhost");
+    const limit = url.searchParams.get("limit");
+    const me = await auth.prisma.user.findUnique({
+      where: { id: auth.user.id },
+      select: { shopPts: true }
+    });
+    const rows = await listShopPtsHistory(auth.prisma, auth.user.id, { limit });
+    sendJson(res, 200, {
+      shopPts: me && me.shopPts != null ? me.shopPts : 0,
+      rows
+    });
     return true;
   }
 
@@ -1248,6 +1285,17 @@ async function handleCosmeticsApi(req, res, pathname) {
             source: "shop"
           }
         });
+        if (price > 0) {
+          const { appendShopPtsLedger } = require("./shop-pts");
+          await appendShopPtsLedger(tx, {
+            userId: auth.user.id,
+            delta: -price,
+            balance: updated.shopPts == null ? 0 : updated.shopPts,
+            kind: "buy_cosmetic",
+            title: "ซื้อ " + (cosmetic.name || "ของตกแต่ง") + " −" + price + " pts",
+            meta: { cosmeticId, name: cosmetic.name, kind: cosmetic.kind, spent: price }
+          });
+        }
         return updated;
       });
       sendJson(res, 200, {

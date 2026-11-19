@@ -1,7 +1,7 @@
 import { api } from "./api.js";
 import { paintUser } from "./shell.js";
 import { itemDescHtml, wireItemDetailsButtons } from "./inventory.js";
-import { confirmDialog } from "/js/ui/dialog.js";
+import { confirmDialog, alertInsufficientPts } from "/js/ui/dialog.js";
 
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
@@ -349,13 +349,19 @@ export async function renderShop(root, { user, onSaved } = {}) {
         });
         if (!res.ok) {
           const err = (data && data.error) || "";
+          if (err === "insufficient_pts") {
+            await alertInsufficientPts({
+              need: sel.shopPrice,
+              have: data && data.shopPts != null ? data.shopPts : shopPts
+            });
+            buy.disabled = false;
+            return;
+          }
           setMsg(
-            err === "insufficient_pts"
-              ? "pts ไม่พอ"
-              : err === "max_quantity"
-                ? "มีไอเทมนี้ครบจำนวนสูงสุดแล้ว"
-                : err === "already_owned"
-                  ? "มีของชิ้นนี้อยู่แล้ว"
+            err === "max_quantity"
+              ? "มีไอเทมนี้ครบจำนวนสูงสุดแล้ว"
+              : err === "already_owned"
+                ? "มีของชิ้นนี้อยู่แล้ว"
                 : err === "registered_required"
                   ? "ต้องเข้าสู่ระบบด้วยบัญชีจริง"
                   : err === "shop_disabled"
@@ -399,18 +405,24 @@ export async function renderShop(root, { user, onSaved } = {}) {
         });
         if (!res.ok) {
           const err = (data && data.error) || "";
+          if (err === "insufficient_pts") {
+            await alertInsufficientPts({
+              need: sel.shopPrice,
+              have: data && data.shopPts != null ? data.shopPts : shopPts
+            });
+            renameBtn.disabled = false;
+            return;
+          }
           setMsg(
-            err === "insufficient_pts"
-              ? "pts ไม่พอ"
-              : err === "username_taken"
-                ? "Username นี้มีคนใช้แล้ว"
-                : err === "same_username"
-                  ? "เป็น username เดิมอยู่แล้ว"
-                  : err === "invalid_username"
-                    ? "Username ไม่ถูกต้อง"
-                    : err === "shop_disabled"
-                      ? "Shop ปิดอยู่"
-                      : "เปลี่ยนไม่สำเร็จ",
+            err === "username_taken"
+              ? "Username นี้มีคนใช้แล้ว"
+              : err === "same_username"
+                ? "เป็น username เดิมอยู่แล้ว"
+                : err === "invalid_username"
+                  ? "Username ไม่ถูกต้อง"
+                  : err === "shop_disabled"
+                    ? "Shop ปิดอยู่"
+                    : "เปลี่ยนไม่สำเร็จ",
             false
           );
           renameBtn.disabled = false;

@@ -29,14 +29,18 @@ function showDialog({
   confirmLabel = "ตกลง",
   cancelLabel = "ยกเลิก",
   danger = false,
-  showCancel = true
+  showCancel = true,
+  cardClass = ""
 } = {}) {
   return new Promise((resolve) => {
     closeActive(false);
     const host = ensureHost();
+    const cardCls = ["nv-dialog-card", cardClass, danger ? "is-danger" : ""]
+      .filter(Boolean)
+      .join(" ");
     host.innerHTML = `
       <div class="nv-dialog" role="dialog" aria-modal="true" aria-labelledby="nvDialogTitle">
-        <div class="nv-dialog-card">
+        <div class="${cardCls}">
           ${title ? `<h3 id="nvDialogTitle">${esc(title)}</h3>` : `<h3 id="nvDialogTitle" class="sr-only">ยืนยัน</h3>`}
           <div class="nv-dialog-body">${bodyHtml}</div>
           <div class="nv-dialog-actions">
@@ -126,5 +130,28 @@ export async function openItemDetailsDialog(item) {
     title: "รายละเอียดไอเทม",
     bodyHtml: itemDetailsBody(item),
     closeLabel: "ปิด"
+  });
+}
+
+/** Centered red-border popup when shop pts are not enough. */
+export function alertInsufficientPts(opts = {}) {
+  const have = Math.max(0, Math.floor(Number(opts.have != null ? opts.have : opts.shopPts) || 0));
+  const need = Math.max(0, Math.floor(Number(opts.need) || 0));
+  const short = need > have ? need - have : 0;
+  const lines = [
+    need ? `ต้องการ <b>${need}</b> pts` : "pts ไม่พอสำหรับรายการนี้",
+    `คุณมี <b>${have}</b> pts`,
+    short ? `ขาดอีก <b>${short}</b> pts` : ""
+  ]
+    .filter(Boolean)
+    .map((line) => `<p class="nv-dialog-msg">${line}</p>`)
+    .join("");
+  return showDialog({
+    title: "pts ไม่พอ",
+    bodyHtml: lines || `<p class="nv-dialog-msg">pts ไม่พอ</p>`,
+    confirmLabel: opts.closeLabel || "ปิด",
+    showCancel: false,
+    danger: true,
+    cardClass: "is-danger"
   });
 }

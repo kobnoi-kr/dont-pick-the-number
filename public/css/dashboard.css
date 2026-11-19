@@ -3470,6 +3470,44 @@ body.modal-open {
   color: #fde68a;
   white-space: nowrap;
 }
+.pts-hist-card { padding: 8px 10px; }
+.pts-hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pts-hist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--nv-border);
+  background: rgba(255,255,255,.03);
+}
+.pts-hist-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.pts-hist-main b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pts-hist-amt {
+  flex: 0 0 auto;
+  text-align: right;
+  display: grid;
+  gap: 2px;
+}
+.pts-delta { font-variant-numeric: tabular-nums; }
+.pts-hist-row.is-gain .pts-delta { color: #86efac; }
+.pts-hist-row.is-spend .pts-delta { color: #fca5a5; }
 .shop-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.9fr);

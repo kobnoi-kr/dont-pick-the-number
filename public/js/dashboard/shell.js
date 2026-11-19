@@ -15,6 +15,7 @@ const TITLES = {
   decorate: "ตกแต่งโปรไฟล์",
   shop: "Shop",
   inventory: "กระเป๋า",
+  "pts-history": "ประวัติ pts",
   profile: "Profile & Settings"
 };
 

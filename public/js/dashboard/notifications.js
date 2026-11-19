@@ -116,8 +116,8 @@ function openNotifDetail(n, meta) {
       link.className = "btn sm";
       link.href =
         (n.payload && n.payload.href) ||
-        (n.type === "shop_pts" ? "/app#shop" : "/app#decorate");
-      link.textContent = n.type === "shop_pts" ? "ไปที่ Shop" : "ไปที่ตกแต่ง";
+        (n.type === "shop_pts" ? "/app#pts-history" : "/app#decorate");
+      link.textContent = n.type === "shop_pts" ? "ดูประวัติ pts" : "ไปที่ตกแต่ง";
       link.style.marginTop = "14px";
       link.style.display = "inline-flex";
       link.onclick = () => modal.classList.add("hidden");

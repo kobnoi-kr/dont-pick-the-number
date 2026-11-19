@@ -89,6 +89,7 @@ model User {
   dmReceived          DirectMessage[]    @relation("DmRecipient")
   cosmetics           UserCosmetic[]
   inventoryItems      UserInventoryItem[]
+  shopPtsLedger       ShopPtsLedger[]
   equippedTitle       Cosmetic?          @relation("EquippedTitle", fields: [equippedTitleId], references: [id], onDelete: SetNull)
   equippedFrame       Cosmetic?          @relation("EquippedFrame", fields: [equippedFrameId], references: [id], onDelete: SetNull)
   equippedEffect      Cosmetic?          @relation("EquippedEffect", fields: [equippedEffectId], references: [id], onDelete: SetNull)
@@ -158,6 +159,23 @@ model UserInventoryItem {
   @@unique([userId, itemId])
   @@index([itemId])
   @@map("user_inventory_items")
+}
+
+/// Shop pts earn / spend history (wins, purchases, admin grants).
+model ShopPtsLedger {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  delta     Int
+  balance   Int
+  kind      String   @db.VarChar(32)
+  title     String   @db.VarChar(120)
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("shop_pts_ledger")
 }
 
 model RankingRewardGrant {

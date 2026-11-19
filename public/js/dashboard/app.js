@@ -8,8 +8,9 @@ import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";
 import { renderProfile } from "./profile.js";
 import { renderDecorate } from "./decorate.js?v=lvlock1";
-import { renderShop } from "./shop.js?v=inv-popup1";
+import { renderShop } from "./shop.js?v=pts299";
 import { renderInventory } from "./inventory.js?v=inv-popup1";
+import { renderPtsHistory } from "./pts-history.js?v=1";
 import { renderLevel } from "./level.js";
 import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
 import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js?v=mute1";
@@ -187,6 +188,7 @@ async function navigate(view) {
   else if (state.view === "decorate") await renderDecorate(root, ctx);
   else if (state.view === "shop") await renderShop(root, ctx);
   else if (state.view === "inventory") await renderInventory(root, ctx);
+  else if (state.view === "pts-history") await renderPtsHistory(root, ctx);
   else if (state.view === "profile") await renderProfile(root, ctx);
   else await renderOverview(root, ctx);
 }
