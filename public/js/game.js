@@ -2758,9 +2758,7 @@ async function openPlayerProfileModal(userId){
   acts.appendChild(add);
 }
 function paintInviteBtn(){
-  const btn=$("inviteFriendsBtn");
-  const show=onlineMode&&canUseFriends()&&netPhase==="lobby"&&!spectating;
-  if(btn) btn.classList.toggle("hidden",!show);
+  // Invite opens from empty lobby "+" slots only.
   if(netPhase==="lobby") renderLobbyGrid();
 }
 async function loadFriendsCache(){
@@ -4146,8 +4144,6 @@ async function bootOnline(){
   const inviteModal=$("inviteModal");
   if(inviteClose) inviteClose.onclick=()=>closeInviteModal();
   if(inviteModal) inviteModal.addEventListener("click",e=>{ if(e.target===inviteModal) closeInviteModal(); });
-  const inviteBtn=$("inviteFriendsBtn");
-  if(inviteBtn) inviteBtn.onclick=()=>openInviteModal();
   paintInviteBtn();
   const acceptBtn=$("roomInviteAccept");
   const declineBtn=$("roomInviteDecline");

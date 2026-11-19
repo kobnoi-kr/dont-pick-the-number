@@ -106,7 +106,6 @@ html,body{background:#070b14}
           <div id="gameModeHint" class="lobby-rules">ตั้งค่าเกมแล้วสุ่มลำดับก่อนเริ่ม</div>
           <p id="winner" class="winner lobby-status" aria-live="polite">รอผู้เล่นเข้าห้อง</p>
           <button type="button" class="btn ghost hidden" id="lobbyItemBtn">ไอเทม</button>
-          <button type="button" class="btn ghost hidden" id="inviteFriendsBtn">เชิญเพื่อน</button>
           <button type="button" class="btn" id="spin" disabled>สุ่มลำดับ (วงล้อ)</button>
           <button type="button" class="btn lobby-start" id="lobbyStartBtn" disabled>เริ่มเกม</button>
           <button type="button" class="btn ghost" id="addBot">เพิ่มบอท</button>
@@ -497,7 +496,7 @@ html,body{background:#070b14}
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=invite2";
+    s.src = "/js/game.js?v=invite3";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();
