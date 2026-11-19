@@ -47,7 +47,7 @@ const GAME_CATALOG = [
   {
     id: "snake",
     slug: "snake",
-    name: "งูและบันได",
+    name: "บันไดงู",
     nameEn: "Snake & Ladders",
     category: "board",
     categoryLabel: "กระดาน",
@@ -391,7 +391,7 @@ async function handleDashboardApi(req, res, pathname) {
       items: rows.map((r) => ({
         title: r.game.roomName,
         subtitle:
-          (r.game.gameMode === "wheel" ? "วงล้อ" : r.game.gameMode === "snake" ? "งูและบันได" : "หาเลข") +
+          (r.game.gameMode === "wheel" ? "วงล้อ" : r.game.gameMode === "snake" ? "บันไดงู" : "หาเลข") +
           " · " +
           (r.won ? "ชนะ" : "เล่น") +
           " · #" +

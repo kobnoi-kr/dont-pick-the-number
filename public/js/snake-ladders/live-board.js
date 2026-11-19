@@ -47,7 +47,7 @@ export function createLiveBoard(opts) {
         </div>
       </div>
       <aside class="sl-panel">
-        <div class="sl-panel-title">งูและบันได</div>
+        <div class="sl-panel-title">บันไดงู</div>
         <div class="sl-meta">
           <div>แมพ: <strong data-el="map">—</strong></div>
           <div>สถานะ: <strong data-el="status">—</strong></div>

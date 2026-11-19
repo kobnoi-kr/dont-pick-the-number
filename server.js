@@ -1390,7 +1390,7 @@ function onSetup(ws, msg) {
   const nextCat = snakeBridge.normalizeCat(patch.cat);
   if (nextCat) {
     if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
-      return fail(ws, "งูและบันไดรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
+      return fail(ws, "บันไดงูรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
     }
     room.cat = nextCat;
   }
@@ -1463,7 +1463,7 @@ function onStart(ws) {
   if (!orderReady(room)) return fail(ws, "กดสุ่มลำดับก่อนเริ่มเกม");
   if (room.cat === "snake") {
     if (room.players.length > snakeBridge.MAX_PLAYERS) {
-      return fail(ws, "งูและบันไดรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
+      return fail(ws, "บันไดงูรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
     }
     if (room.players.length < snakeBridge.MIN_PLAYERS) {
       return fail(ws, "ต้องมีผู้เล่นอย่างน้อย " + snakeBridge.MIN_PLAYERS + " คน");
@@ -1472,7 +1472,7 @@ function onStart(ws) {
       clearChampions(room);
       snakeBridge.startSnake(room);
     } catch (err) {
-      return fail(ws, err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่มเกมงูและบันไดไม่สำเร็จ");
+      return fail(ws, err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่มเกมบันไดงูไม่สำเร็จ");
     }
     armTurnTimer(room);
     broadcast(room);
@@ -1639,7 +1639,7 @@ function onAgain(ws) {
       room.phase = "lobby";
       room.over = null;
       snakeBridge.clearSnake(room);
-      return fail(ws, "เริ่มงูและบันไดรอบใหม่ไม่สำเร็จ");
+      return fail(ws, "เริ่มบันไดงูรอบใหม่ไม่สำเร็จ");
     }
   } else begin(room);
   broadcast(room);
@@ -2218,7 +2218,7 @@ async function onUseHelper(ws, msg) {
 
   if (itemId === EVENODD_ITEM_ID) {
     if (ctx.room.phase !== "lobby") return fail(ws, "เลขคู่/คี่ใช้ได้เฉพาะก่อนเริ่มเกม");
-    if (ctx.room.cat !== "snake") return fail(ws, "เลขคู่/คี่ใช้ได้เฉพาะเกมงูและบันได");
+    if (ctx.room.cat !== "snake") return fail(ws, "เลขคู่/คี่ใช้ได้เฉพาะเกมบันไดงู");
     if (ctx.player.evenOddArmed || (ctx.player.evenOddCharges | 0) > 0) {
       return fail(ws, "ใช้เลขคู่/คี่ไปแล้วในเกมนี้");
     }

@@ -20,7 +20,7 @@ const GAMES = [
   },
   {
     id: "snake",
-    defaultName: "งูและบันได",
+    defaultName: "บันไดงู",
     en: "Snake & Ladders",
     blurb: "เกมกระดาน — ทอยลูกเต๋าถึงช่อง 100 (สูงสุด 6 คน)",
     defaultBeta: true,
@@ -55,7 +55,7 @@ const GAMES = [
 function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "secret") return "หาเลข";
-  if (mode === "snake") return "งูและบันได";
+  if (mode === "snake") return "บันไดงู";
   if (mode === "imposter") return "Imposter";
   if (mode === "race2048") return "2048 Race";
   if (mode === "cardmemory") return "Card Memory";

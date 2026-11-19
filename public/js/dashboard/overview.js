@@ -6,7 +6,7 @@ function esc(s) {
 
 function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
-  if (mode === "snake") return "งูและบันได";
+  if (mode === "snake") return "บันไดงู";
   return "หาเลข";
 }
 

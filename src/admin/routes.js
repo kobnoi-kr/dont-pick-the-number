@@ -656,7 +656,7 @@ async function handleAdminApi(req, res, pathname) {
       const catalog = await getSetting(prisma, "game_catalog", {
         secret: { enabled: true, name: "หาเลข", beta: false, comingSoon: false },
         wheel: { enabled: true, name: "วงล้อ", beta: false, comingSoon: false },
-        snake: { enabled: true, name: "งูและบันได", beta: true, comingSoon: false },
+        snake: { enabled: true, name: "บันไดงู", beta: true, comingSoon: false },
         imposter: { enabled: true, name: "Imposter", beta: false, comingSoon: true },
         race2048: { enabled: true, name: "2048 Race", beta: false, comingSoon: true },
         cardmemory: { enabled: true, name: "Card Memory", beta: false, comingSoon: true }
@@ -676,7 +676,7 @@ async function handleAdminApi(req, res, pathname) {
       const defaults = {
         secret: "หาเลข",
         wheel: "วงล้อ",
-        snake: "งูและบันได",
+        snake: "บันไดงู",
         imposter: "Imposter",
         race2048: "2048 Race",
         cardmemory: "Card Memory"

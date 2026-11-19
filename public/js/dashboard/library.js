@@ -29,7 +29,7 @@ const FALLBACK = [
   },
   {
     id: "snake",
-    name: "งูและบันได",
+    name: "บันไดงู",
     nameEn: "Snake & Ladders",
     category: "board",
     categoryLabel: "กระดาน",

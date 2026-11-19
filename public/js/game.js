@@ -2207,7 +2207,7 @@ function paintGameModeBadge(cat){
   const name=$("gameModeName");
   const hint=$("gameModeHint");
   if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":"🔢";
-  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"งูและบันได":"หาเลข";
+  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"บันไดงู":"หาเลข";
   if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":"ห้ามโดนเลขลับ";
 }
 function normalizeCat(next){
@@ -3076,7 +3076,7 @@ const GUIDE={
 </ul></section>
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
-<li>เลือกเกมกระดานจากที่มีในคลัง (เช่น หาเลข · วงล้อ · งูและบันได)</li>
+<li>เลือกเกมกระดานจากที่มีในคลัง (เช่น หาเลข · วงล้อ · บันไดงู)</li>
 <li>ตั้งกติกาตามเกมที่เลือก เช่น ช่วงตัวเลข / แต้มชนะ / แมพกระดาน / นับถอยหลังต่อตา</li>
 <li>กด <b>เพิ่มบอท</b> ได้ถ้าคนไม่ครบ (ล็อบบี้เท่านั้น)</li>
 <li>กด <b>เปลี่ยนชื่อห้อง</b> ได้เฉพาะตอนอยู่ในล็อบบี้ห้อง</li>
@@ -3470,7 +3470,7 @@ function applySnap(s){
     if($("snakeMode")){
       const mapName=(s.snake&&s.snake.mapName)||"";
       $("snakeMode").textContent=spectating
-        ?"กำลังชม · งูและบันได"+(mapName?" · "+mapName:"")+" · ถึง 100 ชนะ"
+        ?"กำลังชม · บันไดงู"+(mapName?" · "+mapName:"")+" · ถึง 100 ชนะ"
         :"ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6)+(mapName?" · แมพ "+mapName:"");
     }
     updateSnakeBoard(s);
