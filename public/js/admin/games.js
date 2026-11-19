@@ -89,7 +89,7 @@ export async function renderGames(root, { user }) {
       <h2>จัดการเกมในคลัง</h2>
       <p class="muted" style="margin-top:0">
         หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น ป้าย <b>Beta</b> และ <b>Coming Soon</b>
-        — Coming Soon = ผู้เล่นกดเล่นไม่ได้ (แอดมินทดสอบได้) จนเอาติ๊กออก
+        — Coming Soon = ผู้เล่นทั่วไปกดเล่นไม่ได้ (แอดมิน + ผู้ได้รับเชิญทดสอบได้) จนเอาติ๊กออก
       </p>
       <div class="game-admin-grid" id="gCat">
         ${GAMES.map((g) => {
@@ -120,9 +120,9 @@ export async function renderGames(root, { user }) {
               <input type="checkbox" data-id="${g.id}" data-field="beta" ${beta ? "checked" : ""} ${canManage ? "" : "disabled"}/>
               <span>เกม Beta</span>
             </label>
-            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Coming Soon — ผู้เล่นกดเล่นไม่ได้ แอดมินทดสอบได้">
+            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Coming Soon — ผู้เล่นทั่วไปกดเล่นไม่ได้ แอดมิน/ผู้ได้รับเชิญทดสอบได้">
               <input type="checkbox" data-id="${g.id}" data-field="comingSoon" ${comingSoon ? "checked" : ""} ${canManage ? "" : "disabled"}/>
-              <span>Coming Soon (แอดมินทดสอบได้)</span>
+              <span>Coming Soon (แอดมิน + ผู้ได้รับเชิญ)</span>
             </label>
             <label class="field">
               <span>ชื่อที่แสดงให้ผู้เล่น</span>
@@ -140,6 +140,32 @@ export async function renderGames(root, { user }) {
       </div>
       ${canManage ? `<button type="button" class="btn sm" id="gSave" style="margin-top:14px">บันทึกการตั้งค่าเกม</button>` : ""}
       <p class="tiny" id="gMsg"></p>
+    </div>
+
+    <div class="card" style="margin-top:16px" id="gTesterCard">
+      <h2>เชิญผู้เล่นทดสอบ Coming Soon</h2>
+      <p class="muted" style="margin-top:0">
+        ผู้ที่ได้รับเชิญจะกดเล่นเกม Coming Soon ได้จากคลังเกม (บัญชีที่สมัครแล้วเท่านั้น)
+      </p>
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <label class="field" style="margin:0;min-width:160px">
+          <span>เกม</span>
+          <select id="gTesterGame" class="input">
+            ${GAMES.map((g) => `<option value="${esc(g.id)}">${esc(g.defaultName)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="field" style="margin:0;flex:1;min-width:180px">
+          <span>Friend code / username</span>
+          <input id="gTesterQ" class="input" placeholder="เช่น NV-XXXX หรือชื่อผู้ใช้" ${canManage ? "" : "disabled"}/>
+        </label>
+        ${
+          canManage
+            ? `<button type="button" class="btn sm" id="gTesterInvite">เชิญทดสอบ</button>`
+            : ""
+        }
+      </div>
+      <p class="tiny" id="gTesterMsg" style="margin-top:8px"></p>
+      <div id="gTesterList" style="margin-top:12px"></div>
     </div>
 
     <div style="margin-top:16px">
@@ -217,6 +243,99 @@ export async function renderGames(root, { user }) {
         ? "บันทึกแล้ว — ผู้เล่นจะเห็นตามนี้ในคลังเกม"
         : "บันทึกไม่สำเร็จ";
       if (r.res.ok) renderGames(root, { user });
+    };
+  }
+
+  const testerGame = root.querySelector("#gTesterGame");
+  const testerList = root.querySelector("#gTesterList");
+  const testerMsg = root.querySelector("#gTesterMsg");
+  const testerQ = root.querySelector("#gTesterQ");
+
+  async function loadTesters() {
+    if (!testerGame || !testerList) return;
+    const gameId = testerGame.value;
+    testerList.innerHTML = `<div class="tiny muted">กำลังโหลด…</div>`;
+    const r = await api("/api/v1/admin/games/testers?gameId=" + encodeURIComponent(gameId), {
+      method: "GET"
+    });
+    if (!r.res.ok) {
+      testerList.innerHTML = `<div class="empty">โหลดรายชื่อไม่ได้</div>`;
+      return;
+    }
+    const testers = (r.data && r.data.testers) || [];
+    if (!testers.length) {
+      testerList.innerHTML = `<div class="empty">ยังไม่มีผู้ได้รับเชิญสำหรับเกมนี้</div>`;
+      return;
+    }
+    testerList.innerHTML = `<ul class="invite-list" style="list-style:none;padding:0;margin:0">
+      ${testers
+        .map((t) => {
+          const u = t.user || {};
+          const label =
+            (u.displayName || u.username || t.userId || "?") +
+            (u.friendCode ? ` · ${u.friendCode}` : "") +
+            (u.username ? ` · @${u.username}` : "");
+          return `<li class="row-between" style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+            <div>
+              <div>${esc(label)}</div>
+              <div class="tiny muted">${t.invitedAt ? esc(fmtDate(t.invitedAt)) : ""}</div>
+            </div>
+            ${
+              canManage
+                ? `<button type="button" class="btn ghost sm" data-revoke="${esc(t.userId)}">ถอนเชิญ</button>`
+                : ""
+            }
+          </li>`;
+        })
+        .join("")}
+    </ul>`;
+    testerList.querySelectorAll("[data-revoke]").forEach((btn) => {
+      btn.onclick = async () => {
+        const userId = btn.getAttribute("data-revoke");
+        const del = await api("/api/v1/admin/games/testers", {
+          method: "DELETE",
+          body: JSON.stringify({ gameId: testerGame.value, userId })
+        });
+        if (testerMsg) {
+          testerMsg.textContent = del.res.ok ? "ถอนเชิญแล้ว" : "ถอนเชิญไม่สำเร็จ";
+        }
+        if (del.res.ok) loadTesters();
+      };
+    });
+  }
+
+  if (testerGame) {
+    testerGame.onchange = () => loadTesters();
+    loadTesters();
+  }
+  const inviteBtn = root.querySelector("#gTesterInvite");
+  if (inviteBtn) {
+    inviteBtn.onclick = async () => {
+      const q = ((testerQ && testerQ.value) || "").trim();
+      if (!q) {
+        if (testerMsg) testerMsg.textContent = "ใส่ friend code หรือ username ก่อน";
+        return;
+      }
+      const r = await api("/api/v1/admin/games/testers", {
+        method: "POST",
+        body: JSON.stringify({ gameId: testerGame.value, q })
+      });
+      if (!r.res.ok) {
+        if (testerMsg) {
+          testerMsg.textContent =
+            r.data && r.data.error === "user_not_found"
+              ? "ไม่พบผู้เล่น"
+              : r.data && r.data.error === "registered_only"
+                ? "เชิญได้เฉพาะบัญชีที่สมัครแล้ว"
+                : "เชิญไม่สำเร็จ";
+        }
+        return;
+      }
+      if (testerMsg) {
+        testerMsg.textContent = r.data && r.data.already ? "ผู้เล่นนี้ถูกเชิญแล้ว" : "เชิญทดสอบแล้ว";
+      }
+      if (testerQ) testerQ.value = "";
+      loadTesters();
     };
   }
 }

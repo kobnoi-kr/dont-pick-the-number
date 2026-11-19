@@ -213,11 +213,25 @@ async function handleDashboardApi(req, res, pathname) {
       return true;
     }
     let flags = null;
+    let playableSoon = new Set();
+    const user = await optionalUser(req);
     if (authEnabled()) {
       try {
         const prisma = await getPrisma();
         const row = await prisma.systemSetting.findUnique({ where: { key: "game_catalog" } });
         if (row && row.value) flags = row.value;
+        const { listPlayableComingSoonIds } = require("./game-catalog-flags");
+        const roleNames = user
+          ? Array.isArray(user.roles) && user.roles.length
+            ? user.roles
+            : (user.userRoles || []).map((ur) => ur.role && ur.role.name).filter(Boolean)
+          : [];
+        const ids = await listPlayableComingSoonIds(prisma, {
+          roles: roleNames,
+          isAdmin: !!(user && isAdminUser(user)),
+          userId: user && user.id
+        });
+        playableSoon = new Set(ids);
       } catch {
         flags = null;
       }
@@ -243,6 +257,8 @@ async function handleDashboardApi(req, res, pathname) {
       } else {
         out.comingSoon = false;
       }
+      out.canPlay = !out.comingSoon || playableSoon.has(g.id);
+      out.testInvite = !!(out.comingSoon && playableSoon.has(g.id));
       return out;
     });
     sendJson(res, 200, { games });
@@ -538,7 +554,7 @@ async function handleDashboardApi(req, res, pathname) {
     if (created.error === "coming_soon") {
       sendJson(res, 403, {
         error: "coming_soon",
-        message: "เกมนี้ Coming Soon — เปิดให้แอดมินทดสอบเท่านั้น"
+        message: "เกมนี้ Coming Soon — ต้องได้รับคำเชิญทดสอบจากแอดมิน"
       });
       return true;
     }

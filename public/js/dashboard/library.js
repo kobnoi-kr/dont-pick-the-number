@@ -155,12 +155,17 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
 
   function canPlay(g) {
     if (!g) return false;
+    if (typeof g.canPlay === "boolean") return g.canPlay;
     if (!g.comingSoon) return true;
     return admin;
   }
 
   function playLabel(g) {
-    if (g && g.comingSoon && admin) return "ทดสอบ (แอดมิน)";
+    if (g && g.comingSoon && canPlay(g)) {
+      if (admin) return "ทดสอบ (แอดมิน)";
+      if (g.testInvite) return "ทดสอบ (เชิญ)";
+      return "ทดสอบ";
+    }
     return "เล่นเลย";
   }
 
@@ -214,7 +219,11 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
             ${
               playable
                 ? `<button type="button" class="btn sm" data-play="${esc(g.id)}"${
-                    soon ? ' title="Coming Soon — แอดมินทดสอบได้"' : ""
+                    soon
+                      ? g.testInvite
+                        ? ' title="Coming Soon — คุณได้รับคำเชิญทดสอบ"'
+                        : ' title="Coming Soon — แอดมิน/ผู้ได้รับเชิญทดสอบได้"'
+                      : ""
                   }>${esc(playLabel(g))}</button>`
                 : `<button type="button" class="btn sm" disabled title="ยังไม่เปิดเล่น">เร็วๆ นี้</button>`
             }
@@ -243,17 +252,23 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
           <h3>วิธีเล่น</h3>
           <p>${esc(g.howTo)}</p>
           ${
-            soon && !admin
-              ? `<p class="tiny">เกมนี้ยัง Coming Soon — ผู้เล่นทั่วไปยังกดเล่นไม่ได้</p>`
+            soon && playable && g.testInvite
+              ? `<p class="tiny">Coming Soon — คุณได้รับคำเชิญทดสอบจากแอดมิน</p>`
               : soon && admin
-                ? `<p class="tiny">Coming Soon — แอดมินทดสอบได้ จนเอาติ๊กออกในหน้าจัดการเกม</p>`
-                : ""
+                ? `<p class="tiny">Coming Soon — แอดมิน/ผู้ได้รับเชิญทดสอบได้ จนเอาติ๊กออกในหน้าจัดการเกม</p>`
+                : soon
+                  ? `<p class="tiny">เกมนี้ยัง Coming Soon — ต้องได้รับคำเชิญทดสอบจากแอดมิน</p>`
+                  : ""
           }
           <div class="lib-actions">
             ${
               playable
                 ? `<button type="button" class="btn" data-play2="${esc(g.id)}">${
-                    soon && admin ? "ทดสอบสร้างห้อง (แอดมิน)" : "สร้างห้องเกมนี้"
+                    soon && admin
+                      ? "ทดสอบสร้างห้อง (แอดมิน)"
+                      : soon && g.testInvite
+                        ? "ทดสอบสร้างห้อง (เชิญ)"
+                        : "สร้างห้องเกมนี้"
                   }</button>`
                 : `<button type="button" class="btn" disabled>เร็วๆ นี้</button>`
             }

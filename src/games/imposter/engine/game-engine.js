@@ -5,7 +5,7 @@ const { pickWord } = require("../config/words");
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 8;
 const ROLE_REVEAL_MS = 20_000;
-const CLUE_TURN_MS = 45_000;
+const DEFAULT_CLUE_SEC = 45;
 const MAX_ROUNDS = 5;
 const CLUE_MAX_LEN = 32;
 
@@ -54,6 +54,7 @@ function createGame(opts) {
   }
   const discussionSec = clamp(Number(opts.discussionSec) || 60, 30, 180);
   const voteSec = clamp(Number(opts.voteSec) || 45, 20, 120);
+  const clueSec = clamp(Number(opts.clueSec) || DEFAULT_CLUE_SEC, 15, 120);
   const impostorInfo = normalizeInfo(opts.impostorInfo);
   const impostorCount = normalizeImpostorCount(opts.impostorCount, players.length);
   const picked = pickWord(opts.rng);
@@ -78,6 +79,7 @@ function createGame(opts) {
     impostorCount,
     discussionSec,
     voteSec,
+    clueSec,
     order,
     names,
     roles,
@@ -147,6 +149,7 @@ function publicState(state, viewerId) {
     })),
     discussionSec: state.discussionSec,
     voteSec: state.voteSec,
+    clueSec: state.clueSec,
     phaseEndsAt: state.phaseEndsAt || 0,
     phaseLeft,
     impostorInfo: state.impostorInfo,
@@ -219,13 +222,18 @@ function checkAutoWin(state) {
   return state;
 }
 
+function clueTurnMs(state) {
+  const sec = clamp(Number(state && state.clueSec) || DEFAULT_CLUE_SEC, 15, 120);
+  return sec * 1000;
+}
+
 function beginClueTurn(state) {
   state.clues = [];
   state.clueIndex = 0;
   state.votes = {};
   state.voteTallies = null;
   state.lastVoteTarget = null;
-  return setPhase(state, PHASE.CLUE_TURN, CLUE_TURN_MS);
+  return setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
 }
 
 function beginDiscussion(state) {
@@ -267,7 +275,7 @@ function submitClue(state, playerId, text) {
   state.clues.push({ playerId: id, name: state.names[id] || "Player", text: clue });
   state.clueIndex += 1;
   if (state.clueIndex >= turnOrder.length) beginDiscussion(state);
-  else setPhase(state, PHASE.CLUE_TURN, CLUE_TURN_MS);
+  else setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
   return { ok: true, state };
 }
 
@@ -280,7 +288,7 @@ function skipClue(state, playerId) {
   state.clues.push({ playerId: id, name: state.names[id] || "Player", text: "—" });
   state.clueIndex += 1;
   if (state.clueIndex >= turnOrder.length) beginDiscussion(state);
-  else setPhase(state, PHASE.CLUE_TURN, CLUE_TURN_MS);
+  else setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
   return { ok: true, state };
 }
 

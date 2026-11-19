@@ -25,7 +25,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css">
+<link rel="stylesheet" href="/css/imposter.css?v=imp2">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -358,6 +358,9 @@ html,body{background:#070b14}
           <button type="button" class="mode on" data-impostor-info="none" aria-pressed="true">ไม่เห็นอะไร</button>
           <button type="button" class="mode" data-impostor-info="category" aria-pressed="false">แค่หมวดหมู่</button>
         </div>
+        <div class="row count-row"><label for="clueSec">เวลาเขียนคำใบ้ต่อคน (วินาที)</label>
+          <input id="clueSec" type="number" inputmode="numeric" value="45" min="15" max="120">
+        </div>
         <div class="row count-row"><label for="discussionSec">เวลา Discussion (วินาที)</label>
           <input id="discussionSec" type="number" inputmode="numeric" value="60" min="30" max="180">
         </div>
@@ -544,9 +547,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp1");
+    await import("/js/imposter/live-ui.js?v=imp2");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp1";
+    s.src = "/js/game.js?v=imp3";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

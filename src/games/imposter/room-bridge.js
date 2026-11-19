@@ -50,6 +50,8 @@ function applyLobbyDefaults(room) {
   room.discussionSec = Number.isFinite(d) ? Math.min(180, Math.max(30, d)) : 60;
   const v = Number(room.voteSec);
   room.voteSec = Number.isFinite(v) ? Math.min(120, Math.max(20, v)) : 45;
+  const c = Number(room.clueSec);
+  room.clueSec = Number.isFinite(c) ? Math.min(120, Math.max(15, c)) : 45;
 }
 
 function orderedPlayers(room) {
@@ -76,13 +78,18 @@ function startImposter(room) {
     impostorInfo: room.impostorInfo,
     impostorCount: room.impostorCount,
     discussionSec: room.discussionSec,
-    voteSec: room.voteSec
+    voteSec: room.voteSec,
+    clueSec: room.clueSec
   });
   room.imposter = state;
   room.phase = "imposter";
   room.over = null;
   room.startedAt = room.startedAt || Date.now();
   room._persisted = false;
+  // Bots cannot click the reveal popup — auto-confirm so humans are not blocked.
+  for (const p of ordered) {
+    if (p && p.bot) confirmReveal(state, p.id);
+  }
   return state;
 }
 

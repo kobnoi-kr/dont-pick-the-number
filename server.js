@@ -528,6 +528,7 @@ function blankRoom(code, visibility, host) {
     impostorCount: 1,
     discussionSec: 60,
     voteSec: 45,
+    clueSec: 45,
     imposterTimer: null
   };
 }
@@ -560,6 +561,9 @@ function applyRoomSetup(room, setup) {
   }
   if (Number.isInteger(setup.voteSec)) {
     room.voteSec = Math.min(120, Math.max(20, setup.voteSec));
+  }
+  if (Number.isInteger(setup.clueSec)) {
+    room.clueSec = Math.min(120, Math.max(15, setup.clueSec));
   }
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
@@ -631,6 +635,7 @@ function snap(room, player, opts) {
     impostorCount: Number(room.impostorCount) === 2 ? 2 : 1,
     discussionSec: Number(room.discussionSec) || 60,
     voteSec: Number(room.voteSec) || 45,
+    clueSec: Number(room.clueSec) || 45,
     imposter: imposterBridge.snapImposter(room, spectator ? null : player),
     youImposter: spectator ? null : imposterBridge.privateImposter(room, player),
     players: room.players.map((item) => ({
@@ -1461,6 +1466,9 @@ async function onSetup(ws, msg) {
   if (Number.isInteger(patch.voteSec)) {
     room.voteSec = Math.min(120, Math.max(20, patch.voteSec));
   }
+  if (Number.isInteger(patch.clueSec)) {
+    room.clueSec = Math.min(120, Math.max(15, patch.clueSec));
+  }
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
     room.rangeMode = patch.rangeMode;
     if (patch.rangeMode === "99") { room.min = 1; room.max = 99; }
@@ -2038,10 +2046,11 @@ async function assertComingSoonPlayable(ws, player, cat) {
     const prisma = await getPrisma();
     const check = await assertCatPlayable(prisma, cat, {
       roles: player && player.roles,
-      isAdmin: !!(ws && ws.isAdmin)
+      isAdmin: !!(ws && ws.isAdmin),
+      userId: player && player.id
     });
     if (check.ok) return true;
-    fail(ws, "เกมนี้ Coming Soon — เปิดให้แอดมินทดสอบเท่านั้น");
+    fail(ws, "เกมนี้ Coming Soon — ต้องได้รับคำเชิญทดสอบจากแอดมิน");
     return false;
   } catch {
     return true;
@@ -3111,7 +3120,10 @@ attachGameApi({
       if (authEnabled()) {
         const { assertCatPlayable } = require("./src/dashboard/game-catalog-flags");
         const prisma = await getPrisma();
-        const check = await assertCatPlayable(prisma, room.cat, { roles: player.roles });
+        const check = await assertCatPlayable(prisma, room.cat, {
+          roles: player.roles,
+          userId: player.id
+        });
         if (!check.ok) return { error: "coming_soon" };
       }
     } catch {

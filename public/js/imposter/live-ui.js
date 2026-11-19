@@ -33,7 +33,7 @@
     let lastPrivate = null;
     let lastPublic = null;
     let pickedVote = null;
-    let popupShownForRound = "";
+    let popupOpen = false;
 
     root.innerHTML = `
       <div class="imp-root">
@@ -42,6 +42,12 @@
           <div class="imp-timer" data-imp="timer">—</div>
         </div>
         <p class="sub" data-imp="sub"></p>
+        <div class="imp-role-card hidden" data-imp="roleCard">
+          <p class="imp-role-kicker" data-imp="roleKicker"></p>
+          <p class="imp-role-main" data-imp="roleMain"></p>
+          <p class="imp-role-hint" data-imp="roleHint"></p>
+          <button type="button" class="btn sm" data-imp="roleOk" style="margin-top:10px">เข้าใจแล้ว</button>
+        </div>
         <div class="imp-alive" data-imp="alive"></div>
         <ul class="imp-clue-board" data-imp="clues"></ul>
         <form class="imp-clue-form hidden" data-imp="clueForm" autocomplete="off">
@@ -57,21 +63,37 @@
           <button class="btn" type="submit">ทายคำ</button>
         </form>
       </div>
-      <div class="imp-overlay hidden" data-imp="overlay" role="dialog" aria-modal="true">
-        <div class="imp-popup" data-imp="popup">
-          <h2 data-imp="popTitle"></h2>
-          <div class="imp-word" data-imp="popWord"></div>
-          <p class="imp-hint" data-imp="popHint"></p>
-          <button type="button" class="btn" data-imp="popOk">เข้าใจแล้ว</button>
-        </div>
-      </div>
     `;
 
+    // Mount overlay on body so it is never clipped by stage/layout.
+    let overlay = document.getElementById("impRoleOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "impRoleOverlay";
+      overlay.className = "imp-overlay hidden";
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.innerHTML = `
+        <div class="imp-popup" data-imp-pop="popup">
+          <h2 data-imp-pop="popTitle"></h2>
+          <div class="imp-word" data-imp-pop="popWord"></div>
+          <p class="imp-hint" data-imp-pop="popHint"></p>
+          <button type="button" class="btn" data-imp-pop="popOk">เข้าใจแล้ว</button>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+
     const $ = (k) => root.querySelector('[data-imp="' + k + '"]');
+    const $p = (k) => overlay.querySelector('[data-imp-pop="' + k + '"]');
     const clueForm = $("clueForm");
     const guessForm = $("guessForm");
-    const overlay = $("overlay");
-    const popup = $("popup");
+    const popup = $p("popup");
+
+    function confirmRole() {
+      popupOpen = false;
+      overlay.classList.add("hidden");
+      send({ t: "imposter:confirm" });
+    }
 
     clueForm.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -81,38 +103,53 @@
     });
     $("skipClue").onclick = () => send({ t: "imposter:skipClue" });
     $("abstain").onclick = () => send({ t: "imposter:vote", targetId: null });
+    $("roleOk").onclick = confirmRole;
     guessForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const word = ($("guessInput").value || "").trim();
       send({ t: "imposter:guess", word });
       $("guessInput").value = "";
     });
-    $("popOk").onclick = () => {
-      overlay.classList.add("hidden");
-      send({ t: "imposter:confirm" });
-    };
+    $p("popOk").onclick = confirmRole;
 
-    function showPopup(priv) {
-      if (!priv) return;
+    function fillRoleCopy(priv, titleEl, wordEl, hintEl) {
       const isImp = priv.role === "imposter";
-      popup.classList.toggle("is-imposter", isImp);
       if (isImp) {
-        $("popTitle").textContent = "YOU ARE THE IMPOSTER";
-        $("popWord").textContent = priv.category ? "หมวด: " + priv.category : "คุณคือ Imposter!";
-        $("popHint").textContent = priv.category
+        titleEl.textContent = "YOU ARE THE IMPOSTER";
+        wordEl.textContent = priv.category ? "หมวด: " + priv.category : "คุณคือ Imposter!";
+        hintEl.textContent = priv.category
           ? "คุณเห็นแค่หมวดหมู่ — สังเกตคำใบ้แล้วกลมกลืน"
           : "พยายามสังเกตคำใบ้ของผู้เล่นคนอื่น และกลมกลืนไปกับพวกเขา";
       } else {
-        $("popTitle").textContent = "YOUR WORD";
-        $("popWord").textContent = priv.word || "—";
-        $("popHint").textContent = "จดจำคำศัพท์ของคุณ และให้คำใบ้โดยไม่พูดคำศัพท์ตรง ๆ";
+        titleEl.textContent = "YOUR WORD";
+        wordEl.textContent = priv.word || "—";
+        hintEl.textContent = "จดจำคำศัพท์ของคุณ และให้คำใบ้โดยไม่พูดคำศัพท์ตรง ๆ";
       }
+      return isImp;
+    }
+
+    function showPopup(priv) {
+      if (!priv) return;
+      const isImp = fillRoleCopy(priv, $p("popTitle"), $p("popWord"), $p("popHint"));
+      popup.classList.toggle("is-imposter", isImp);
       overlay.classList.remove("hidden");
+      popupOpen = true;
+    }
+
+    function paintRoleCard(priv, phase) {
+      const card = $("roleCard");
+      if (!card) return;
+      const show = phase === "ROLE_REVEAL" && priv;
+      card.classList.toggle("hidden", !show);
+      if (!show) return;
+      const isImp = fillRoleCopy(priv, $("roleKicker"), $("roleMain"), $("roleHint"));
+      card.classList.toggle("is-imposter", isImp);
+      $("roleOk").classList.toggle("hidden", !!priv.confirmed);
     }
 
     function paint(state, priv) {
       lastPublic = state || null;
-      lastPrivate = priv || lastPrivate;
+      if (priv) lastPrivate = priv;
       if (!state) return;
 
       $("phaseTitle").textContent = phaseLabel(state.phase) + " · รอบ " + (state.round || 1);
@@ -121,7 +158,7 @@
       const turnName =
         state.clueTurnId && state.names ? state.names[state.clueTurnId] || "—" : "";
       let sub = "";
-      if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณในหน้าต่างกลางจอ";
+      if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณด้านล่าง / หน้าต่างกลางจอ";
       else if (state.phase === "CLUE_TURN")
         sub = state.yourTurn ? "ถึงตาคุณให้คำใบ้" : "รอ " + turnName + " ให้คำใบ้";
       else if (state.phase === "DISCUSSION") sub = "คุยกันผ่านแชทในห้อง";
@@ -130,6 +167,8 @@
       else if (state.phase === "GUESS") sub = "Imposter ที่ถูกจับทายคำศัพท์";
       else if (state.phase === "FINISHED") sub = state.winReason || "";
       $("sub").textContent = sub;
+
+      paintRoleCard(lastPrivate, state.phase);
 
       const aliveSet = new Set(state.alive || []);
       $("alive").innerHTML = (state.order || [])
@@ -182,10 +221,7 @@
       );
       if (tallies) {
         $("tallies").innerHTML = tallies
-          .map(
-            (t) =>
-              `<li><span>${esc(t.name)}</span><b>${t.count} โหวต</b></li>`
-          )
+          .map((t) => `<li><span>${esc(t.name)}</span><b>${t.count} โหวต</b></li>`)
           .join("");
       }
 
@@ -194,14 +230,10 @@
       $("guessInput").disabled = !guessOn;
       guessForm.querySelector("button[type=submit]").disabled = !guessOn;
 
-      const key = (state.round || 1) + ":" + (state.phase || "");
-      if (state.phase === "ROLE_REVEAL" && lastPrivate && popupShownForRound !== key) {
-        if (!lastPrivate.confirmed) {
-          showPopup(lastPrivate);
-          popupShownForRound = key;
-        }
-      }
-      if (state.phase !== "ROLE_REVEAL") {
+      if (state.phase === "ROLE_REVEAL" && lastPrivate && !lastPrivate.confirmed) {
+        if (!popupOpen || overlay.classList.contains("hidden")) showPopup(lastPrivate);
+      } else {
+        popupOpen = false;
         overlay.classList.add("hidden");
       }
     }

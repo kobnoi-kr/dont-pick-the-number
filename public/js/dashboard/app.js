@@ -149,7 +149,7 @@ async function createRoomFromModal() {
   const { res, data } = await api("/api/v1/rooms", { method: "POST", body: JSON.stringify(body) });
   if (!res.ok || !data || !data.code) {
     if (data && data.error === "coming_soon") {
-      msg.textContent = data.message || "เกมนี้ Coming Soon — แอดมินเท่านั้นที่ทดสอบได้";
+      msg.textContent = data.message || "เกมนี้ Coming Soon — ต้องได้รับคำเชิญทดสอบจากแอดมิน";
       return;
     }
     location.href = playUrl({

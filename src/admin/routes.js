@@ -704,6 +704,176 @@ async function handleAdminApi(req, res, pathname) {
     return true;
   }
 
+  // —— Coming Soon test invites ——
+  if (pathname === "/api/v1/admin/games/testers") {
+    const {
+      loadTestInvites,
+      saveTestInvites,
+      inviteListForGame
+    } = require("../dashboard/game-catalog-flags");
+
+    if (method(req) === "GET") {
+      const auth = await requirePermission(req, res, "games.view");
+      if (!auth) return true;
+      const url = new URL(req.url || "/", "http://localhost");
+      const gameId = String(url.searchParams.get("gameId") || "").trim();
+      const invites = await loadTestInvites(prisma);
+      if (gameId) {
+        const list = inviteListForGame(invites, gameId);
+        const userIds = list
+          .map((row) => (typeof row === "string" ? row : row && row.userId))
+          .filter(Boolean);
+        const users = userIds.length
+          ? await prisma.user.findMany({
+              where: { id: { in: userIds } },
+              select: {
+                id: true,
+                username: true,
+                displayName: true,
+                friendCode: true,
+                avatarUrl: true,
+                accountType: true
+              }
+            })
+          : [];
+        const byId = new Map(users.map((u) => [u.id, u]));
+        sendJson(res, 200, {
+          gameId,
+          testers: list.map((row) => {
+            const id = typeof row === "string" ? row : row && row.userId;
+            const u = byId.get(id);
+            return {
+              userId: id,
+              invitedAt: typeof row === "object" && row ? row.invitedAt || null : null,
+              invitedBy: typeof row === "object" && row ? row.invitedBy || null : null,
+              user: u
+                ? {
+                    id: u.id,
+                    username: u.username,
+                    displayName: u.displayName,
+                    friendCode: u.friendCode,
+                    avatarUrl: u.avatarUrl,
+                    accountType: u.accountType
+                  }
+                : null
+            };
+          })
+        });
+        return true;
+      }
+      sendJson(res, 200, { invites });
+      return true;
+    }
+
+    if (method(req) === "POST") {
+      const auth = await requirePermission(req, res, "games.manage");
+      if (!auth) return true;
+      const body = await readJsonBody(req).catch(() => null);
+      const gameId = String((body && body.gameId) || "").trim();
+      const q = String((body && (body.q || body.friendCode || body.username || body.userId)) || "").trim();
+      if (!gameId || !q) {
+        sendJson(res, 400, { error: "invalid_body" });
+        return true;
+      }
+      let user = null;
+      if (/^[0-9a-f-]{36}$/i.test(q)) {
+        user = await prisma.user.findUnique({ where: { id: q } });
+      }
+      if (!user) {
+        user = await prisma.user.findFirst({
+          where: {
+            status: { not: "deleted" },
+            OR: [
+              { friendCode: { equals: q, mode: "insensitive" } },
+              { username: { equals: q, mode: "insensitive" } },
+              { displayName: { equals: q, mode: "insensitive" } }
+            ]
+          }
+        });
+      }
+      if (!user) {
+        sendJson(res, 404, { error: "user_not_found" });
+        return true;
+      }
+      if (user.accountType !== "registered") {
+        sendJson(res, 400, { error: "registered_only", message: "เชิญได้เฉพาะบัญชีที่สมัครแล้ว" });
+        return true;
+      }
+      const invites = await loadTestInvites(prisma);
+      const list = inviteListForGame(invites, gameId).slice();
+      if (list.some((row) => (typeof row === "string" ? row : row && row.userId) === user.id)) {
+        sendJson(res, 200, { ok: true, already: true, userId: user.id });
+        return true;
+      }
+      list.push({
+        userId: user.id,
+        invitedAt: new Date().toISOString(),
+        invitedBy: auth.user.id
+      });
+      invites[gameId] = list;
+      await saveTestInvites(prisma, invites);
+      await writeAdminLog(prisma, {
+        adminId: auth.user.id,
+        action: "games.tester_invite",
+        metadata: { gameId, userId: user.id },
+        ipAddress: ip
+      });
+      try {
+        const { createUserNotification } = require("../dashboard/notify");
+        await createUserNotification(prisma, {
+          userId: user.id,
+          type: "game_test_invite",
+          title: "เชิญทดสอบเกม",
+          body: "คุณได้รับคำเชิญทดสอบเกม Coming Soon: " + gameId,
+          payload: { gameId }
+        });
+      } catch {
+        /* ignore */
+      }
+      sendJson(res, 201, {
+        ok: true,
+        userId: user.id,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          friendCode: user.friendCode
+        }
+      });
+      return true;
+    }
+
+    if (method(req) === "DELETE") {
+      const auth = await requirePermission(req, res, "games.manage");
+      if (!auth) return true;
+      const body = await readJsonBody(req).catch(() => null);
+      const gameId = String((body && body.gameId) || "").trim();
+      const userId = String((body && body.userId) || "").trim();
+      if (!gameId || !userId) {
+        sendJson(res, 400, { error: "invalid_body" });
+        return true;
+      }
+      const invites = await loadTestInvites(prisma);
+      const list = inviteListForGame(invites, gameId).filter((row) => {
+        const id = typeof row === "string" ? row : row && row.userId;
+        return id !== userId;
+      });
+      invites[gameId] = list;
+      await saveTestInvites(prisma, invites);
+      await writeAdminLog(prisma, {
+        adminId: auth.user.id,
+        action: "games.tester_revoke",
+        metadata: { gameId, userId },
+        ipAddress: ip
+      });
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
   // —— Games history ——
   if (pathname === "/api/v1/admin/games/history") {
     const auth = await requirePermission(req, res, "games.view");

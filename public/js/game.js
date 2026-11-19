@@ -2567,7 +2567,15 @@ $("pickGo").onclick=openWheel;
 $("pickUndo").onclick=undoPick;
 $("pickLeave").onclick=leaveGame;
 if($("snakeLeave")) $("snakeLeave").onclick=leaveGame;
-if($("imposterLeave")) $("imposterLeave").onclick=leaveGame;
+if($("imposterLeave")){
+  $("imposterLeave").onclick=()=>{
+    if(onlineMode){
+      if(isHost()) send({t:"abort"});
+      return;
+    }
+    leaveGame();
+  };
+}
 $("doSpin").onclick=spinNumber;
 $("wheelRepick").onclick=repickNumbers;
 $("wheelLeave").onclick=leaveGame;
@@ -3501,6 +3509,9 @@ function syncSetup(s){
   if($("impostorCount")&&document.activeElement!==$("impostorCount")){
     $("impostorCount").value=Number(s.impostorCount)===2?"2":"1";
   }
+  if($("clueSec")&&document.activeElement!==$("clueSec")){
+    $("clueSec").value=Number(s.clueSec)||45;
+  }
   if($("discussionSec")&&document.activeElement!==$("discussionSec")){
     $("discussionSec").value=Number(s.discussionSec)||60;
   }
@@ -3511,7 +3522,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueSec","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
       const wrap=$(id);
       if(!wrap) return;
@@ -3524,7 +3535,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","discussionSec","voteSec"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueSec","discussionSec","voteSec"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -3544,7 +3555,7 @@ function hostLocks(){
     // Spectators use quit (unwatch); hide host abort buttons.
     const showLeave=spectating?false:host;
     el.classList.toggle("hidden",!showLeave);
-    el.textContent="กลับห้อง";
+    el.textContent=id==="imposterLeave"&&netPhase==="imposter"?"ตัดจบเกม · กลับห้อง":"กลับห้อง";
   });
   if($("quitGameBtn")){
     const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
@@ -4073,6 +4084,8 @@ function pushNums(){
   if(infoBtn) patch.impostorInfo=infoBtn.getAttribute("data-impostor-info")==="category"?"category":"none";
   const impCount=parseIntStrict(($("impostorCount")&&$("impostorCount").value)||"1");
   if(impCount!=null) patch.impostorCount=impCount===2?2:1;
+  const clue=parseIntStrict(($("clueSec")&&$("clueSec").value)||"");
+  if(clue!=null) patch.clueSec=clue;
   const disc=parseIntStrict(($("discussionSec")&&$("discussionSec").value)||"");
   if(disc!=null) patch.discussionSec=disc;
   const vote=parseIntStrict(($("voteSec")&&$("voteSec").value)||"");
@@ -4379,7 +4392,8 @@ async function bootOnline(){
   if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
     if(e.target===$("winnerModal")) closeWinnerModal();
   });
-  ["leave","back","wheelLeave","pickLeave","snakeLeave","imposterLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
+  ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
+  if($("imposterLeave")) $("imposterLeave").onclick=()=>{ if(isHost()) send({t:"abort"}); };
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };

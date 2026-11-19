@@ -14,9 +14,11 @@ function run() {
     impostorCount: 1,
     discussionSec: 60,
     voteSec: 45,
+    clueSec: 30,
     rng: () => 0.1
   });
   assert.strictEqual(state.phase, eng.PHASE.ROLE_REVEAL);
+  assert.strictEqual(state.clueSec, 30);
   assert.strictEqual(state.order.length, 4);
   const imposters = state.order.filter((id) => state.roles[id] === "imposter");
   assert.strictEqual(imposters.length, 1);
