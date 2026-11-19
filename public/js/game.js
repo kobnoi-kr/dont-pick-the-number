@@ -407,11 +407,51 @@ function clearRoomChatLog(){
   const log=$("roomChatLog");
   if(log) log.innerHTML="";
 }
+function isMobileChatDrawer(){
+  try{ return window.matchMedia("(max-width: 960px)").matches; }catch(_){ return false; }
+}
+function isRoomChatDrawerOpen(){
+  return document.body.classList.contains("chat-drawer-open");
+}
+function setRoomChatUnread(on){
+  const btn=$("roomChatToggle");
+  if(btn) btn.classList.toggle("has-unread", !!on);
+}
+function setRoomChatDrawer(open){
+  const want=!!open;
+  document.body.classList.toggle("chat-drawer-open", want);
+  const btn=$("roomChatToggle");
+  const scrim=$("roomChatScrim");
+  if(btn){
+    btn.setAttribute("aria-expanded", want?"true":"false");
+    btn.setAttribute("aria-label", want?"ปิดแชท":"เปิดแชท");
+    btn.title=want?"ปิดแชท":"แชท";
+  }
+  if(scrim){
+    scrim.classList.toggle("hidden", !want);
+    scrim.setAttribute("aria-hidden", want?"false":"true");
+  }
+  if(want){
+    setRoomChatUnread(false);
+    const log=$("roomChatLog");
+    if(log) log.scrollTop=log.scrollHeight;
+    const input=$("roomChatInput");
+    if(input&&isMobileChatDrawer()){
+      try{ input.focus({preventScroll:true}); }catch(_){ try{ input.focus(); }catch(__){} }
+    }
+  }else{
+    const panel=$("roomEmojiPanel");
+    const emojiBtn=$("roomEmojiBtn");
+    if(panel) panel.classList.add("hidden");
+    if(emojiBtn) emojiBtn.setAttribute("aria-expanded","false");
+  }
+}
 function paintRoomChatBar(){
   const dock=$("roomChatDock");
   const hint=$("roomChatHint");
   const panel=$("roomEmojiPanel");
   const emojiBtn=$("roomEmojiBtn");
+  const toggle=$("roomChatToggle");
   const inRoom=onlineMode&&!spectating&&document.body.classList.contains("room-bg");
   const registered=canUseFriends();
   const show=inRoom&&registered;
@@ -420,12 +460,16 @@ function paintRoomChatBar(){
     dock.classList.toggle("hidden", !show);
     if(!show&&!wasHidden) clearRoomChatLog();
   }
+  if(toggle) toggle.classList.toggle("hidden", !show);
   if(hint) hint.classList.toggle("hidden", !(inRoom&&!registered));
   if(!show){
+    setRoomChatDrawer(false);
+    setRoomChatUnread(false);
     if(panel) panel.classList.add("hidden");
     if(emojiBtn) emojiBtn.setAttribute("aria-expanded","false");
   }else{
     paintRoomChatTargets();
+    if(!isMobileChatDrawer()) setRoomChatDrawer(false);
   }
 }
 function appendRoomChatLog(msg){
@@ -454,6 +498,9 @@ function appendRoomChatLog(msg){
   log.appendChild(line);
   while(log.childElementCount>100) log.firstChild.remove();
   log.scrollTop=log.scrollHeight;
+  if(!fromMe&&isMobileChatDrawer()&&!isRoomChatDrawerOpen()){
+    setRoomChatUnread(true);
+  }
 }
 function paintRoomChatTargets(){
   const sel=$("roomChatTo");
@@ -482,9 +529,12 @@ function setRoomChatTarget(userId){
   if(id&&Array.from(sel.options).some(o=>o.value===id)) sel.value=id;
   else sel.value="";
   paintRoomChatTargets();
-  const input=$("roomChatInput");
-  if(input) input.focus();
   paintRoomChatBar();
+  if(isMobileChatDrawer()) setRoomChatDrawer(true);
+  else{
+    const input=$("roomChatInput");
+    if(input) input.focus();
+  }
 }
 function showRoomChatBubble(fromId, body, meta){
   const pid=String(fromId||"");
@@ -4261,6 +4311,35 @@ async function bootOnline(){
     if(e.target.closest("#roomChatDock")||e.target.closest("#roomChatBar")) return;
     setEmojiPanel(false);
   });
+  const roomChatToggle=$("roomChatToggle");
+  const roomChatClose=$("roomChatClose");
+  const roomChatScrim=$("roomChatScrim");
+  if(roomChatToggle){
+    roomChatToggle.onclick=e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(!canUseFriends()){ paintRoomChatBar(); return; }
+      setRoomChatDrawer(!isRoomChatDrawerOpen());
+    };
+  }
+  if(roomChatClose){
+    roomChatClose.onclick=e=>{
+      e.preventDefault();
+      setRoomChatDrawer(false);
+    };
+  }
+  if(roomChatScrim){
+    roomChatScrim.onclick=()=>setRoomChatDrawer(false);
+  }
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&isRoomChatDrawerOpen()) setRoomChatDrawer(false);
+  });
+  try{
+    window.matchMedia("(max-width: 960px)").addEventListener("change",()=>{
+      if(!isMobileChatDrawer()) setRoomChatDrawer(false);
+      paintRoomChatBar();
+    });
+  }catch(_){}
   const roomChatTo=$("roomChatTo");
   if(roomChatTo){
     roomChatTo.onchange=()=>paintRoomChatTargets();

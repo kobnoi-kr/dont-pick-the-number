@@ -224,7 +224,13 @@ html,body{background:#070b14}
 </aside>
 </div>
 
+<button type="button" id="roomChatToggle" class="room-chat-toggle hidden" aria-label="เปิดแชท" aria-expanded="false" title="แชท">💬</button>
+<div id="roomChatScrim" class="room-chat-scrim hidden" aria-hidden="true"></div>
 <div id="roomChatDock" class="room-chat-dock hidden">
+  <div class="room-chat-head">
+    <span class="room-chat-head-title">แชทในห้อง</span>
+    <button type="button" id="roomChatClose" class="room-chat-close" aria-label="ปิดแชท" title="ปิด">✕</button>
+  </div>
   <div id="roomChatLog" class="room-chat-log" aria-live="polite"></div>
   <form id="roomChatBar" class="room-chat-bar" autocomplete="off">
     <button type="button" class="room-emoji-btn" id="roomEmojiBtn" aria-label="อิโมจิ" aria-expanded="false" title="อิโมจิ">😊</button>
