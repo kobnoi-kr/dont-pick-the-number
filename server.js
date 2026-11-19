@@ -1986,7 +1986,6 @@ async function onInviteFriend(ws, msg) {
   if (!authEnabled()) return fail(ws, "ระบบเพื่อนยังไม่พร้อม");
   const ctx = seat(ws);
   if (!ctx) return fail(ws, "ต้องอยู่ในห้องก่อน");
-  if (ctx.room.visibility !== "private") return fail(ws, "เชิญเพื่อนได้เฉพาะห้องส่วนตัว");
   if (ctx.room.phase !== "lobby") return fail(ws, "เชิญได้เฉพาะตอนล็อบบี้");
   const fromUserId = ctx.player.id;
   const friendUserId = validToken(msg.friendUserId) ? msg.friendUserId : "";

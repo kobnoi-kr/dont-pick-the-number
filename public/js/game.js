@@ -1140,14 +1140,14 @@ function renderLobbyGrid(){
     const name=list[i];
     const slot=document.createElement("div");
     if(!name){
-      const canInvite=onlineMode&&canUseFriends()&&roomVisibility==="private"&&netPhase==="lobby"&&!spectating;
+      const canInvite=onlineMode&&canUseFriends()&&netPhase==="lobby"&&!spectating;
       slot.className="lobby-slot empty"+(canInvite?" inviteable":"");
       slot.innerHTML=`<div class="lobby-empty-circle" aria-hidden="true"><span class="lobby-empty-plus">+</span></div><div class="lobby-slot-name">${canInvite?"เชิญเพื่อน":"รอผู้เล่น…"}</div>`;
       if(canInvite){
         slot.setAttribute("role","button");
         slot.tabIndex=0;
         slot.title="เชิญเพื่อนเข้าห้อง";
-        slot.onclick=()=>openInviteModal();
+        slot.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); openInviteModal(); };
         slot.onkeydown=(e)=>{
           if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openInviteModal(); }
         };
@@ -2441,6 +2441,7 @@ function paintAuthBar(user){
   }
   if(loginLink) loginLink.classList.toggle("hidden", registered);
   paintRoomChatBar();
+  paintInviteBtn();
 }
 function canUseFriends(){
   return !!(authUser&&authUser.accountType==="registered");
@@ -2757,7 +2758,9 @@ async function openPlayerProfileModal(userId){
   acts.appendChild(add);
 }
 function paintInviteBtn(){
-  // Invite is opened from empty lobby "+" slots — refresh grid affordance.
+  const btn=$("inviteFriendsBtn");
+  const show=onlineMode&&canUseFriends()&&netPhase==="lobby"&&!spectating;
+  if(btn) btn.classList.toggle("hidden",!show);
   if(netPhase==="lobby") renderLobbyGrid();
 }
 async function loadFriendsCache(){
@@ -2774,25 +2777,36 @@ async function loadFriendsCache(){
   }
 }
 function openInviteModal(){
-  if(!canUseFriends()||roomVisibility!=="private"||netPhase!=="lobby") return;
-  $("inviteModalMsg").textContent="";
-  $("inviteModal").classList.remove("hidden");
+  if(!canUseFriends()||netPhase!=="lobby"||spectating) return;
+  const modal=$("inviteModal");
+  const msg=$("inviteModalMsg");
+  if(!modal) return;
+  if(msg) msg.textContent="";
+  modal.classList.remove("hidden");
   renderInviteFriendList();
   send({t:"friendsOnline"});
   loadFriendsCache().then(()=>renderInviteFriendList());
 }
 function closeInviteModal(){
-  $("inviteModal").classList.add("hidden");
+  const modal=$("inviteModal");
+  if(modal) modal.classList.add("hidden");
 }
 function renderInviteFriendList(){
   const box=$("inviteFriendList");
   const empty=$("inviteEmpty");
   if(!box) return;
   box.textContent="";
-  const online=friendsCache.filter(u=>onlineFriendIds.has(u.id)&&!playerMeta.some(p=>p.id===u.id));
-  if(empty) empty.classList.toggle("hidden", online.length>0);
-  online.forEach(u=>{
+  const inRoom=new Set(playerMeta.map(p=>p&&p.id).filter(Boolean));
+  const candidates=friendsCache.filter(u=>u&&u.id&&!inRoom.has(u.id));
+  const online=candidates.filter(u=>onlineFriendIds.has(u.id));
+  const offline=candidates.filter(u=>!onlineFriendIds.has(u.id));
+  if(empty){
+    empty.textContent=candidates.length?"เพื่อนออนไลน์จะเชิญได้ทันที":"ยังไม่มีเพื่อนที่ยอมรับแล้ว";
+    empty.classList.toggle("hidden", online.length>0);
+  }
+  const paintRow=(u, isOnline)=>{
     const li=document.createElement("li");
+    if(!isOnline) li.classList.add("is-offline");
     const meta=document.createElement("div");
     meta.className="meta";
     if(u.avatarUrl){
@@ -2814,14 +2828,22 @@ function renderInviteFriendList(){
     const btn=document.createElement("button");
     btn.type="button";
     btn.className="btn";
-    btn.textContent="เชิญ";
-    btn.onclick=()=>{
-      send({t:"inviteFriend",friendUserId:u.id});
-      $("inviteModalMsg").textContent="ส่งคำเชิญแล้ว";
-    };
+    if(isOnline){
+      btn.textContent="เชิญ";
+      btn.onclick=()=>{
+        send({t:"inviteFriend",friendUserId:u.id});
+        const tip=$("inviteModalMsg");
+        if(tip) tip.textContent="ส่งคำเชิญแล้ว";
+      };
+    }else{
+      btn.textContent="ออฟไลน์";
+      btn.disabled=true;
+    }
     li.append(meta,btn);
     box.appendChild(li);
-  });
+  };
+  online.forEach(u=>paintRow(u, true));
+  offline.forEach(u=>paintRow(u, false));
 }
 function showRoomInvite(msg){
   pendingRoomInvite=msg;
@@ -4120,8 +4142,13 @@ async function bootOnline(){
   };
   if(authChoiceCancel) authChoiceCancel.onclick=()=>closeAuthChoiceModal();
   if(authChoiceModal) authChoiceModal.addEventListener("click",e=>{ if(e.target===authChoiceModal) closeAuthChoiceModal(); });
-  $("inviteModalClose").onclick=()=>closeInviteModal();
-  $("inviteModal").addEventListener("click",e=>{ if(e.target===$("inviteModal")) closeInviteModal(); });
+  const inviteClose=$("inviteModalClose");
+  const inviteModal=$("inviteModal");
+  if(inviteClose) inviteClose.onclick=()=>closeInviteModal();
+  if(inviteModal) inviteModal.addEventListener("click",e=>{ if(e.target===inviteModal) closeInviteModal(); });
+  const inviteBtn=$("inviteFriendsBtn");
+  if(inviteBtn) inviteBtn.onclick=()=>openInviteModal();
+  paintInviteBtn();
   const acceptBtn=$("roomInviteAccept");
   const declineBtn=$("roomInviteDecline");
   if(acceptBtn) acceptBtn.onclick=()=>{
