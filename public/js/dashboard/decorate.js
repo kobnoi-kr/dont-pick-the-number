@@ -187,7 +187,7 @@ export async function renderDecorate(root, { user } = {}) {
            </div>
            <div class="card" style="margin-top:14px">
              <h3 style="margin-top:0">คลังของฉัน</h3>
-             <p class="tiny muted" style="margin:0 0 10px">กดยศตกแต่งเพื่อสวม/ถอด (สูงสุด 4 ไม่นับยศเลเวล) · กดยศเลเวลเพื่อสลับช่องเลเวล</p>
+             <p class="tiny muted" style="margin:0 0 10px">กดยศตกแต่งเพื่อสวม/ถอด (สูงสุด 4 ไม่นับยศเลเวล) · ยศเลเวลล็อกตามเลเวลสูงสุด ถอด/สลับไม่ได้</p>
              <div class="dec-kind-tabs" id="decKindTabs" role="tablist" aria-label="หมวดของตกแต่ง">
                <button type="button" class="dec-kind-tab on" data-kind="all" role="tab" aria-selected="true">ทั้งหมด</button>
                <button type="button" class="dec-kind-tab" data-kind="title" role="tab" aria-selected="false">ยศ</button>
@@ -316,13 +316,19 @@ export async function renderDecorate(root, { user } = {}) {
                 item.tierLabel || tier
               )}</span>`
             : "";
-        const wearLabel =
-          item.kind === "title" && isOn && !isLevelTitleItem(item)
+        const levelLocked = item.kind === "title" && isLevelTitleItem(item);
+        const wearLabel = levelLocked
+          ? isOn
+            ? "ล็อกตามเลเวล"
+            : "เก็บตามเลเวล"
+          : item.kind === "title" && isOn
             ? "ถอดยศ"
             : isOn
               ? "สวมอยู่"
               : "สวมใส่";
-        return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}" data-id="${esc(item.id)}">
+        return `<button type="button" class="dec-inv-card${isOn ? " on" : ""}${
+          levelLocked ? " locked" : ""
+        }" data-id="${esc(item.id)}" ${levelLocked ? "disabled title=\"ยศเลเวลล็อกตามเลเวลสูงสุด ถอดไม่ได้\"" : ""}>
           <div class="dec-inv-thumb">${thumbHtml(item, user)}</div>
           <span class="tiny">${esc(KIND_LABEL[item.kind] || item.kind)}</span>
           ${tierPill}
@@ -338,12 +344,14 @@ export async function renderDecorate(root, { user } = {}) {
         const id = btn.getAttribute("data-id");
         const item = owned.find((x) => x.id === id);
         if (!item) return;
-        // Level title already on: no-op. Frame/effect already on: no-op.
-        // Extra titles already on: toggle off via API.
-        if (item.kind !== "title" && equipped[item.kind] && equipped[item.kind].id === item.id) {
+        // Level titles are locked to max level — never equip/unequip from UI.
+        if (item.kind === "title" && isLevelTitleItem(item)) {
+          setMsg("ยศเลเวลล็อกตามเลเวลสูงสุด — ถอดหรือสลับไม่ได้", false);
           return;
         }
-        if (item.kind === "title" && isLevelTitleItem(item) && isTitleEquipped(equipped, item.id)) {
+        // Frame/effect already on: no-op.
+        // Extra titles already on: toggle off via API.
+        if (item.kind !== "title" && equipped[item.kind] && equipped[item.kind].id === item.id) {
           return;
         }
 

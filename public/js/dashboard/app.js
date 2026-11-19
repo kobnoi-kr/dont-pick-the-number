@@ -7,12 +7,12 @@ import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";
 import { renderProfile } from "./profile.js";
-import { renderDecorate } from "./decorate.js";
+import { renderDecorate } from "./decorate.js?v=lvlock1";
 import { renderShop } from "./shop.js?v=inv-popup1";
 import { renderInventory } from "./inventory.js?v=inv-popup1";
 import { renderLevel } from "./level.js";
 import { wireNotifications, refreshNotifications, onNotificationPush } from "./notifications.js";
-import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js";
+import { wireChat, onChatDmPush, refreshChatUnread } from "./chat.js?v=mute1";
 import { loadAnnouncementToasts, onLiveAnnouncement, startAnnouncementPoll } from "./toasts.js";
 import { showRoomInviteBanner } from "./invites.js";
 import {

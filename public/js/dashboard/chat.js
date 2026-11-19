@@ -109,17 +109,47 @@ function paintConversationList() {
       const u = c.user || {};
       const preview = c.lastMessage ? c.lastMessage.body : "เริ่มแชท…";
       const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread > 99 ? "99+" : c.unread}</span>` : "";
-      return `<button type="button" class="chat-conv${c.unread ? " has-unread" : ""}" data-peer="${esc(c.userId)}">
-        ${avatarHtml(u)}
-        <span class="chat-conv-meta">
-          <span class="chat-conv-name">${esc(u.displayName || "เพื่อน")}${unread}</span>
-          <span class="chat-conv-preview">${esc(preview)}</span>
-        </span>
-      </button>`;
+      const muted = !!c.muted;
+      return `<div class="chat-conv-row${c.unread ? " has-unread" : ""}${muted ? " is-muted" : ""}">
+        <button type="button" class="chat-conv" data-peer="${esc(c.userId)}">
+          ${avatarHtml(u)}
+          <span class="chat-conv-meta">
+            <span class="chat-conv-name">${esc(u.displayName || "เพื่อน")}${unread}${
+              muted ? `<span class="chat-muted-tag">ปิดเสียง</span>` : ""
+            }</span>
+            <span class="chat-conv-preview">${esc(preview)}</span>
+          </span>
+        </button>
+        <button type="button" class="btn ghost sm chat-mute-btn" data-mute="${esc(c.userId)}" title="${
+          muted ? "เปิดเสียงแชท" : "ปิดเสียงแชท"
+        }" aria-label="${muted ? "เปิดเสียง" : "ปิดเสียง"}">${muted ? "🔔" : "🔇"}</button>
+      </div>`;
     })
     .join("");
   list.querySelectorAll("[data-peer]").forEach((btn) => {
     btn.onclick = () => openThread(btn.getAttribute("data-peer"));
+  });
+  list.querySelectorAll("[data-mute]").forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const peerId = btn.getAttribute("data-mute");
+      const row = conversations.find((c) => c.userId === peerId);
+      const muted = !!(row && row.muted);
+      btn.disabled = true;
+      const { res, data } = await api(`/api/v1/chat/mute/${encodeURIComponent(peerId)}`, {
+        method: muted ? "DELETE" : "POST",
+        body: "{}"
+      });
+      btn.disabled = false;
+      if (!res.ok) return;
+      const nextMuted = !!(data && data.muted);
+      conversations = conversations.map((c) =>
+        c.userId === peerId ? Object.assign({}, c, { muted: nextMuted, unread: nextMuted ? 0 : c.unread }) : c
+      );
+      paintConversationList();
+      refreshChatUnread();
+    };
   });
 }
 
@@ -154,6 +184,8 @@ async function openThread(peerId) {
   if (listView) listView.classList.add("hidden");
   if (threadView) threadView.classList.remove("hidden");
   if (title) title.textContent = (peer && peer.displayName) || "แชท";
+  const convMuted = !!(conversations.find((c) => c.userId === peerId) || {}).muted;
+  paintThreadMuteBtn(peerId, convMuted);
   if (box) box.innerHTML = `<div class="loading">Loading…</div>`;
   const { res, data } = await api(`/api/v1/chat/with/${encodeURIComponent(peerId)}?limit=80`, { method: "GET" });
   if (!res.ok) {
@@ -161,6 +193,12 @@ async function openThread(peerId) {
     return;
   }
   if (title && data.peer) title.textContent = data.peer.displayName || "แชท";
+  if (typeof data.muted === "boolean") {
+    conversations = conversations.map((c) =>
+      c.userId === peerId ? Object.assign({}, c, { muted: data.muted }) : c
+    );
+    paintThreadMuteBtn(peerId, data.muted);
+  }
   paintUnread(data.unread || 0);
   const meId = (window.__nvMeId || "").toString();
   if (box) {
@@ -182,6 +220,16 @@ async function openThread(peerId) {
     input.value = "";
     requestAnimationFrame(() => input.focus());
   }
+}
+
+function paintThreadMuteBtn(peerId, muted) {
+  const btn = document.getElementById("chatThreadMuteBtn");
+  if (!btn) return;
+  btn.dataset.peer = peerId || "";
+  btn.textContent = muted ? "🔔" : "🔇";
+  btn.title = muted ? "เปิดเสียงแชท" : "ปิดเสียงแชท";
+  btn.setAttribute("aria-label", muted ? "เปิดเสียง" : "ปิดเสียง");
+  btn.classList.toggle("is-muted", !!muted);
 }
 
 function backToList() {
@@ -280,6 +328,13 @@ export async function refreshChatUnread() {
 }
 
 export function onChatDmPush(msg) {
+  const senderId = msg && msg.message && msg.message.senderId;
+  const mutedLocal = conversations.some((c) => c.userId === senderId && c.muted);
+  if (mutedLocal) {
+    // Muted peers: no sound / unread bump from push
+    if (activePeerId && senderId === activePeerId) openThread(activePeerId);
+    return;
+  }
   playSfx(DM_SOUND, 0.5);
   const panel = document.getElementById("chatPanel");
   const open = panel && !panel.classList.contains("hidden");
@@ -355,6 +410,29 @@ export function wireChat(user) {
     e.stopPropagation();
     backToList();
   };
+  const threadMute = document.getElementById("chatThreadMuteBtn");
+  if (threadMute) {
+    threadMute.onclick = async (e) => {
+      e.stopPropagation();
+      const peerId = activePeerId || threadMute.dataset.peer;
+      if (!peerId) return;
+      const row = conversations.find((c) => c.userId === peerId);
+      const muted = !!(row && row.muted);
+      threadMute.disabled = true;
+      const { res, data } = await api(`/api/v1/chat/mute/${encodeURIComponent(peerId)}`, {
+        method: muted ? "DELETE" : "POST",
+        body: "{}"
+      });
+      threadMute.disabled = false;
+      if (!res.ok) return;
+      const nextMuted = !!(data && data.muted);
+      conversations = conversations.map((c) =>
+        c.userId === peerId ? Object.assign({}, c, { muted: nextMuted, unread: nextMuted ? 0 : c.unread }) : c
+      );
+      paintThreadMuteBtn(peerId, nextMuted);
+      refreshChatUnread();
+    };
+  }
   const form = document.getElementById("chatThreadForm");
   if (form) {
     form.onsubmit = (e) => {

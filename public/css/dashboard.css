@@ -2559,11 +2559,39 @@ body.modal-open {
   padding-right: 2px;
   -webkit-overflow-scrolling: touch;
 }
+.chat-conv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-conv-row.has-unread .chat-conv {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.08);
+}
+.chat-conv-row.is-muted .chat-conv-preview { opacity: 0.72; }
+.chat-mute-btn {
+  flex: 0 0 auto;
+  min-width: 36px;
+  padding: 6px 8px;
+}
+.chat-muted-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  color: #94a3b8;
+  vertical-align: middle;
+}
+.chat-thread-head #chatThreadMuteBtn.is-muted { color: #86efac; }
 .chat-conv {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: left;
   padding: 10px;
   border-radius: 12px;
@@ -2572,9 +2600,16 @@ body.modal-open {
   color: inherit;
   cursor: pointer;
 }
-.chat-conv:hover, .chat-conv.has-unread {
+.chat-conv:hover {
   background: rgba(255,255,255,.06);
   border-color: rgba(255,255,255,.08);
+}
+.dec-inv-card.locked {
+  opacity: 0.92;
+  cursor: default;
+}
+.dec-inv-card.locked:hover {
+  border-color: var(--nv-border, rgba(148,163,184,.22));
 }
 .chat-av {
   width: 36px;

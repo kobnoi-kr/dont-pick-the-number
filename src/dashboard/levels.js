@@ -260,23 +260,25 @@ async function applyExpGain(prisma, userId, gain, { notifyLevelUp = true } = {})
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, exp: true, level: true, accountType: true, status: true }
+    select: { id: true, exp: true, level: true, maxLevel: true, accountType: true, status: true }
   });
   if (!user || user.accountType !== "registered" || user.status === "deleted") return null;
 
   const before = levelFromExp(config, user.exp || 0);
   const nextExp = Math.max(0, (user.exp || 0) + amount);
   const after = levelFromExp(config, nextExp);
+  const maxLevel = Math.max(1, Number(user.maxLevel) || 1, after.level);
 
   await prisma.user.update({
     where: { id: userId },
-    data: { exp: nextExp, level: after.level }
+    data: { exp: nextExp, level: after.level, maxLevel }
   });
 
   try {
-    const { grantLevelTitlesUpTo, syncLevelTitleCosmetics } = require("./cosmetics");
+    const { grantLevelTitlesUpTo, syncLevelTitleCosmetics, syncEquippedLevelTitle } = require("./cosmetics");
     await syncLevelTitleCosmetics(prisma, config.levels);
-    await grantLevelTitlesUpTo(prisma, userId, after.level);
+    await grantLevelTitlesUpTo(prisma, userId, maxLevel);
+    await syncEquippedLevelTitle(prisma, userId);
   } catch {
     /* ignore */
   }

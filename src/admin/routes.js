@@ -458,16 +458,23 @@ async function handleAdminApi(req, res, pathname) {
 
         const updated = await prisma.user.update({
           where: { id: userId },
+          // Keep maxLevel so level titles stay at peak achievement
           data: { exp: 0, level: 1 },
           include: userInclude
         });
+        try {
+          const { syncEquippedLevelTitle } = require("../dashboard/cosmetics");
+          await syncEquippedLevelTitle(prisma, userId);
+        } catch {
+          /* ignore */
+        }
         await writeAdminLog(prisma, {
           adminId: auth.user.id,
           action: "user.reset_exp",
           targetId: userId,
           metadata: {
-            before: { exp: target.exp, level: target.level },
-            after: { exp: 0, level: 1 }
+            before: { exp: target.exp, level: target.level, maxLevel: target.maxLevel },
+            after: { exp: 0, level: 1, maxLevel: updated.maxLevel }
           },
           ipAddress: ip
         });

@@ -606,6 +606,48 @@ async function grantLevelTitlesUpTo(prisma, userId, level) {
   await Promise.all(missing.map((id) => grantCosmetic(prisma, userId, id, "level")));
 }
 
+/**
+ * Force equipped level title to the user's highest level reached.
+ * Non-level titles stay in extra slots only.
+ */
+async function syncEquippedLevelTitle(prisma, userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      level: true,
+      maxLevel: true,
+      equippedTitleId: true,
+      equippedExtraTitleIds: true
+    }
+  });
+  if (!user) return null;
+  const peak = Math.max(1, Number(user.maxLevel) || 1, Number(user.level) || 1);
+  const wantId = levelTitleCosmeticId(peak);
+  await grantCosmetic(prisma, userId, wantId, "level");
+
+  const data = {};
+  if (peak > (Number(user.maxLevel) || 0)) data.maxLevel = peak;
+
+  const current = user.equippedTitleId || "";
+  if (isLevelTitleId(current) && current !== wantId) {
+    data.equippedTitleId = wantId;
+  } else if (!current || current === "title.rookie") {
+    data.equippedTitleId = wantId;
+  } else if (!isLevelTitleId(current)) {
+    // Decorative title wrongly in level slot → move to extras
+    data.equippedExtraTitleIds = normalizeExtraTitleIds([
+      current,
+      ...normalizeExtraTitleIds(user.equippedExtraTitleIds)
+    ]);
+    data.equippedTitleId = wantId;
+  }
+
+  if (Object.keys(data).length) {
+    await prisma.user.update({ where: { id: userId }, data });
+  }
+  return wantId;
+}
+
 async function ensureLevelOneTitleCosmetic(prisma) {
   const id = levelTitleCosmeticId(1);
   const existing = await prisma.cosmetic.findUnique({ where: { id } });
@@ -644,6 +686,7 @@ async function ensureStarterCosmetics(prisma, userId) {
     where: { id: userId },
     select: {
       level: true,
+      maxLevel: true,
       equippedTitleId: true,
       equippedFrameId: true,
       equippedEffectId: true,
@@ -661,14 +704,11 @@ async function ensureStarterCosmetics(prisma, userId) {
   const needsFrame = !have.has("frame.basic");
   const needsEffect = !have.has("effect.none");
   const hasRookie = have.has("title.rookie");
-  const equippedIsNonLevel =
-    !!user.equippedTitleId &&
-    user.equippedTitleId !== "title.rookie" &&
-    !isLevelTitleId(user.equippedTitleId);
+  const peak = Math.max(1, Number(user.maxLevel) || 1, Number(user.level) || 1);
+  const wantLevelTitle = levelTitleCosmeticId(peak);
+  const levelTitleOk = user.equippedTitleId === wantLevelTitle;
   const needsEquipFix =
-    !user.equippedTitleId ||
-    user.equippedTitleId === "title.rookie" ||
-    equippedIsNonLevel ||
+    !levelTitleOk ||
     !user.equippedFrameId ||
     !user.equippedEffectId;
 
@@ -692,19 +732,9 @@ async function ensureStarterCosmetics(prisma, userId) {
     }
   }
 
+  await syncEquippedLevelTitle(prisma, userId);
+
   const data = {};
-  if (!user.equippedTitleId || user.equippedTitleId === "title.rookie" || equippedIsNonLevel) {
-    // Non-level titles belong in extra slots (max 4), not the level title slot.
-    if (equippedIsNonLevel) {
-      data.equippedExtraTitleIds = normalizeExtraTitleIds([
-        user.equippedTitleId,
-        ...normalizeExtraTitleIds(user.equippedExtraTitleIds)
-      ]);
-    }
-    const lv = Math.max(1, Number(user.level) || 1);
-    data.equippedTitleId = levelTitleCosmeticId(lv);
-    await grantCosmetic(prisma, userId, data.equippedTitleId, "level");
-  }
   if (!user.equippedFrameId) data.equippedFrameId = "frame.basic";
   if (!user.equippedEffectId) data.equippedEffectId = "effect.none";
   if (Object.keys(data).length) {
@@ -723,11 +753,16 @@ async function loadUserCosmetics(prisma, userId) {
   }
   const userLite = await prisma.user.findUnique({
     where: { id: userId },
-    select: { level: true }
+    select: { level: true, maxLevel: true }
   });
-  const level = Math.max(1, (userLite && userLite.level) || 1);
-  await grantLevelTitlesUpTo(prisma, userId, level);
+  const peak = Math.max(
+    1,
+    (userLite && userLite.maxLevel) || 1,
+    (userLite && userLite.level) || 1
+  );
+  await grantLevelTitlesUpTo(prisma, userId, peak);
   await ensureStarterCosmetics(prisma, userId);
+  await syncEquippedLevelTitle(prisma, userId);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -911,17 +946,18 @@ async function handleCosmeticsApi(req, res, pathname) {
     if (kind === "title") {
       const user = await auth.prisma.user.findUnique({
         where: { id: auth.user.id },
-        select: { equippedTitleId: true, equippedExtraTitleIds: true, level: true }
+        select: { equippedTitleId: true, equippedExtraTitleIds: true, level: true, maxLevel: true }
       });
       if (!user) {
         sendJson(res, 404, { error: "not_found" });
         return true;
       }
       if (isLevelTitleId(cosmeticId)) {
-        await auth.prisma.user.update({
-          where: { id: auth.user.id },
-          data: { equippedTitleId: cosmeticId }
-        });
+        // Level titles always follow max level — cannot swap/unequip
+        await syncEquippedLevelTitle(auth.prisma, auth.user.id);
+        const freshLocked = await loadUserCosmetics(auth.prisma, auth.user.id);
+        sendJson(res, 200, Object.assign({}, freshLocked, { lockedLevelTitle: true }));
+        return true;
       } else {
         const extras = normalizeExtraTitleIds(user.equippedExtraTitleIds);
         const idx = extras.indexOf(cosmeticId);
@@ -2015,6 +2051,7 @@ module.exports = {
   levelTitleCosmeticId,
   syncLevelTitleCosmetics,
   grantLevelTitlesUpTo,
+  syncEquippedLevelTitle,
   loadUserCosmetics,
   adminGiftCosmetic,
   handleCosmeticsApi,

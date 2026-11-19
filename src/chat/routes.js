@@ -30,10 +30,52 @@ function publicDm(row) {
   };
 }
 
-async function unreadCount(prisma, userId) {
+async function unreadCount(prisma, userId, opts) {
+  const muted = (opts && opts.mutedIds) || [];
   return prisma.directMessage.count({
-    where: { recipientId: userId, readAt: null }
+    where: {
+      recipientId: userId,
+      readAt: null,
+      ...(muted.length ? { senderId: { notIn: muted } } : {})
+    }
   });
+}
+
+function normalizeMutedIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const id of raw) {
+    const s = String(id || "").trim();
+    if (!/^[0-9a-f-]{36}$/i.test(s) || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length >= 200) break;
+  }
+  return out;
+}
+
+async function loadMutedPeerIds(prisma, userId) {
+  const row = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { preferences: true }
+  });
+  const prefs = (row && row.preferences) || {};
+  return normalizeMutedIds(prefs.mutedChatPeerIds);
+}
+
+async function saveMutedPeerIds(prisma, userId, ids) {
+  const muted = normalizeMutedIds(ids);
+  const current = await prisma.userSettings.findUnique({ where: { userId } });
+  const preferences = Object.assign({}, (current && current.preferences) || {}, {
+    mutedChatPeerIds: muted
+  });
+  await prisma.userSettings.upsert({
+    where: { userId },
+    create: { userId, preferences },
+    update: { preferences }
+  });
+  return muted;
 }
 
 async function handleUnread(req, res) {
@@ -44,8 +86,9 @@ async function handleUnread(req, res) {
   const auth = await requireAuth(req, res);
   if (!auth) return true;
   if (!requireRegistered(auth, res)) return true;
-  const count = await unreadCount(auth.prisma, auth.user.id);
-  sendJson(res, 200, { unread: count });
+  const mutedIds = await loadMutedPeerIds(auth.prisma, auth.user.id);
+  const count = await unreadCount(auth.prisma, auth.user.id, { mutedIds });
+  sendJson(res, 200, { unread: count, mutedPeerIds: mutedIds });
   return true;
 }
 
@@ -59,8 +102,10 @@ async function handleConversations(req, res) {
   if (!requireRegistered(auth, res)) return true;
   const me = auth.user.id;
   const friendIds = await listAcceptedFriendIds(auth.prisma, me);
+  const mutedIds = await loadMutedPeerIds(auth.prisma, me);
+  const mutedSet = new Set(mutedIds);
   if (!friendIds.length) {
-    sendJson(res, 200, { conversations: [], unread: 0 });
+    sendJson(res, 200, { conversations: [], unread: 0, mutedPeerIds: mutedIds });
     return true;
   }
 
@@ -96,20 +141,25 @@ async function handleConversations(req, res) {
     });
   }
 
-  const unreadRows = await auth.prisma.directMessage.groupBy({
-    by: ["senderId"],
-    where: { recipientId: me, readAt: null, senderId: { in: friendIds } },
-    _count: { _all: true }
-  });
+  const unreadSenderIds = friendIds.filter((id) => !mutedSet.has(id));
+  const unreadRows = unreadSenderIds.length
+    ? await auth.prisma.directMessage.groupBy({
+        by: ["senderId"],
+        where: { recipientId: me, readAt: null, senderId: { in: unreadSenderIds } },
+        _count: { _all: true }
+      })
+    : [];
   const unreadMap = Object.fromEntries(unreadRows.map((r) => [r.senderId, r._count._all]));
 
   const conversations = friendIds.map((fid) => {
     const base = byPeer.get(fid) || { user: null, lastMessage: null };
+    const muted = mutedSet.has(fid);
     return {
       userId: fid,
       user: base.user,
       lastMessage: base.lastMessage,
-      unread: unreadMap[fid] || 0
+      unread: muted ? 0 : unreadMap[fid] || 0,
+      muted
     };
   });
 
@@ -132,8 +182,39 @@ async function handleConversations(req, res) {
     return bt - at;
   });
 
-  const unread = await unreadCount(auth.prisma, me);
-  sendJson(res, 200, { conversations, unread });
+  const unread = await unreadCount(auth.prisma, me, { mutedIds });
+  sendJson(res, 200, { conversations, unread, mutedPeerIds: mutedIds });
+  return true;
+}
+
+async function handleMute(req, res, peerId) {
+  const auth = await requireAuth(req, res);
+  if (!auth) return true;
+  if (!requireRegistered(auth, res)) return true;
+  const me = auth.user.id;
+  if (peerId === me) {
+    sendJson(res, 400, { error: "invalid_peer" });
+    return true;
+  }
+  if (!(await areFriends(auth.prisma, me, peerId))) {
+    sendJson(res, 403, { error: "friends_only" });
+    return true;
+  }
+  const muted = await loadMutedPeerIds(auth.prisma, me);
+  const set = new Set(muted);
+  if (method(req) === "POST") {
+    set.add(peerId);
+    const next = await saveMutedPeerIds(auth.prisma, me, [...set]);
+    sendJson(res, 200, { ok: true, muted: true, mutedPeerIds: next });
+    return true;
+  }
+  if (method(req) === "DELETE") {
+    set.delete(peerId);
+    const next = await saveMutedPeerIds(auth.prisma, me, [...set]);
+    sendJson(res, 200, { ok: true, muted: false, mutedPeerIds: next });
+    return true;
+  }
+  sendJson(res, 405, { error: "method_not_allowed" });
   return true;
 }
 
@@ -171,10 +252,12 @@ async function handleThread(req, res, peerId) {
       where: { id: peerId },
       select: { id: true, displayName: true, avatarUrl: true, friendCode: true }
     });
+    const mutedIds = await loadMutedPeerIds(auth.prisma, me);
     sendJson(res, 200, {
       peer: publicFriendUser(peer),
       messages: rows.map(publicDm),
-      unread: await unreadCount(auth.prisma, me)
+      unread: await unreadCount(auth.prisma, me, { mutedIds }),
+      muted: mutedIds.includes(peerId)
     });
     return true;
   }
@@ -201,15 +284,16 @@ async function handleThread(req, res, peerId) {
       }
     });
     const payload = publicDm(row);
+    const peerMuted = (await loadMutedPeerIds(auth.prisma, peerId)).includes(me);
     const game = getGameApi();
-    if (game && typeof game.notifyUser === "function") {
+    if (!peerMuted && game && typeof game.notifyUser === "function") {
       try {
         game.notifyUser(peerId, { t: "chat:dm", message: payload });
       } catch {
         /* ignore */
       }
     }
-    sendJson(res, 201, { message: payload });
+    sendJson(res, 201, { message: payload, mutedForRecipient: peerMuted });
     return true;
   }
 
@@ -220,6 +304,8 @@ async function handleThread(req, res, peerId) {
 async function handleChatApi(req, res, pathname) {
   if (pathname === "/api/v1/chat/unread") return handleUnread(req, res);
   if (pathname === "/api/v1/chat/conversations") return handleConversations(req, res);
+  const mute = pathname.match(/^\/api\/v1\/chat\/mute\/([0-9a-f-]{36})$/i);
+  if (mute) return handleMute(req, res, mute[1]);
   const thread = pathname.match(/^\/api\/v1\/chat\/with\/([0-9a-f-]{36})$/i);
   if (thread) return handleThread(req, res, thread[1]);
   return false;

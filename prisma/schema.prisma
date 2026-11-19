@@ -52,6 +52,8 @@ model User {
   gender           Gender?
   age              Int?
   level            Int          @default(1)
+  /// Highest level ever reached — level titles stay locked to this even if exp is reset.
+  maxLevel         Int          @default(1) @map("max_level")
   exp              Int          @default(0)
   shopPts          Int          @default(0) @map("shop_pts")
   equippedTitleId       String? @map("equipped_title_id") @db.VarChar(64)
