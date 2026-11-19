@@ -2,7 +2,7 @@
 
 const { MIN_PLAYERS, MAX_PLAYERS } = require("../config/default-board");
 const { createBoard } = require("./board");
-const { rollDice } = require("./dice");
+const { rollDiceParity } = require("./dice");
 const { resolveMove } = require("./movement");
 const { currentPlayer, advanceTurn, assertCanRoll } = require("./turn-manager");
 const { findWinner } = require("./win-condition");
@@ -123,13 +123,14 @@ function startGame(state) {
  * Server-authoritative roll.
  * @param {object} state
  * @param {string} userId
- * @param {{commandId?:string, rng?:Function}} [opts]
+ * @param {{commandId?:string, rng?:Function, parity?:'even'|'odd'|null}} [opts]
  */
 function roll(state, userId, opts) {
   const commandId = opts && opts.commandId ? String(opts.commandId) : null;
   assertCanRoll(state, userId, commandId);
 
-  const dice = rollDice(opts && opts.rng);
+  const parity = opts && (opts.parity === "even" || opts.parity === "odd") ? opts.parity : null;
+  const dice = rollDiceParity(opts && opts.rng, parity);
   const player = currentPlayer(state);
   const move = resolveMove(state.board, player.position, dice, {
     ignoreSnakes: !!(opts && opts.ignoreSnakes)
@@ -170,5 +171,6 @@ module.exports = {
   startGame,
   roll,
   publicState,
-  currentPlayer
+  currentPlayer,
+  advanceTurn
 };

@@ -458,6 +458,10 @@ function clearAngelGuards(room) {
     player.angelGuard = false;
     player.angelCardUsed = false;
     player.angelSnakeCharges = 0;
+    player.skipTurnGuard = false;
+    player.skipNextTurn = false;
+    player.evenOddCharges = 0;
+    player.evenOddArmed = false;
   });
 }
 function blankRoom(code, visibility, host) {
@@ -613,11 +617,16 @@ function snap(room, player, opts) {
       auto: !!(item.auto || item.bot),
       angelGuard: !!(item.angelGuard || (item.angelSnakeCharges | 0) > 0),
       angelSnakeCharges: Math.max(0, Number(item.angelSnakeCharges) || 0),
+      skipTurnGuard: !!item.skipTurnGuard,
+      skipNextTurn: !!item.skipNextTurn,
+      evenOddCharges: Math.max(0, Number(item.evenOddCharges) || 0),
       champion: Array.isArray(room.lastWinners) && room.lastWinners.includes(item.id)
     })),
     youAuto: !!(player && (player.auto || player.bot)),
     youAngelGuard: !!(player && (player.angelGuard || (player.angelSnakeCharges | 0) > 0)),
     youAngelSnakeCharges: player ? Math.max(0, Number(player.angelSnakeCharges) || 0) : 0,
+    youSkipTurnGuard: !!(player && player.skipTurnGuard),
+    youEvenOddCharges: player ? Math.max(0, Number(player.evenOddCharges) || 0) : 0,
     order: room.order,
     alive: room.alive,
     roundOrder: room.roundOrder,
@@ -791,6 +800,42 @@ function skipToConnected(room) {
   }
   return room.turn !== start;
 }
+/** Consume pending skip-next flags for the current secret-number seat. */
+function processPendingSkipPlay(room) {
+  if (room.phase !== "play" || !room.alive.length) return false;
+  let changed = false;
+  let hops = 0;
+  while (hops < room.alive.length) {
+    const name = currentName(room);
+    const player = byName(room, name);
+    if (player && player.skipNextTurn) {
+      player.skipNextTurn = false;
+      room.turn = room.alive.length ? (room.turn + 1) % room.alive.length : 0;
+      changed = true;
+      hops += 1;
+      continue;
+    }
+    break;
+  }
+  if (changed) skipToConnected(room);
+  return changed;
+}
+/** If current snake seat has skipNextTurn, advance without rolling. */
+function processPendingSkipSnake(room) {
+  if (room.phase !== "snake" || !room.snake || room.snake.status !== "playing") return false;
+  let changed = false;
+  let hops = 0;
+  const n = (room.players || []).length || 1;
+  while (hops < n) {
+    const seat = snakeBridge.snakeCurrentSeat(room);
+    if (!seat || !seat.skipNextTurn) break;
+    seat.skipNextTurn = false;
+    if (!snakeBridge.skipSnakeTurn(room)) break;
+    changed = true;
+    hops += 1;
+  }
+  return changed;
+}
 function finishRound(room) {
   const left = room.roundOrder.filter((name) => room.alive.includes(name));
   const gained = !left.length ? [] : room.pointAll ? left : [left[left.length - 1]];
@@ -957,12 +1002,14 @@ function applyPickChoice(room, name, n) {
 function armTurnTimer(room) {
   clearTurnTimer(room);
   if (room.phase === "play") {
+    processPendingSkipPlay(room);
     if (!currentName(room) || room.alive.length < 1) return;
   } else if (room.phase === "pick") {
     const each = Math.max(room.pickEach, 1);
     const total = room.wheelOrder.length * each;
     if (room.pickCursor >= total) return;
   } else if (room.phase === "snake") {
+    processPendingSkipSnake(room);
     if (!room.snake || room.snake.status !== "playing") return;
   } else return;
   const player = turnPlayer(room);
@@ -1129,7 +1176,11 @@ function applyLand(room, plan) {
   let angelDraw = false;
   if (plan.hit) {
     const player = byName(room, plan.owner);
-    if (player && player.angelGuard) {
+    if (player && player.skipTurnGuard) {
+      // Skip Turn: ละเว้นตัวเองเมื่อเลขตก — อยู่ต่อได้ทันที (ใช้คู่กับนางฟ้าได้)
+      player.skipTurnGuard = false;
+      room.wheelLog.push({ n: plan.n, who: plan.owner, skipSaved: true });
+    } else if (player && player.angelGuard) {
       player.angelGuard = false;
       room.wheelLog.push({ n: plan.n, who: plan.owner, angelSaved: true });
       // pickEach ≤ 1 → เสมอ; pickEach > 1 และผู้เล่นในวงล้อ > 2 → ชุบต่อ
@@ -1450,14 +1501,26 @@ function onRoll(ws, msg) {
   if (!ctx || ctx.room.phase !== "snake") return;
   const room = ctx.room;
   if (!room.snake || room.snake.status !== "playing") return;
+  processPendingSkipSnake(room);
   if (!yourTurn(room, ctx.player)) return fail(ws, "ยังไม่ถึงตาคุณ");
   const commandId = msg && msg.commandId != null ? String(msg.commandId).slice(0, 64) : null;
-  const { result, error } = snakeBridge.applySnakeRoll(room, ctx.player.id, { commandId });
+  const wantParity = msg && (msg.parity === "even" || msg.parity === "odd") ? msg.parity : null;
+  if (wantParity) {
+    const left = Math.max(0, Number(ctx.player.evenOddCharges) || 0);
+    if (left < 1) return fail(ws, "ใช้คู่/คี่ครบแล้วในเกมนี้");
+  }
+  const { result, error } = snakeBridge.applySnakeRoll(room, ctx.player.id, {
+    commandId,
+    parity: wantParity
+  });
   if (error) {
     const code = error.code || "";
     if (code === "not_your_turn") return fail(ws, "ยังไม่ถึงตาคุณ");
     if (code === "duplicate_command") return;
     return fail(ws, "ทอยลูกเต๋าไม่สำเร็จ");
+  }
+  if (wantParity) {
+    ctx.player.evenOddCharges = Math.max(0, (Number(ctx.player.evenOddCharges) || 0) - 1);
   }
   if (result.finished) finishSnakeMatch(room, result.state.winnerId);
   else armTurnTimer(room);
@@ -2118,31 +2181,139 @@ function onMessage(ws, raw) {
 async function onUseHelper(ws, msg) {
   const ctx = seat(ws);
   if (!ctx || !ctx.player || !ctx.room) return fail(ws, "เข้าห้องก่อน");
-  if (ctx.room.phase !== "lobby") return fail(ws, "ใช้ไอเทมได้เฉพาะก่อนเริ่มเกม");
   if (ctx.player.bot) return fail(ws, "บอทใช้ไอเทมไม่ได้");
   if (!ws.accountType || ws.accountType !== "registered") {
     return fail(ws, "เข้าสู่ระบบก่อนถึงจะใช้ไอเทมได้");
   }
   const itemId = String((msg && msg.itemId) || "").trim();
-  if (itemId !== "item.angel") return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
-  if (ctx.player.angelCardUsed || ctx.player.angelGuard || (ctx.player.angelSnakeCharges | 0) > 0) {
-    return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
+  const {
+    consumeItem,
+    ANGEL_ITEM_ID,
+    SKIP_ITEM_ID,
+    EVENODD_ITEM_ID,
+    EVENODD_CHARGES
+  } = require("./src/dashboard/inventory");
+
+  if (itemId === ANGEL_ITEM_ID) {
+    if (ctx.room.phase !== "lobby") return fail(ws, "การ์ดนางฟ้าใช้ได้เฉพาะก่อนเริ่มเกม");
+    if (ctx.player.angelCardUsed || ctx.player.angelGuard || (ctx.player.angelSnakeCharges | 0) > 0) {
+      return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
+    }
+    try {
+      const { getPrisma, authEnabled } = require("./src/db");
+      if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+      const prisma = await getPrisma();
+      const used = await consumeItem(prisma, ctx.player.id, ANGEL_ITEM_ID);
+      if (!used || !used.ok) return fail(ws, "ไม่มีการ์ดนางฟ้าในกระเป๋า");
+      ctx.player.angelCardUsed = true;
+      ctx.player.angelGuard = true;
+      ctx.player.angelSnakeCharges = 3;
+      broadcast(ctx.room);
+      send(ws, { t: "helperUsed", itemId: ANGEL_ITEM_ID, quantity: used.quantity });
+    } catch (err) {
+      return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+    }
+    return;
   }
-  try {
-    const { getPrisma, authEnabled } = require("./src/db");
-    if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
-    const prisma = await getPrisma();
-    const { consumeItem, ANGEL_ITEM_ID } = require("./src/dashboard/inventory");
-    const used = await consumeItem(prisma, ctx.player.id, itemId || ANGEL_ITEM_ID);
-    if (!used || !used.ok) return fail(ws, "ไม่มีการ์ดนางฟ้าในกระเป๋า");
-    ctx.player.angelCardUsed = true;
-    ctx.player.angelGuard = true;
-    ctx.player.angelSnakeCharges = 3;
-    broadcast(ctx.room);
-    send(ws, { t: "helperUsed", itemId: ANGEL_ITEM_ID, quantity: used.quantity });
-  } catch (err) {
-    return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+
+  if (itemId === EVENODD_ITEM_ID) {
+    if (ctx.room.phase !== "lobby") return fail(ws, "เลขคู่/คี่ใช้ได้เฉพาะก่อนเริ่มเกม");
+    if (ctx.room.cat !== "snake") return fail(ws, "เลขคู่/คี่ใช้ได้เฉพาะเกมงูและบันได");
+    if (ctx.player.evenOddArmed || (ctx.player.evenOddCharges | 0) > 0) {
+      return fail(ws, "ใช้เลขคู่/คี่ไปแล้วในเกมนี้");
+    }
+    try {
+      const { getPrisma, authEnabled } = require("./src/db");
+      if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+      const prisma = await getPrisma();
+      const used = await consumeItem(prisma, ctx.player.id, EVENODD_ITEM_ID);
+      if (!used || !used.ok) return fail(ws, "ไม่มีไอเทมเลขคู่/คี่ในกระเป๋า");
+      ctx.player.evenOddArmed = true;
+      ctx.player.evenOddCharges = EVENODD_CHARGES;
+      broadcast(ctx.room);
+      send(ws, { t: "helperUsed", itemId: EVENODD_ITEM_ID, quantity: used.quantity });
+    } catch (err) {
+      return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+    }
+    return;
   }
+
+  if (itemId === SKIP_ITEM_ID) {
+    const phase = ctx.room.phase;
+    if (phase !== "play" && phase !== "snake" && phase !== "wheel") {
+      return fail(ws, "Skip Turn ใช้ได้เฉพาะระหว่างเกม");
+    }
+    if (phase === "wheel") {
+      if (ctx.player.skipTurnGuard) return fail(ws, "ติด Skip Turn อยู่แล้ว");
+      try {
+        const { getPrisma, authEnabled } = require("./src/db");
+        if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+        const prisma = await getPrisma();
+        const used = await consumeItem(prisma, ctx.player.id, SKIP_ITEM_ID);
+        if (!used || !used.ok) return fail(ws, "ไม่มี Skip Turn ในกระเป๋า");
+        ctx.player.skipTurnGuard = true;
+        broadcast(ctx.room);
+        send(ws, { t: "helperUsed", itemId: SKIP_ITEM_ID, quantity: used.quantity });
+      } catch (err) {
+        return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+      }
+      return;
+    }
+
+    const targetId = String((msg && msg.targetUserId) || "").trim();
+    if (!targetId) return fail(ws, "เลือกผู้เล่นที่จะข้ามเทิร์น");
+    const target = (ctx.room.players || []).find((p) => p && p.id === targetId);
+    if (!target || target.bot) return fail(ws, "ไม่พบผู้เล่น");
+
+    if (phase === "play") {
+      if (!(ctx.room.alive || []).includes(target.name)) return fail(ws, "ผู้เล่นคนนี้ออกจากรอบแล้ว");
+    }
+    if (phase === "snake") {
+      if (!ctx.room.snake || ctx.room.snake.status !== "playing") return fail(ws, "เกมงูยังไม่เริ่ม");
+    }
+
+    try {
+      const { getPrisma, authEnabled } = require("./src/db");
+      if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+      const prisma = await getPrisma();
+      const used = await consumeItem(prisma, ctx.player.id, SKIP_ITEM_ID);
+      if (!used || !used.ok) return fail(ws, "ไม่มี Skip Turn ในกระเป๋า");
+
+      if (phase === "play") {
+        if (currentName(ctx.room) === target.name) {
+          ctx.room.turn = ctx.room.alive.length ? (ctx.room.turn + 1) % ctx.room.alive.length : 0;
+          skipToConnected(ctx.room);
+          processPendingSkipPlay(ctx.room);
+          armTurnTimer(ctx.room);
+        } else {
+          target.skipNextTurn = true;
+        }
+      } else if (phase === "snake") {
+        const cur = snakeBridge.snakeCurrentSeat(ctx.room);
+        if (cur && cur.id === target.id) {
+          snakeBridge.skipSnakeTurn(ctx.room);
+          processPendingSkipSnake(ctx.room);
+          armTurnTimer(ctx.room);
+        } else {
+          target.skipNextTurn = true;
+        }
+      }
+
+      broadcast(ctx.room);
+      send(ws, {
+        t: "helperUsed",
+        itemId: SKIP_ITEM_ID,
+        quantity: used.quantity,
+        targetUserId: target.id,
+        targetName: target.name
+      });
+    } catch (err) {
+      return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+    }
+    return;
+  }
+
+  return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
 }
 function onRoomChat(ws, msg) {
   const ctx = seat(ws);

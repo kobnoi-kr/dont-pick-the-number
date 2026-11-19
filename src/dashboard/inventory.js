@@ -5,7 +5,10 @@ const { requireAuth } = require("../auth/middleware");
 const { getPrisma, authEnabled } = require("../db");
 
 const ANGEL_ITEM_ID = "item.angel";
+const SKIP_ITEM_ID = "item.skip";
+const EVENODD_ITEM_ID = "item.evenodd";
 const MAX_ITEM_QUANTITY = 99;
+const EVENODD_CHARGES = 5;
 
 const CATALOG_ITEMS = [
   {
@@ -19,6 +22,31 @@ const CATALOG_ITEMS = [
     shopPrice: 399,
     imageUrl: "/images/items/angel-card.png",
     effect: "angel_guard"
+  },
+  {
+    id: SKIP_ITEM_ID,
+    name: "Skip Turn",
+    description: "ข้ามเทิร์นระหว่างเกม — ใช้ได้ทุกโหมด",
+    details:
+      "ใช้ระหว่างเกม (ไม่ใช่ก่อนเริ่ม)\n" +
+      "เลขลับ / งูและบันได: เลือกข้ามเทิร์นตัวเองหรือคนอื่นได้\n" +
+      "วงล้อ: ละเว้นตัวเองเมื่อเลขตกตัวเอง\n" +
+      "ใช้คู่กับการ์ดนางฟ้าได้",
+    shopPrice: 299,
+    imageUrl: "/images/items/skip-turn.png",
+    effect: "skip_turn"
+  },
+  {
+    id: EVENODD_ITEM_ID,
+    name: "เลขคู่ / คี่",
+    description: "บังคับทอยคู่หรือคี่ในเกมงู 5 ครั้ง",
+    details:
+      "ใช้ก่อนเริ่มเกม · เฉพาะงูและบันได\n" +
+      "หลังใช้ จะมีปุ่ม คู่ / คี่ ระหว่างเกม\n" +
+      "จำกัด 5 ครั้งต่อ 1 เกม",
+    shopPrice: 249,
+    imageUrl: "/images/items/even-odd.png",
+    effect: "even_odd"
   }
 ];
 
@@ -621,6 +649,9 @@ async function handleAdminInventoryApi(req, res, pathname) {
 
 module.exports = {
   ANGEL_ITEM_ID,
+  SKIP_ITEM_ID,
+  EVENODD_ITEM_ID,
+  EVENODD_CHARGES,
   MAX_ITEM_QUANTITY,
   CATALOG_ITEMS,
   ensureInventoryCatalog,

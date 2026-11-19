@@ -19,4 +19,16 @@ function rollDice(rng) {
   return 1 + crypto.randomInt(0, 6);
 }
 
-module.exports = { rollDice };
+/** parity: "even" | "odd" | null — re-roll until matching (dice 1–6). */
+function rollDiceParity(rng, parity) {
+  const want = parity === "even" || parity === "odd" ? parity : null;
+  if (!want) return rollDice(rng);
+  for (let i = 0; i < 32; i++) {
+    const d = rollDice(rng);
+    if (want === "even" && d % 2 === 0) return d;
+    if (want === "odd" && d % 2 === 1) return d;
+  }
+  return want === "even" ? 2 : 1;
+}
+
+module.exports = { rollDice, rollDiceParity };

@@ -22,7 +22,7 @@ function tokenOffset(index, total) {
 /**
  * @param {{
  *   root: HTMLElement,
- *   onRoll?: () => void,
+ *   onRoll?: (parity?: 'even'|'odd'|null) => void,
  *   onToggleAuto?: () => void,
  *   onSnakeHit?: () => void,
  *   onYourTurn?: () => void
@@ -57,6 +57,11 @@ export function createLiveBoard(opts) {
         <div class="sl-dice-block">
           <div class="sl-dice" data-el="dice">${diceFaceHtml(null)}</div>
           <button type="button" class="sl-btn" data-el="roll">ทอยลูกเต๋า</button>
+          <div class="sl-parity hidden" data-el="parity">
+            <button type="button" class="sl-btn sl-btn-parity" data-el="even">คู่</button>
+            <button type="button" class="sl-btn sl-btn-parity" data-el="odd">คี่</button>
+            <span class="sl-parity-left" data-el="parityLeft"></span>
+          </div>
           <button type="button" class="sl-btn sl-btn-ghost" data-el="auto">เล่นอัตโนมัติ</button>
         </div>
         <div class="sl-banner" data-el="banner" role="status"></div>
@@ -73,6 +78,10 @@ export function createLiveBoard(opts) {
     players: root.querySelector('[data-el="players"]'),
     dice: root.querySelector('[data-el="dice"]'),
     roll: root.querySelector('[data-el="roll"]'),
+    parity: root.querySelector('[data-el="parity"]'),
+    even: root.querySelector('[data-el="even"]'),
+    odd: root.querySelector('[data-el="odd"]'),
+    parityLeft: root.querySelector('[data-el="parityLeft"]'),
     auto: root.querySelector('[data-el="auto"]'),
     map: root.querySelector('[data-el="map"]'),
     status: root.querySelector('[data-el="status"]'),
@@ -93,6 +102,7 @@ export function createLiveBoard(opts) {
   let spectator = false;
   let autoPlay = false;
   let animating = false;
+  let evenOddCharges = 0;
 
   function escAttr(s) {
     return String(s || "")
@@ -103,8 +113,20 @@ export function createLiveBoard(opts) {
 
   els.roll.addEventListener("click", () => {
     if (spectator || animating || autoPlay || els.roll.disabled) return;
-    if (onRoll) onRoll();
+    if (onRoll) onRoll(null);
   });
+  if (els.even) {
+    els.even.addEventListener("click", () => {
+      if (spectator || animating || autoPlay || els.even.disabled || evenOddCharges < 1) return;
+      if (onRoll) onRoll("even");
+    });
+  }
+  if (els.odd) {
+    els.odd.addEventListener("click", () => {
+      if (spectator || animating || autoPlay || els.odd.disabled || evenOddCharges < 1) return;
+      if (onRoll) onRoll("odd");
+    });
+  }
   if (els.auto) {
     els.auto.addEventListener("click", () => {
       if (spectator || !onToggleAuto) return;
@@ -291,6 +313,14 @@ export function createLiveBoard(opts) {
     else if (active) els.roll.textContent = `รอ ${active.username}`;
     else els.roll.textContent = "ทอยลูกเต๋า";
 
+    const showParity = !spectator && evenOddCharges > 0 && state.status === "playing";
+    if (els.parity) els.parity.classList.toggle("hidden", !showParity);
+    if (els.even) els.even.disabled = !can || evenOddCharges < 1;
+    if (els.odd) els.odd.disabled = !can || evenOddCharges < 1;
+    if (els.parityLeft) {
+      els.parityLeft.textContent = showParity ? `เหลือ ${evenOddCharges}/5` : "";
+    }
+
     if (els.auto) {
       const showAuto = !spectator && state.status === "playing";
       els.auto.classList.toggle("hidden", !showAuto);
@@ -377,6 +407,7 @@ export function createLiveBoard(opts) {
     youId = (meta && meta.youId) || youId || "";
     spectator = !!(meta && meta.spectator);
     autoPlay = !!(meta && meta.auto);
+    evenOddCharges = Math.max(0, Number(meta && meta.evenOddCharges) || 0);
     root.classList.toggle("is-spectator", spectator);
     root.classList.toggle("is-auto", autoPlay);
 

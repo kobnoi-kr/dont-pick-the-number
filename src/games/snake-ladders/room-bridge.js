@@ -11,6 +11,7 @@ const {
   roll,
   publicState,
   currentPlayer,
+  advanceTurn,
   MIN_PLAYERS,
   MAX_PLAYERS,
   listMaps,
@@ -118,7 +119,8 @@ function applySnakeRoll(room, userId, opts) {
     const seat = (room.players || []).find((p) => p && p.id === userId);
     const snakeCharges = seat ? Math.max(0, Number(seat.angelSnakeCharges) || 0) : 0;
     const ignoreSnakes = snakeCharges > 0;
-    const result = roll(room.snake, userId, Object.assign({}, opts || {}, { ignoreSnakes }));
+    const parity = opts && (opts.parity === "even" || opts.parity === "odd") ? opts.parity : null;
+    const result = roll(room.snake, userId, Object.assign({}, opts || {}, { ignoreSnakes, parity }));
     room.snake = result.state;
     if (result.move && result.move.angelBlockedSnake && seat) {
       seat.angelSnakeCharges = Math.max(0, snakeCharges - 1);
@@ -127,6 +129,13 @@ function applySnakeRoll(room, userId, opts) {
   } catch (err) {
     return { error: err };
   }
+}
+
+/** Skip the current snake seat without rolling. */
+function skipSnakeTurn(room) {
+  if (!room || !room.snake || room.snake.status !== "playing") return false;
+  room.snake = advanceTurn(room.snake);
+  return true;
 }
 
 function normalizeCat(cat) {
@@ -150,5 +159,6 @@ module.exports = {
   snapSnake,
   snakeYourTurn,
   snakeCurrentSeat,
-  applySnakeRoll
+  applySnakeRoll,
+  skipSnakeTurn
 };

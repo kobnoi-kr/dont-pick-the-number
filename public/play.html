@@ -407,7 +407,7 @@ html,body{background:#070b14}
       <h3 id="lobbyBagTitle">ไอเทม</h3>
       <button type="button" id="lobbyBagClose" class="textbtn" aria-label="ปิด">ปิด</button>
     </div>
-    <p class="sub bag-modal-sub">กระเป๋าของคุณ — เลือกไอเทมแล้วกดใช้ก่อนเริ่มเกม</p>
+    <p class="sub bag-modal-sub">กระเป๋าของคุณ — นางฟ้า/คู่-คี่ ใช้ก่อนเริ่ม · Skip Turn ใช้ระหว่างเกม</p>
     <div class="bag-layout">
       <div id="lobbyBagGrid" class="bag-grid"></div>
       <div id="lobbyBagPreview" class="bag-preview"><p class="empty">เลือกไอเทมเพื่อดูรายละเอียด</p></div>
@@ -423,6 +423,16 @@ html,body{background:#070b14}
     <p class="hint" id="inviteEmpty">ไม่มีเพื่อนออนไลน์</p>
     <button type="button" id="inviteModalClose" class="btn ghost">ปิด</button>
     <p id="inviteModalMsg" class="msg"></p>
+  </div>
+</div>
+<div id="skipTargetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="skipTargetTitle">
+  <div class="modal-card">
+    <h3 id="skipTargetTitle">ข้ามเทิร์นใคร?</h3>
+    <p class="sub">เลือกตัวเองหรือผู้เล่นอื่น — ใช้ Skip Turn 1 ชิ้น</p>
+    <ul class="invite-list" id="skipTargetList"></ul>
+    <p class="hint" id="skipTargetEmpty">ไม่มีผู้เล่นให้ข้าม</p>
+    <button type="button" id="skipTargetCancel" class="btn ghost">ยกเลิก</button>
+    <p id="skipTargetMsg" class="msg"></p>
   </div>
 </div>
 <div id="roomInviteBanner" class="invite-banner hidden" role="dialog" aria-live="polite" aria-labelledby="roomInviteTitle">
@@ -496,7 +506,7 @@ html,body{background:#070b14}
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=invite3";
+    s.src = "/js/game.js?v=items2";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

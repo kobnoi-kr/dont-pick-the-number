@@ -15,9 +15,11 @@ function ensureSnakeBoard(){
   if(!root||!window.NVSnake||typeof window.NVSnake.createLiveBoard!=="function") return null;
   snakeLive=window.NVSnake.createLiveBoard({
     root,
-    onRoll:()=>{
+    onRoll:(parity)=>{
       if(!onlineMode||spectating||myAuto||!myTurn) return;
-      send({t:"roll",commandId:"roll-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)});
+      const payload={t:"roll",commandId:"roll-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)};
+      if(parity==="even"||parity==="odd") payload.parity=parity;
+      send(payload);
     },
     onToggleAuto:()=>{
       if(!onlineMode||spectating||netPhase!=="snake") return;
@@ -37,11 +39,16 @@ function updateSnakeBoard(s){
     note.classList.toggle("hidden",!spectating);
     if(spectating) note.textContent="โหมด Spectator — ดูกระดานได้อย่างเดียว ไม่สามารถทอยได้";
   }
+  const me=(s&&s.players||playerMeta||[]).find(p=>p&&p.id===(s&&s.youId||myId));
+  const evenOddCharges=s&&s.youEvenOddCharges!=null
+    ?Number(s.youEvenOddCharges)||0
+    :(me?Number(me.evenOddCharges)||0:0);
   return Promise.resolve(
     board.update(s&&s.snake?s.snake:null,{
       youId:s&&s.youId||myId||"",
       spectator:!!spectating,
-      auto:!!myAuto
+      auto:!!myAuto,
+      evenOddCharges
     })
   ).then(()=>{
     if(seq!==snakeSnapSeq) return;
@@ -1474,9 +1481,37 @@ async function refreshAngelQty(){
 function paintLobbyAngel(){
   const btn=$("lobbyItemBtn");
   if(!btn) return;
-  const show=onlineMode&&netPhase==="lobby"&&!spectating;
+  const inLobby=netPhase==="lobby";
+  const inGame=netPhase==="play"||netPhase==="snake"||netPhase==="wheel";
+  const show=onlineMode&&!spectating&&canUseFriends()&&(inLobby||inGame);
   btn.classList.toggle("hidden",!show);
   if(!show) closeLobbyBagModal();
+  else if($("lobbyBagModal")&&!$("lobbyBagModal").classList.contains("hidden")) paintLobbyBagModal();
+}
+function helperCanUseInBag(item){
+  if(!item||!(Number(item.quantity)>0)||spinning||spectating) return false;
+  if(item.id==="item.angel"){
+    return netPhase==="lobby"&&!angelArmed();
+  }
+  if(item.id==="item.evenodd"){
+    const me=playerMeta.find(p=>p&&p.id===myId);
+    const armed=!!(me&&((me.evenOddCharges|0)>0));
+    return netPhase==="lobby"&&gameCat==="snake"&&!armed;
+  }
+  if(item.id==="item.skip"){
+    if(netPhase==="wheel"){
+      const me=playerMeta.find(p=>p&&p.id===myId);
+      return !!(me&&!me.skipTurnGuard);
+    }
+    return netPhase==="play"||netPhase==="snake";
+  }
+  return false;
+}
+function helperUseLabel(item){
+  if(!item) return "ใช้";
+  if(item.id==="item.angel"||item.id==="item.evenodd") return "ใช้ก่อนเริ่ม";
+  if(item.id==="item.skip") return netPhase==="wheel"?"ติด Skip (ตัวเอง)":"ใช้ข้ามเทิร์น";
+  return "ใช้";
 }
 function openLobbyBagModal(){
   const modal=$("lobbyBagModal");
@@ -1530,23 +1565,35 @@ function paintLobbyBagModal(){
     preview.innerHTML=`<p class="empty">เลือกไอเทมเพื่อดูรายละเอียด</p>`;
     return;
   }
-  const armed=sel.id==="item.angel"&&angelArmed();
-  const canUse=sel.id==="item.angel"&&!armed&&(Number(sel.quantity)||0)>0&&!spinning&&netPhase==="lobby";
+  const armedAngel=sel.id==="item.angel"&&angelArmed();
+  const me=playerMeta.find(p=>p&&p.id===myId);
+  const armedEven=sel.id==="item.evenodd"&&!!(me&&((me.evenOddCharges|0)>0));
+  const armedSkip=sel.id==="item.skip"&&netPhase==="wheel"&&!!(me&&me.skipTurnGuard);
+  const armed=armedAngel||armedEven||armedSkip;
+  const canUse=helperCanUseInBag(sel);
+  const statusNote=armedAngel||armedEven||armedSkip
+    ?" · ใช้แล้วในเกมนี้"
+    :(sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake"||netPhase==="wheel")?" · ใช้ระหว่างเกม":"");
   preview.innerHTML=`
     <div class="bag-preview-stage">${bagThumbHtml(sel)}</div>
     <div class="bag-preview-meta">
       <span class="bag-pill">ไอเทม</span>
       <b>${escBag(sel.name||"")}</b>
       ${bagItemDescHtml(sel)}
-      <p class="tiny muted" style="margin:8px 0 0">ในกระเป๋า: <b>×${Number(sel.quantity)||0}</b>${armed?" · ใช้แล้วในเกมนี้":""}</p>
+      <p class="tiny muted" style="margin:8px 0 0">ในกระเป๋า: <b>×${Number(sel.quantity)||0}</b>${statusNote}</p>
     </div>
     <div class="bag-preview-actions">
-      <button type="button" class="btn" id="lobbyBagUseBtn" ${canUse?"":"disabled"}>${armed?"ใช้แล้ว":"ใช้ก่อนเริ่ม"}</button>
+      <button type="button" class="btn" id="lobbyBagUseBtn" ${canUse?"":"disabled"}>${armed?"ใช้แล้ว":helperUseLabel(sel)}</button>
     </div>`;
   const useBtn=$("lobbyBagUseBtn");
   if(useBtn){
     useBtn.onclick=()=>{
       if(!canUse) return;
+      if(sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake")){
+        closeLobbyBagModal();
+        openSkipTargetModal();
+        return;
+      }
       send({t:"useHelper",itemId:sel.id});
       const msg=$("lobbyBagMsg");
       if(msg){ msg.textContent="กำลังใช้…"; msg.classList.add("ok"); }
@@ -2789,6 +2836,66 @@ function closeInviteModal(){
   const modal=$("inviteModal");
   if(modal) modal.classList.add("hidden");
 }
+function openSkipTargetModal(){
+  if(spectating||(netPhase!=="play"&&netPhase!=="snake")) return;
+  const modal=$("skipTargetModal");
+  if(!modal) return;
+  const tip=$("skipTargetMsg");
+  if(tip) tip.textContent="";
+  modal.classList.remove("hidden");
+  renderSkipTargetList();
+}
+function closeSkipTargetModal(){
+  const modal=$("skipTargetModal");
+  if(modal) modal.classList.add("hidden");
+}
+function renderSkipTargetList(){
+  const box=$("skipTargetList");
+  const empty=$("skipTargetEmpty");
+  if(!box) return;
+  box.textContent="";
+  let list=[];
+  if(netPhase==="play"){
+    list=(playerMeta||[]).filter(p=>p&&p.id&&!p.bot&&(alive||[]).includes(p.name));
+  }else if(netPhase==="snake"){
+    list=(playerMeta||[]).filter(p=>p&&p.id&&!p.bot);
+  }
+  if(empty) empty.classList.toggle("hidden", list.length>0);
+  list.forEach(u=>{
+    const li=document.createElement("li");
+    const meta=document.createElement("div");
+    meta.className="meta";
+    if(u.avatarUrl){
+      const img=document.createElement("img");
+      img.src=u.avatarUrl;
+      img.alt="";
+      img.referrerPolicy="no-referrer";
+      meta.appendChild(img);
+    }else{
+      const ph=document.createElement("span");
+      ph.className="ph";
+      ph.textContent=(u.name||"?").slice(0,1).toUpperCase();
+      meta.appendChild(ph);
+    }
+    const nm=document.createElement("span");
+    nm.className="name";
+    nm.textContent=(u.name||"")+(u.id===myId?" (คุณ)":"")+(u.skipNextTurn?" · จะข้าม":"");
+    meta.appendChild(nm);
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="btn";
+    btn.textContent="ข้าม";
+    btn.disabled=!!u.skipNextTurn;
+    btn.onclick=()=>{
+      send({t:"useHelper",itemId:"item.skip",targetUserId:u.id});
+      const tipEl=$("skipTargetMsg");
+      if(tipEl) tipEl.textContent="กำลังใช้…";
+      btn.disabled=true;
+    };
+    li.append(meta,btn);
+    box.appendChild(li);
+  });
+}
 function renderInviteFriendList(){
   const box=$("inviteFriendList");
   const empty=$("inviteEmpty");
@@ -3385,8 +3492,15 @@ function applySnap(s){
       renderWheelInfo();
       const last=wheelLog[wheelLog.length-1];
       if(last){
-        $("wheelResult").textContent=last.who+" โดนเลข "+last.n+" ออกจากเกม";
-        $("wheelResult").classList.add("bad");
+        let landMsg=last.who
+          ?(last.skipSaved
+            ?last.who+" โดนเลข "+last.n+" แต่ Skip Turn ละเว้นไว้"
+            :last.angelSaved
+              ?last.who+" โดนเลข "+last.n+" แต่การ์ดนางฟ้าช่วยไว้"
+              :last.who+" โดนเลข "+last.n+" ออกจากเกม")
+          :"ออกเลข "+last.n;
+        $("wheelResult").textContent=landMsg;
+        $("wheelResult").classList.toggle("bad", !!(last.who&&!last.skipSaved&&!last.angelSaved));
         $("numRead").textContent=String(last.n);
         $("numRead").classList.add("hit");
       }else{
@@ -3838,6 +3952,11 @@ function connect(){
         const bagMsg=$("lobbyBagMsg");
         if(bagMsg){ bagMsg.textContent="ใช้ไอเทมแล้ว"; bagMsg.classList.add("ok"); }
       }
+      if(msg.itemId==="item.skip"){
+        closeSkipTargetModal();
+        const tip=$("skipTargetMsg");
+        if(tip) tip.textContent="";
+      }
       refreshAngelQty();
     }else if(msg.t==="roomChat"){
       if(msg.fromId){
@@ -4144,6 +4263,10 @@ async function bootOnline(){
   const inviteModal=$("inviteModal");
   if(inviteClose) inviteClose.onclick=()=>closeInviteModal();
   if(inviteModal) inviteModal.addEventListener("click",e=>{ if(e.target===inviteModal) closeInviteModal(); });
+  const skipCancel=$("skipTargetCancel");
+  const skipModal=$("skipTargetModal");
+  if(skipCancel) skipCancel.onclick=()=>closeSkipTargetModal();
+  if(skipModal) skipModal.addEventListener("click",e=>{ if(e.target===skipModal) closeSkipTargetModal(); });
   paintInviteBtn();
   const acceptBtn=$("roomInviteAccept");
   const declineBtn=$("roomInviteDecline");
