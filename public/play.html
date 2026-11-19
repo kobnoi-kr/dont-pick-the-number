@@ -104,17 +104,7 @@ html,body{background:#070b14}
         <div class="lobby-actions-card">
           <div id="gameModeHint" class="lobby-rules">ตั้งค่าเกมแล้วสุ่มลำดับก่อนเริ่ม</div>
           <p id="winner" class="winner lobby-status" aria-live="polite">รอผู้เล่นเข้าห้อง</p>
-          <div class="lobby-helper-card hidden" id="lobbyHelperCard">
-            <div class="lobby-helper-row">
-              <img class="lobby-helper-thumb" src="/images/items/angel-card.png" alt="" width="40" height="56" decoding="async">
-              <div class="lobby-helper-meta">
-                <b>การ์ดนางฟ้า</b>
-                <span class="tiny muted" id="lobbyAngelQty">ในกระเป๋า: —</span>
-              </div>
-            </div>
-            <button type="button" class="btn sm" id="useAngelBtn" disabled>ใช้ก่อนเริ่ม</button>
-            <p class="tiny muted" id="lobbyAngelHint" style="margin:6px 0 0">กันแพ้ 1 ครั้ง · เลข/วงล้อ: ชุบต่อได้ถ้าเลข&gt;1 และผู้เล่นอื่น&gt;2 · ไม่ครบเงื่อนไข=เสมอ · งูกันไหล 3 ครั้ง</p>
-          </div>
+          <button type="button" class="btn ghost hidden" id="lobbyItemBtn">ไอเทม</button>
           <button type="button" class="btn" id="spin" disabled>สุ่มลำดับ (วงล้อ)</button>
           <button type="button" class="btn lobby-start" id="lobbyStartBtn" disabled>เริ่มเกม</button>
           <button type="button" class="btn ghost" id="addBot">เพิ่มบอท</button>
@@ -410,6 +400,20 @@ html,body{background:#070b14}
     </form>
     <button type="button" id="codeModalCancel" class="btn ghost">ยกเลิก</button>
     <p id="codeModalMsg" class="msg"></p>
+  </div>
+</div>
+<div id="lobbyBagModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lobbyBagTitle">
+  <div class="modal-card bag-modal-card">
+    <div class="bag-modal-head">
+      <h3 id="lobbyBagTitle">ไอเทม</h3>
+      <button type="button" id="lobbyBagClose" class="textbtn" aria-label="ปิด">ปิด</button>
+    </div>
+    <p class="sub bag-modal-sub">กระเป๋าของคุณ — เลือกไอเทมแล้วกดใช้ก่อนเริ่มเกม</p>
+    <div class="bag-layout">
+      <div id="lobbyBagGrid" class="bag-grid"></div>
+      <div id="lobbyBagPreview" class="bag-preview"><p class="empty">เลือกไอเทมเพื่อดูรายละเอียด</p></div>
+    </div>
+    <p id="lobbyBagMsg" class="msg"></p>
   </div>
 </div>
 <div id="inviteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">

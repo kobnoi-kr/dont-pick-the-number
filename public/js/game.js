@@ -1430,43 +1430,123 @@ function renderPlayers(){
   paintRoomChatBar();
   paintRoomChatTargets();
 }
-let angelQtyCache=null;
+let lobbyBagItems=null;
+let lobbyBagSelectedId="";
+function escBag(s){
+  return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function bagItemDescHtml(item){
+  const short=String((item&&item.description)||"").trim();
+  const details=String((item&&item.details)||"").trim();
+  if(!short&&!details) return "";
+  if(!details) return `<p class="item-desc-short">${escBag(short)}</p>`;
+  const lines=details.split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>`<li>${escBag(l)}</li>`).join("");
+  return `<p class="item-desc-short">${escBag(short)}</p>
+    <details class="item-desc-more"><summary>รายละเอียดเพิ่มเติม</summary><ul class="item-desc-list">${lines}</ul></details>`;
+}
+function bagThumbHtml(item){
+  const url=item&&item.imageUrl?String(item.imageUrl):"";
+  return url
+    ?`<img class="bag-card-img" src="${escBag(url)}" alt="" decoding="async">`
+    :`<div class="bag-card-img bag-card-fallback" aria-hidden="true">?</div>`;
+}
+function angelArmed(){
+  const me=playerMeta.find(p=>p&&p.id===myId);
+  return !!(me&&me.angelGuard);
+}
 async function refreshAngelQty(){
   if(!onlineMode||spectating) return;
   try{
     const res=await fetch("/api/v1/inventory/me",{method:"GET",credentials:"same-origin",headers:{Accept:"application/json"}});
     const data=await res.json().catch(()=>({}));
-    if(!res.ok){ angelQtyCache=0; }
-    else{
-      const items=Array.isArray(data.items)?data.items:[];
-      const hit=items.find(it=>it&&it.id==="item.angel");
-      angelQtyCache=hit?Number(hit.quantity)||0:0;
-    }
-  }catch(_){ angelQtyCache=0; }
+    lobbyBagItems=res.ok&&Array.isArray(data.items)?data.items:[];
+  }catch(_){ lobbyBagItems=[]; }
+  if(lobbyBagSelectedId&&!(lobbyBagItems||[]).some(it=>it&&it.id===lobbyBagSelectedId)){
+    lobbyBagSelectedId="";
+  }
   paintLobbyAngel();
+  if($("lobbyBagModal")&&!$("lobbyBagModal").classList.contains("hidden")) paintLobbyBagModal();
 }
 function paintLobbyAngel(){
-  const card=$("lobbyHelperCard");
-  const qtyEl=$("lobbyAngelQty");
-  const btn=$("useAngelBtn");
-  const hint=$("lobbyAngelHint");
-  if(!card) return;
+  const btn=$("lobbyItemBtn");
+  if(!btn) return;
   const show=onlineMode&&netPhase==="lobby"&&!spectating;
-  card.classList.toggle("hidden",!show);
-  if(!show) return;
-  const me=playerMeta.find(p=>p&&p.id===myId);
-  const armed=!!(me&&me.angelGuard);
-  const qty=angelQtyCache==null?"…":String(angelQtyCache);
-  if(qtyEl) qtyEl.textContent=armed?"ติดการ์ดแล้ว · ในกระเป๋า: "+qty:"ในกระเป๋า: "+qty;
-  if(hint){
-    hint.textContent=armed
-      ?"พร้อมกันแพ้ 1 ครั้งในเกมนี้"
-      :"กันแพ้ 1 ครั้ง · เลข/วงล้อชุบต่อได้ถ้าเลข>1 และผู้เล่นอื่น>2 · ไม่ครบ=เสมอ · งูกันไหล 3 ครั้ง";
+  btn.classList.toggle("hidden",!show);
+  if(!show) closeLobbyBagModal();
+}
+function openLobbyBagModal(){
+  const modal=$("lobbyBagModal");
+  if(!modal) return;
+  const msg=$("lobbyBagMsg");
+  if(msg){ msg.textContent=""; msg.classList.remove("ok"); }
+  modal.classList.remove("hidden");
+  if(lobbyBagItems==null) refreshAngelQty();
+  else paintLobbyBagModal();
+}
+function closeLobbyBagModal(){
+  const modal=$("lobbyBagModal");
+  if(modal) modal.classList.add("hidden");
+}
+function paintLobbyBagModal(){
+  const grid=$("lobbyBagGrid");
+  const preview=$("lobbyBagPreview");
+  if(!grid||!preview) return;
+  const items=Array.isArray(lobbyBagItems)?lobbyBagItems:[];
+  if(lobbyBagItems==null){
+    grid.innerHTML=`<div class="loading">Loading…</div>`;
+    preview.innerHTML=`<p class="empty">กำลังโหลดกระเป๋า…</p>`;
+    return;
   }
-  if(btn){
-    const canUse=!armed&&Number(angelQtyCache)>0&&!spinning;
-    btn.disabled=!canUse;
-    btn.textContent=armed?"ใช้แล้ว":"ใช้ก่อนเริ่ม";
+  if(!items.length){
+    grid.innerHTML=`<p class="empty">ยังไม่มีไอเทม — ซื้อได้ที่ Shop</p>`;
+    preview.innerHTML=`<p class="empty">ยังไม่มีไอเทมในกระเป๋า</p>`;
+    return;
+  }
+  if(!lobbyBagSelectedId||!items.some(it=>it.id===lobbyBagSelectedId)){
+    lobbyBagSelectedId=items[0].id;
+  }
+  const sel=items.find(it=>it.id===lobbyBagSelectedId)||null;
+  grid.innerHTML=items.map(it=>{
+    const on=it.id===lobbyBagSelectedId;
+    const qty=Number(it.quantity)||0;
+    return `<button type="button" class="bag-card${on?" on":""}" data-bag-id="${escBag(it.id)}">
+      <div class="bag-card-thumb">${bagThumbHtml(it)}</div>
+      <span class="bag-pill">ไอเทม</span>
+      <b>${escBag(it.name||"")}</b>
+      <span class="bag-qty-tag">×${qty}</span>
+    </button>`;
+  }).join("");
+  grid.querySelectorAll("[data-bag-id]").forEach(btn=>{
+    btn.onclick=()=>{
+      lobbyBagSelectedId=btn.getAttribute("data-bag-id")||"";
+      paintLobbyBagModal();
+    };
+  });
+  if(!sel){
+    preview.innerHTML=`<p class="empty">เลือกไอเทมเพื่อดูรายละเอียด</p>`;
+    return;
+  }
+  const armed=sel.id==="item.angel"&&angelArmed();
+  const canUse=sel.id==="item.angel"&&!armed&&(Number(sel.quantity)||0)>0&&!spinning&&netPhase==="lobby";
+  preview.innerHTML=`
+    <div class="bag-preview-stage">${bagThumbHtml(sel)}</div>
+    <div class="bag-preview-meta">
+      <span class="bag-pill">ไอเทม</span>
+      <b>${escBag(sel.name||"")}</b>
+      ${bagItemDescHtml(sel)}
+      <p class="tiny muted" style="margin:8px 0 0">ในกระเป๋า: <b>×${Number(sel.quantity)||0}</b>${armed?" · ใช้แล้วในเกมนี้":""}</p>
+    </div>
+    <div class="bag-preview-actions">
+      <button type="button" class="btn" id="lobbyBagUseBtn" ${canUse?"":"disabled"}>${armed?"ใช้แล้ว":"ใช้ก่อนเริ่ม"}</button>
+    </div>`;
+  const useBtn=$("lobbyBagUseBtn");
+  if(useBtn){
+    useBtn.onclick=()=>{
+      if(!canUse) return;
+      send({t:"useHelper",itemId:sel.id});
+      const msg=$("lobbyBagMsg");
+      if(msg){ msg.textContent="กำลังใช้…"; msg.classList.add("ok"); }
+    };
   }
 }
 function paintAutoButtons(){
@@ -3715,8 +3795,17 @@ function connect(){
     }else if(msg.t==="inviteDeclined"){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
     }else if(msg.t==="helperUsed"){
-      if(msg.itemId==="item.angel"&&msg.quantity!=null) angelQtyCache=Number(msg.quantity)||0;
+      if(msg.itemId&&msg.quantity!=null&&Array.isArray(lobbyBagItems)){
+        const hit=lobbyBagItems.find(it=>it&&it.id===msg.itemId);
+        if(hit) hit.quantity=Number(msg.quantity)||0;
+      }
       paintLobbyAngel();
+      if($("lobbyBagModal")&&!$("lobbyBagModal").classList.contains("hidden")){
+        paintLobbyBagModal();
+        const bagMsg=$("lobbyBagMsg");
+        if(bagMsg){ bagMsg.textContent="ใช้ไอเทมแล้ว"; bagMsg.classList.add("ok"); }
+      }
+      refreshAngelQty();
     }else if(msg.t==="roomChat"){
       if(msg.fromId){
         const meta={
@@ -3796,10 +3885,14 @@ async function bootOnline(){
   if($("spin")) $("spin").onclick=()=>{ if(isHost()) send({t:"spinOrder"}); };
   if($("clearScores")) $("clearScores").onclick=()=>{ if(isHost()) send({t:"clear"}); };
   if($("lobbyStartBtn")) $("lobbyStartBtn").onclick=()=>requestStartGame();
-  if($("useAngelBtn")) $("useAngelBtn").onclick=()=>{
+  if($("lobbyItemBtn")) $("lobbyItemBtn").onclick=()=>{
     if(!onlineMode||netPhase!=="lobby"||spectating) return;
-    send({t:"useHelper",itemId:"item.angel"});
+    openLobbyBagModal();
   };
+  if($("lobbyBagClose")) $("lobbyBagClose").onclick=()=>closeLobbyBagModal();
+  if($("lobbyBagModal")) $("lobbyBagModal").addEventListener("click",e=>{
+    if(e.target===$("lobbyBagModal")) closeLobbyBagModal();
+  });
   if($("settingsGearBtn")) $("settingsGearBtn").onclick=()=>openSettingsModal();
   if($("settingsClose")) $("settingsClose").onclick=()=>closeSettingsModal();
   if($("settingsModal")) $("settingsModal").addEventListener("click",e=>{ if(e.target===$("settingsModal")) closeSettingsModal(); });
