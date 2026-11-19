@@ -511,11 +511,11 @@ html,body{background:#070b14}
     // If auth/session works, drop any stale ban overlay left after unban.
     clearBanNotice();
     loadAnnouncementToasts().catch(() => {});
-    const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=baghide1");
+    const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb1");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=guide3";
+    s.src = "/js/game.js?v=bomb1";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

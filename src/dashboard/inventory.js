@@ -7,6 +7,7 @@ const { getPrisma, authEnabled } = require("../db");
 const ANGEL_ITEM_ID = "item.angel";
 const SKIP_ITEM_ID = "item.skip";
 const EVENODD_ITEM_ID = "item.evenodd";
+const BOMB_ITEM_ID = "item.bomb";
 const MAX_ITEM_QUANTITY = 99;
 const EVENODD_CHARGES = 5;
 
@@ -18,7 +19,7 @@ const CATALOG_ITEMS = [
     details:
       "หาเลขลับ: เลขลับเหลือ ≤1 แล้วโดน → เสมอ · เลขลับเหลือ >1 และผู้เล่นอื่น >2 → ชุบเล่นต่อ\n" +
       "วงล้อ: เลือกเลข ≤1 แล้วโดน → เสมอ · เลือกเลข >1 และผู้เล่น >2 → ชุบเล่นต่อ\n" +
-      "บันไดงู: กันไหลลงงู 3 ครั้ง",
+      "บันไดงู: กันไหลลงงู 3 ครั้ง · กันระเบิด 1 ครั้งต่อชาร์จ",
     shopPrice: 399,
     imageUrl: "/images/items/angel-card.png",
     effect: "angel_guard"
@@ -47,6 +48,19 @@ const CATALOG_ITEMS = [
     shopPrice: 299,
     imageUrl: "/images/items/even-odd.png",
     effect: "even_odd"
+  },
+  {
+    id: BOMB_ITEM_ID,
+    name: "วางบอม",
+    description: "วางระเบิดบนกระดานงู ช่อง 1–99",
+    details:
+      "ใช้ระหว่างเกม · เฉพาะบันไดงู\n" +
+      "เลือกช่อง 1–99 เพื่อวางบอม\n" +
+      "ผู้เล่นที่เหยียบจะสุ่ม: ถอยหลังสูงสุด 6 ช่อง (ไม่ต่ำกว่า 1) หรือ Pause สูงสุด 3 เทิร์น\n" +
+      "มีการ์ดนางฟ้า (ชาร์จงูเหลือ) → โมฆะระเบิด / ระเบิดหาย / ใช้ชาร์จ 1",
+    shopPrice: 299,
+    imageUrl: "/images/items/bomb.png",
+    effect: "place_bomb"
   }
 ];
 
@@ -782,6 +796,7 @@ module.exports = {
   ANGEL_ITEM_ID,
   SKIP_ITEM_ID,
   EVENODD_ITEM_ID,
+  BOMB_ITEM_ID,
   EVENODD_CHARGES,
   MAX_ITEM_QUANTITY,
   CATALOG_ITEMS,

@@ -46,6 +46,10 @@ export function createLiveBoard(opts) {
             <svg class="sl-paths" data-el="paths" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
             <div class="sl-tokens" data-el="tokens" aria-hidden="true"></div>
           </div>
+          <div class="sl-bomb-pick-bar hidden" data-el="bombPickBar" role="status">
+            <span>เลือกช่องวางบอม (1–99)</span>
+            <button type="button" class="sl-btn sl-btn-compact sl-btn-ghost" data-el="bombPickCancel">ยกเลิก</button>
+          </div>
         </div>
       </div>
       <aside class="sl-panel" data-el="panel">
@@ -110,7 +114,9 @@ export function createLiveBoard(opts) {
     turn: root.querySelector('[data-el="turn"]'),
     log: root.querySelector('[data-el="log"]'),
     banner: root.querySelector('[data-el="banner"]'),
-    wait: root.querySelector('[data-el="wait"]')
+    wait: root.querySelector('[data-el="wait"]'),
+    bombPickBar: root.querySelector('[data-el="bombPickBar"]'),
+    bombPickCancel: root.querySelector('[data-el="bombPickCancel"]')
   };
 
   /** @type {Map<string, HTMLElement>} */
@@ -118,6 +124,10 @@ export function createLiveBoard(opts) {
   let builtFor = "";
   let tokenSig = "";
   let lastMoveKey = "";
+  let bombPickMode = false;
+  /** @type {null | { onPick?: (cell:number)=>void, onCancel?: ()=>void }} */
+  let bombPickHandlers = null;
+  let lastBombsSig = "";
   let lastSession = "";
   let lastTurnSoundKey = "";
   let youId = "";
@@ -229,6 +239,63 @@ export function createLiveBoard(opts) {
     }
     els.paths.innerHTML = renderBoardPaths(state.ladders, state.snakes, size);
     builtFor = `${size}:${(state.ladders || []).length}:${(state.snakes || []).length}`;
+    lastBombsSig = "";
+    els.board.querySelectorAll(".sl-cell").forEach((cellEl) => {
+      cellEl.addEventListener("click", () => {
+        if (!bombPickMode || !bombPickHandlers || typeof bombPickHandlers.onPick !== "function") return;
+        const n = Math.floor(Number(cellEl.dataset.cell) || 0);
+        const sizeNow = Number(state.boardSize) || 100;
+        if (n < 1 || n >= sizeNow) return;
+        bombPickHandlers.onPick(n);
+      });
+    });
+  }
+
+  function syncBombMarkers(bombs) {
+    const list = Array.isArray(bombs) ? bombs : [];
+    const sig = list.map((b) => String(b && b.cell)).sort().join(",");
+    if (sig === lastBombsSig) return;
+    lastBombsSig = sig;
+    const want = new Set(list.map((b) => String(Math.floor(Number(b && b.cell) || 0))));
+    els.board.querySelectorAll(".sl-cell").forEach((cellEl) => {
+      const id = String(cellEl.dataset.cell || "");
+      const on = want.has(id);
+      cellEl.classList.toggle("has-bomb", on);
+      let mark = cellEl.querySelector(".sl-bomb-mark");
+      if (on) {
+        if (!mark) {
+          mark = document.createElement("img");
+          mark.className = "sl-bomb-mark";
+          mark.src = "/images/items/bomb-cell.png";
+          mark.alt = "BOMB";
+          mark.draggable = false;
+          cellEl.appendChild(mark);
+        }
+      } else if (mark) {
+        mark.remove();
+      }
+    });
+  }
+
+  function setBombPickMode(enabled, handlers) {
+    bombPickMode = !!enabled;
+    bombPickHandlers = bombPickMode ? handlers || null : null;
+    root.classList.toggle("is-bomb-pick", bombPickMode);
+    if (els.bombPickBar) els.bombPickBar.classList.toggle("hidden", !bombPickMode);
+    els.board.querySelectorAll(".sl-cell").forEach((cellEl) => {
+      const n = Math.floor(Number(cellEl.dataset.cell) || 0);
+      const size = Number(els.board.children.length) || 100;
+      const pickable = bombPickMode && n >= 1 && n < size;
+      cellEl.classList.toggle("is-bomb-pickable", pickable);
+    });
+  }
+
+  if (els.bombPickCancel) {
+    els.bombPickCancel.addEventListener("click", () => {
+      const cancel = bombPickHandlers && bombPickHandlers.onCancel;
+      setBombPickMode(false);
+      if (typeof cancel === "function") cancel();
+    });
   }
 
   function ensureTokens(players) {
@@ -453,6 +520,8 @@ export function createLiveBoard(opts) {
       node.classList.add("is-lit", "is-lit-portal", "is-lit-ladder");
     } else if (kind === "snake") {
       node.classList.add("is-lit", "is-lit-portal", "is-lit-snake");
+    } else if (kind === "bomb_back") {
+      node.classList.add("is-lit", "is-lit-bomb");
     } else {
       node.classList.add("is-lit");
     }
@@ -550,6 +619,10 @@ export function createLiveBoard(opts) {
           msg += state.lastMove.portal.type === "ladder" ? " 🪜" : " 🐍";
           msg += ` → ${state.lastMove.final}`;
         }
+        const bomb = state.lastMove.bombEffect;
+        if (bomb && bomb.type === "angel") msg += " · 👼 โมฆะบอม";
+        else if (bomb && bomb.type === "back") msg += ` · 💣 ถอย ${bomb.steps} ช่อง`;
+        else if (bomb && bomb.type === "pause") msg += ` · 💣 Pause ${bomb.turns} เทิร์น`;
         log(msg);
       }
       await animateLastMove(state);
@@ -557,6 +630,7 @@ export function createLiveBoard(opts) {
       lastMoveKey = moveKey;
     }
 
+    syncBombMarkers(state.bombs);
     placeTokens(state, null);
     renderPanel(state);
 
@@ -576,14 +650,16 @@ export function createLiveBoard(opts) {
   }
 
   function destroy() {
+    setBombPickMode(false);
     root.innerHTML = "";
     tokenEls.clear();
     tokenSig = "";
     lastTurnSoundKey = "";
+    lastBombsSig = "";
     try {
       delete document.body.dataset.snakeMap;
     } catch (_) {}
   }
 
-  return { update, destroy, root };
+  return { update, destroy, root, setBombPickMode };
 }

@@ -460,9 +460,11 @@ function clearAngelGuards(room) {
     player.angelSnakeCharges = 0;
     player.skipTurnGuard = false;
     player.skipNextTurn = false;
+    player.bombPauseTurns = 0;
     player.evenOddCharges = 0;
     player.evenOddArmed = false;
   });
+  if (room) room.snakeBombs = [];
 }
 function blankRoom(code, visibility, host) {
   return {
@@ -618,7 +620,8 @@ function snap(room, player, opts) {
       angelGuard: !!(item.angelGuard || (item.angelSnakeCharges | 0) > 0),
       angelSnakeCharges: Math.max(0, Number(item.angelSnakeCharges) || 0),
       skipTurnGuard: !!item.skipTurnGuard,
-      skipNextTurn: !!item.skipNextTurn,
+      skipNextTurn: !!item.skipNextTurn || Math.max(0, Number(item.bombPauseTurns) || 0) > 0,
+      bombPauseTurns: Math.max(0, Number(item.bombPauseTurns) || 0),
       evenOddCharges: Math.max(0, Number(item.evenOddCharges) || 0),
       champion: Array.isArray(room.lastWinners) && room.lastWinners.includes(item.id)
     })),
@@ -820,15 +823,24 @@ function processPendingSkipPlay(room) {
   if (changed) skipToConnected(room);
   return changed;
 }
-/** If current snake seat has skipNextTurn, advance without rolling. */
+/** If current snake seat has skipNextTurn / bomb pause, advance without rolling. */
 function processPendingSkipSnake(room) {
   if (room.phase !== "snake" || !room.snake || room.snake.status !== "playing") return false;
   let changed = false;
   let hops = 0;
   const n = (room.players || []).length || 1;
-  while (hops < n) {
+  while (hops < n * 3) {
     const seat = snakeBridge.snakeCurrentSeat(room);
-    if (!seat || !seat.skipNextTurn) break;
+    if (!seat) break;
+    const pauseLeft = Math.max(0, Number(seat.bombPauseTurns) || 0);
+    if (pauseLeft > 0) {
+      seat.bombPauseTurns = pauseLeft - 1;
+      if (!snakeBridge.skipSnakeTurn(room)) break;
+      changed = true;
+      hops += 1;
+      continue;
+    }
+    if (!seat.skipNextTurn) break;
     seat.skipNextTurn = false;
     if (!snakeBridge.skipSnakeTurn(room)) break;
     changed = true;
@@ -2191,6 +2203,7 @@ async function onUseHelper(ws, msg) {
     ANGEL_ITEM_ID,
     SKIP_ITEM_ID,
     EVENODD_ITEM_ID,
+    BOMB_ITEM_ID,
     EVENODD_CHARGES
   } = require("./src/dashboard/inventory");
 
@@ -2308,6 +2321,44 @@ async function onUseHelper(ws, msg) {
         targetName: target.name
       });
     } catch (err) {
+      return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+    }
+    return;
+  }
+
+  if (itemId === BOMB_ITEM_ID) {
+    if (ctx.room.phase !== "snake") return fail(ws, "วางบอมใช้ได้เฉพาะเกมบันไดงู");
+    if (!ctx.room.snake || ctx.room.snake.status !== "playing") {
+      return fail(ws, "เกมงูยังไม่เริ่ม");
+    }
+    const cell = Math.floor(Number(msg && msg.cell) || 0);
+    try {
+      snakeBridge.assertBombCell(ctx.room, cell);
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "invalid_bomb_cell") return fail(ws, "เลือกช่อง 1–99 เท่านั้น");
+      if (code === "bomb_cell_taken") return fail(ws, "ช่องนี้มีบอมอยู่แล้ว");
+      if (code === "snake_not_playing") return fail(ws, "เกมงูยังไม่เริ่ม");
+      return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+    }
+    try {
+      const { getPrisma, authEnabled } = require("./src/db");
+      if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+      const prisma = await getPrisma();
+      const used = await consumeItem(prisma, ctx.player.id, BOMB_ITEM_ID);
+      if (!used || !used.ok) return fail(ws, "ไม่มีวางบอมในกระเป๋า");
+      const placed = snakeBridge.placeSnakeBomb(ctx.room, cell, ctx.player.id);
+      broadcast(ctx.room);
+      send(ws, {
+        t: "helperUsed",
+        itemId: BOMB_ITEM_ID,
+        quantity: used.quantity,
+        cell: placed.cell
+      });
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "invalid_bomb_cell") return fail(ws, "เลือกช่อง 1–99 เท่านั้น");
+      if (code === "bomb_cell_taken") return fail(ws, "ช่องนี้มีบอมอยู่แล้ว");
       return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
     }
     return;

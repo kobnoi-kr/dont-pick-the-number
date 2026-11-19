@@ -567,6 +567,62 @@ body.snake-play #snakeGame .sl-board-frame {
     0 0 18px rgba(244, 63, 94, 0.8);
 }
 
+.sl-cell.is-lit-bomb::before {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 220, 120, 0.95) 0%, rgba(249, 115, 22, 0.75) 48%, rgba(220, 38, 38, 0.35) 78%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(251, 146, 60, 0.95),
+    0 0 18px rgba(239, 68, 68, 0.85);
+}
+
+.sl-cell.has-bomb {
+  z-index: 2;
+}
+
+.sl-bomb-mark {
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  width: 42%;
+  height: 42%;
+  max-width: 28px;
+  max-height: 28px;
+  object-fit: contain;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.sl-bomb-pick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(249, 115, 22, 0.55);
+  background: rgba(40, 16, 10, 0.92);
+  color: #fed7aa;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sl-bomb-pick-bar.hidden {
+  display: none !important;
+}
+
+.sl-live.is-bomb-pick .sl-cell.is-bomb-pickable {
+  cursor: pointer;
+  outline: 2px solid rgba(249, 115, 22, 0.35);
+  outline-offset: -2px;
+}
+
+.sl-live.is-bomb-pick .sl-cell.is-bomb-pickable:hover {
+  outline-color: rgba(251, 146, 60, 0.95);
+  box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.35);
+}
+
 @keyframes sl-cell-lit-pulse {
   from {
     opacity: 0.55;

@@ -46,6 +46,7 @@ function pauseFlashActive(pid){
 function playerHasPause(metaOrId){
   if(metaOrId&&typeof metaOrId==="object"){
     if(metaOrId.skipNextTurn) return true;
+    if(Math.max(0, Number(metaOrId.bombPauseTurns)||0)>0) return true;
     return pauseFlashActive(metaOrId.id||metaOrId.userId);
   }
   return pauseFlashActive(metaOrId);
@@ -1617,13 +1618,31 @@ function helperCanUseInBag(item){
     }
     return netPhase==="play"||netPhase==="snake";
   }
+  if(item.id==="item.bomb"){
+    return netPhase==="snake"&&gameCat==="snake";
+  }
   return false;
 }
 function helperUseLabel(item){
   if(!item) return "ใช้";
   if(item.id==="item.angel"||item.id==="item.evenodd") return "ใช้ก่อนเริ่ม";
   if(item.id==="item.skip") return netPhase==="wheel"?"ติด Skip (ตัวเอง)":"ใช้ข้ามเทิร์น";
+  if(item.id==="item.bomb") return "วางบนกระดาน";
   return "ใช้";
+}
+function startBombCellPick(){
+  const board=ensureSnakeBoard();
+  if(!board||typeof board.setBombPickMode!=="function") return;
+  closeLobbyBagModal();
+  board.setBombPickMode(true,{
+    onPick(cell){
+      board.setBombPickMode(false);
+      send({t:"useHelper",itemId:"item.bomb",cell});
+      const msg=$("lobbyBagMsg");
+      if(msg){ msg.textContent="กำลังวางบอม…"; msg.classList.add("ok"); }
+    },
+    onCancel(){}
+  });
 }
 function openLobbyBagModal(){
   const modal=$("lobbyBagModal");
@@ -1685,7 +1704,11 @@ function paintLobbyBagModal(){
   const canUse=helperCanUseInBag(sel);
   const statusNote=armedAngel||armedEven||armedSkip
     ?" · ใช้แล้วในเกมนี้"
-    :(sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake"||netPhase==="wheel")?" · ใช้ระหว่างเกม":"");
+    :sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake"||netPhase==="wheel")
+      ?" · ใช้ระหว่างเกม"
+      :sel.id==="item.bomb"&&netPhase==="snake"
+        ?" · ใช้ระหว่างเกม · บันไดงู"
+        :"";
   preview.innerHTML=`
     <div class="bag-preview-stage">${bagThumbHtml(sel)}</div>
     <div class="bag-preview-meta">
@@ -1704,6 +1727,10 @@ function paintLobbyBagModal(){
       if(sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake")){
         closeLobbyBagModal();
         openSkipTargetModal();
+        return;
+      }
+      if(sel.id==="item.bomb"){
+        startBombCellPick();
         return;
       }
       send({t:"useHelper",itemId:sel.id});
@@ -3204,7 +3231,7 @@ const GUIDE={
 <li>ซื้อไอเทมได้ที่ <b>Shop</b> ด้วย pts · ดูประวัติได้ที่ <b>ประวัติ pts</b></li>
 <li>ในล็อบบี้กด <b>ไอเทม</b> เพื่อเปิดกระเป๋า</li>
 <li><b>การ์ดนางฟ้า</b> · <b>เลขคู่/คี่</b> ใช้ก่อนเริ่มเกม</li>
-<li><b>Skip Turn</b> ใช้ระหว่างเกม (มีปุ่มกระเป๋าในเกม)</li>
+<li><b>Skip Turn</b> · <b>วางบอม</b> ใช้ระหว่างเกม (มีปุ่มกระเป๋าในเกม)</li>
 </ul></section>
 <section><h4>ห้องส่วนตัว</h4><ul>
 <li>โชว์ในล็อบบี้ออนไลน์แบบล็อก 🔒 แต่ไม่โชว์รหัส</li>
@@ -3231,12 +3258,13 @@ const GUIDE={
 <section><h4>บันไดงู</h4><ul>
 <li>ทอยลูกเต๋าปีนบันได เลี่ยงงู · ถึงช่อง 100 ชนะ · ผู้เล่น 2–6 คน</li>
 <li>เลือกแมพได้ตอนตั้งค่าห้อง (งู/บันไดอยู่คนละตำแหน่ง)</li>
-<li><b>การ์ดนางฟ้า</b> กันไหลลงงูได้ 3 ครั้งต่อเกม</li>
+<li><b>การ์ดนางฟ้า</b> กันไหลลงงูได้ 3 ครั้งต่อเกม · กันระเบิดได้ (ใช้ชาร์จ 1)</li>
 <li><b>เลขคู่/คี่</b> ใช้ก่อนเริ่ม → ได้ปุ่มบังคับทอยคู่หรือคี่ 5 ครั้งต่อเกม</li>
 <li><b>Skip Turn</b> ข้ามเทิร์นตัวเองหรือคนอื่นได้ระหว่างเกม</li>
+<li><b>วางบอม</b> เลือกช่อง 1–99 · เหยียบแล้วสุ่มถอยสูงสุด 6 หรือ Pause สูงสุด 3 เทิร์น</li>
 </ul></section>
 <section><h4>เคล็ดลับ</h4><ul>
-<li>ระหว่างเกมกดปุ่ม <b>🎒 ไอเทม</b> เพื่อใช้ Skip Turn จากกระเป๋า</li>
+<li>ระหว่างเกมกดปุ่ม <b>🎒 ไอเทม</b> เพื่อใช้ Skip Turn / วางบอม จากกระเป๋า</li>
 <li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบเล่นแทนคุณได้</li>
 <li>ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมซ้ายบน · คู่มืออยู่ปุ่มมุมขวาบน</li>
@@ -4090,6 +4118,11 @@ function connect(){
         const tip=$("skipTargetMsg");
         if(tip) tip.textContent="";
         if(msg.targetUserId) flashPlayerPause(msg.targetUserId);
+      }
+      if(msg.itemId==="item.bomb"){
+        const board=ensureSnakeBoard();
+        if(board&&typeof board.setBombPickMode==="function") board.setBombPickMode(false);
+        closeLobbyBagModal();
       }
       refreshAngelQty();
     }else if(msg.t==="roomChat"){
