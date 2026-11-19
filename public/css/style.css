@@ -468,6 +468,21 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .lobby-rules{color:var(--muted);font-size:.88rem;line-height:1.45;margin-bottom:8px}
 .lobby-status{font-size:1.05rem;min-height:1.4em;margin:4px 0 10px}
 .lobby-actions-card .btn{margin-top:8px}
+.lobby-helper-card{
+  margin-top:8px;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(251,191,36,.28);
+  background:rgba(251,191,36,.06);
+}
+.lobby-helper-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.lobby-helper-thumb{
+  width:40px;height:56px;object-fit:contain;border-radius:6px;
+  background:rgba(8,12,24,.45);flex:0 0 auto;
+}
+.lobby-helper-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+.lobby-helper-meta b{font-size:.92rem}
+.lobby-slot.has-angel .lobby-slot-status{color:#fbbf24}
 .btn.lobby-start{background:linear-gradient(135deg,#6366f1,#2563eb)}
 .btn.danger-outline{border-color:#7f1d1d!important;color:#fca5a5!important}
 .btn.danger-outline:hover{background:rgba(127,29,29,.2)}

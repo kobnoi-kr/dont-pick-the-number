@@ -988,6 +988,17 @@ async function handleCosmeticsApi(req, res, pathname) {
         if (ta !== tb) return ta - tb;
         return (a.shopPrice || 0) - (b.shopPrice || 0);
       });
+    let helpers = [];
+    let helperQty = {};
+    try {
+      const { listShopItems, loadUserInventory } = require("./inventory");
+      helpers = await listShopItems(prisma);
+      if (soft && soft.user && soft.user.id) {
+        helperQty = (await loadUserInventory(prisma, soft.user.id)).quantities || {};
+      }
+    } catch (err) {
+      console.warn("[shop] helpers unavailable", err && err.message);
+    }
     sendJson(res, 200, {
       comingSoon: !ptsCfg.enabled,
       enabled: !!ptsCfg.enabled,
@@ -995,6 +1006,7 @@ async function handleCosmeticsApi(req, res, pathname) {
       shopPts,
       ownedIds,
       items: sorted,
+      helpers: helpers.map((h) => Object.assign({}, h, { quantity: helperQty[h.id] || 0 })),
       services: [
         {
           id: "service.username",

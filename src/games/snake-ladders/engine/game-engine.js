@@ -131,7 +131,9 @@ function roll(state, userId, opts) {
 
   const dice = rollDice(opts && opts.rng);
   const player = currentPlayer(state);
-  const move = resolveMove(state.board, player.position, dice);
+  const move = resolveMove(state.board, player.position, dice, {
+    ignoreSnakes: !!(opts && opts.ignoreSnakes)
+  });
 
   const players = state.players.map((p) => {
     if (p.userId !== player.userId) return p;

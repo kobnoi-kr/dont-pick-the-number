@@ -86,6 +86,7 @@ model User {
   dmSent              DirectMessage[]    @relation("DmSender")
   dmReceived          DirectMessage[]    @relation("DmRecipient")
   cosmetics           UserCosmetic[]
+  inventoryItems      UserInventoryItem[]
   equippedTitle       Cosmetic?          @relation("EquippedTitle", fields: [equippedTitleId], references: [id], onDelete: SetNull)
   equippedFrame       Cosmetic?          @relation("EquippedFrame", fields: [equippedFrameId], references: [id], onDelete: SetNull)
   equippedEffect      Cosmetic?          @relation("EquippedEffect", fields: [equippedEffectId], references: [id], onDelete: SetNull)
@@ -125,6 +126,36 @@ model UserCosmetic {
   @@unique([userId, cosmeticId])
   @@index([cosmeticId])
   @@map("user_cosmetics")
+}
+
+/// Consumable helper items (e.g. angel card) sold in Shop.
+model InventoryItem {
+  id          String   @id @db.VarChar(64)
+  name        String   @db.VarChar(64)
+  description String?  @db.VarChar(255)
+  shopPrice   Int?     @map("shop_price")
+  imageUrl    String?  @map("image_url") @db.VarChar(255)
+  effect      String?  @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  owners UserInventoryItem[]
+
+  @@map("inventory_items")
+}
+
+model UserInventoryItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  itemId    String   @map("item_id") @db.VarChar(64)
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@index([itemId])
+  @@map("user_inventory_items")
 }
 
 model RankingRewardGrant {

@@ -1182,8 +1182,10 @@ function renderLobbyGrid(){
     status.className="lobby-slot-status"+(ready?" on":"");
     const statusBits=[];
     if(hostFlag) statusBits.push("HOST");
+    if(meta&&meta.angelGuard) statusBits.push("ANGEL");
     if(!statusBits.length) statusBits.push(meta&&meta.bot?"BOT":(connected?"ONLINE":"OFFLINE"));
     status.textContent=statusBits.join(" · ");
+    if(meta&&meta.angelGuard) slot.classList.add("has-angel");
     const nm=document.createElement("div");
     nm.className="lobby-slot-name";
     nm.textContent=name;
@@ -1422,10 +1424,50 @@ function renderPlayers(){
     const addBtn=$("addForm").querySelector("button");
     if(addBtn) addBtn.disabled=spinning||wheelSpinning||locked;
   }
+  paintLobbyAngel();
   paintAutoButtons();
   paintRoomChatBubbles();
   paintRoomChatBar();
   paintRoomChatTargets();
+}
+let angelQtyCache=null;
+async function refreshAngelQty(){
+  if(!onlineMode||spectating) return;
+  try{
+    const res=await fetch("/api/v1/inventory/me",{method:"GET",credentials:"same-origin",headers:{Accept:"application/json"}});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){ angelQtyCache=0; }
+    else{
+      const items=Array.isArray(data.items)?data.items:[];
+      const hit=items.find(it=>it&&it.id==="item.angel");
+      angelQtyCache=hit?Number(hit.quantity)||0:0;
+    }
+  }catch(_){ angelQtyCache=0; }
+  paintLobbyAngel();
+}
+function paintLobbyAngel(){
+  const card=$("lobbyHelperCard");
+  const qtyEl=$("lobbyAngelQty");
+  const btn=$("useAngelBtn");
+  const hint=$("lobbyAngelHint");
+  if(!card) return;
+  const show=onlineMode&&netPhase==="lobby"&&!spectating;
+  card.classList.toggle("hidden",!show);
+  if(!show) return;
+  const me=playerMeta.find(p=>p&&p.id===myId);
+  const armed=!!(me&&me.angelGuard);
+  const qty=angelQtyCache==null?"…":String(angelQtyCache);
+  if(qtyEl) qtyEl.textContent=armed?"ติดการ์ดแล้ว · ในกระเป๋า: "+qty:"ในกระเป๋า: "+qty;
+  if(hint){
+    hint.textContent=armed
+      ?"พร้อมกันแพ้ 1 ครั้งในเกมนี้"
+      :"กันแพ้ 1 ครั้ง · หาเลข/วงล้อกันระเบิด · งูกันไหล";
+  }
+  if(btn){
+    const canUse=!armed&&Number(angelQtyCache)>0&&!spinning;
+    btn.disabled=!canUse;
+    btn.textContent=armed?"ใช้แล้ว":"ใช้ก่อนเริ่ม";
+  }
 }
 function paintAutoButtons(){
   const show=onlineMode&&(netPhase==="play"||netPhase==="pick"||netPhase==="snake")&&!spectating;
@@ -3594,6 +3636,7 @@ function connect(){
     try{ msg=JSON.parse(e.data); }catch(err){ return; }
     if(!msg||typeof msg!=="object") return;
     if(msg.t==="state"){
+      if(msg.phase==="lobby") refreshAngelQty();
       if(msg.spectator){ spectating=true; applySpectatorUi(); }
       onSnap(msg);
     }
@@ -3671,6 +3714,9 @@ function connect(){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนรับคำเชิญแล้ว";
     }else if(msg.t==="inviteDeclined"){
       if(!$("inviteModal").classList.contains("hidden")) $("inviteModalMsg").textContent="เพื่อนปฏิเสธคำเชิญ";
+    }else if(msg.t==="helperUsed"){
+      if(msg.itemId==="item.angel"&&msg.quantity!=null) angelQtyCache=Number(msg.quantity)||0;
+      paintLobbyAngel();
     }else if(msg.t==="roomChat"){
       if(msg.fromId){
         const meta={
@@ -3750,6 +3796,10 @@ async function bootOnline(){
   if($("spin")) $("spin").onclick=()=>{ if(isHost()) send({t:"spinOrder"}); };
   if($("clearScores")) $("clearScores").onclick=()=>{ if(isHost()) send({t:"clear"}); };
   if($("lobbyStartBtn")) $("lobbyStartBtn").onclick=()=>requestStartGame();
+  if($("useAngelBtn")) $("useAngelBtn").onclick=()=>{
+    if(!onlineMode||netPhase!=="lobby"||spectating) return;
+    send({t:"useHelper",itemId:"item.angel"});
+  };
   if($("settingsGearBtn")) $("settingsGearBtn").onclick=()=>openSettingsModal();
   if($("settingsClose")) $("settingsClose").onclick=()=>closeSettingsModal();
   if($("settingsModal")) $("settingsModal").addEventListener("click",e=>{ if(e.target===$("settingsModal")) closeSettingsModal(); });

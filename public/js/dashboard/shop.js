@@ -7,7 +7,14 @@ function esc(s) {
   );
 }
 
-const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์", service: "บริการ" };
+const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์", service: "บริการ", helper: "ไอเทม" };
+
+function helperThumb(item) {
+  const url = item && item.imageUrl ? String(item.imageUrl) : "";
+  return url
+    ? `<img class="shop-helper-img" src="${esc(url)}" alt="${esc(item.name)}" decoding="async" loading="lazy">`
+    : `<div class="shop-helper-img shop-helper-fallback" aria-hidden="true">?</div>`;
+}
 const TIERS = [
   { id: "all", label: "ทั้งหมด" },
   { id: "common", label: "Common" },
@@ -108,6 +115,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
   let tierFilter = "all";
   let items = [];
   let services = [];
+  let helpers = [];
   let owned = new Set();
   let shopPts = (user && user.shopPts) || 0;
   let enabled = true;
@@ -118,7 +126,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
     <section class="page-head">
       <div>
         <h2 style="margin:0">Shop</h2>
-        <p class="muted" style="margin:6px 0 0">ซื้อกรอบ · เอฟเฟกต์ · เปลี่ยน username ด้วย pts</p>
+        <p class="muted" style="margin:6px 0 0">ซื้อกรอบ · เอฟเฟกต์ · ไอเทมช่วยเล่น · เปลี่ยน username ด้วย pts</p>
       </div>
       <div class="shop-balance" id="shopBalance" title="คะแนน Shop">0 pts</div>
     </section>
@@ -138,13 +146,13 @@ export async function renderShop(root, { user, onSaved } = {}) {
   }
 
   function catalogAll() {
-    return items.concat(services);
+    return items.concat(helpers, services);
   }
 
   function filtered() {
     return catalogAll().filter((it) => {
       if (kindFilter !== "all" && it.kind !== kindFilter) return false;
-      if (it.kind === "service") return true;
+      if (it.kind === "service" || it.kind === "helper") return true;
       if (tierFilter !== "all" && (it.tier || "common") !== tierFilter) return false;
       return true;
     });
@@ -189,6 +197,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
               <button type="button" class="shop-tab${kindFilter === "all" ? " on" : ""}" data-kind="all">ทั้งหมด</button>
               <button type="button" class="shop-tab${kindFilter === "frame" ? " on" : ""}" data-kind="frame">กรอบ</button>
               <button type="button" class="shop-tab${kindFilter === "effect" ? " on" : ""}" data-kind="effect">เอฟเฟกต์</button>
+              <button type="button" class="shop-tab${kindFilter === "helper" ? " on" : ""}" data-kind="helper">ไอเทม</button>
               <button type="button" class="shop-tab${kindFilter === "service" ? " on" : ""}" data-kind="service">บริการ</button>
             </div>
             <div class="shop-tier-tabs" role="tablist" aria-label="Tier">
@@ -205,24 +214,32 @@ export async function renderShop(root, { user, onSaved } = {}) {
               ? `<div class="shop-grid">${list
                   .map((it) => {
                     const isService = it.kind === "service";
-                    const isOwned = !isService && owned.has(it.id);
+                    const isHelper = it.kind === "helper";
+                    const isOwned = !isService && !isHelper && owned.has(it.id);
                     const on = sel && sel.id === it.id;
                     const letter = ((user && (user.displayName || user.username)) || "N").slice(0, 1);
-                    return `<button type="button" class="shop-card tier-${esc(it.tier || "common")}${
-                      on ? " on" : ""
-                    }${isOwned ? " owned" : ""}" data-pick="${esc(it.id)}">
+                    return `<button type="button" class="shop-card tier-${esc(
+                      isHelper ? "rare" : it.tier || "common"
+                    )}${on ? " on" : ""}${isOwned ? " owned" : ""}" data-pick="${esc(it.id)}">
                       ${
                         isService
                           ? serviceThumb()
-                          : `<div class="shop-card-thumb">${thumb(it, letter)}</div>`
+                          : isHelper
+                            ? `<div class="shop-card-thumb">${helperThumb(it)}</div>`
+                            : `<div class="shop-card-thumb">${thumb(it, letter)}</div>`
                       }
-                      <span class="shop-tier-pill tier-${esc(it.tier || "common")}">${esc(
-                        isService ? "บริการ" : it.tierLabel || it.tier || "Common"
+                      <span class="shop-tier-pill tier-${esc(isHelper ? "rare" : it.tier || "common")}">${esc(
+                        isService ? "บริการ" : isHelper ? "ไอเทม" : it.tierLabel || it.tier || "Common"
                       )}</span>
                       <span class="tiny">${esc(KIND_LABEL[it.kind] || it.kind)}</span>
                       <b>${esc(it.name)}</b>
                       <span class="shop-price">${it.shopPrice != null ? it.shopPrice + " pts" : "—"}</span>
                       ${isOwned ? `<span class="shop-owned-tag">มีแล้ว</span>` : ""}
+                      ${
+                        isHelper && Number(it.quantity) > 0
+                          ? `<span class="shop-owned-tag">มี ×${Number(it.quantity)}</span>`
+                          : ""
+                      }
                     </button>`;
                   })
                   .join("")}</div>`
@@ -249,6 +266,25 @@ export async function renderShop(root, { user, onSaved } = {}) {
                           <div class="shop-preview-actions" style="margin-top:12px">
                             <button type="button" class="btn" id="shopRenameBtn">จ่าย ${sel.shopPrice} pts แล้วเปลี่ยน</button>
                           </div>`
+                   }
+                 </div>`
+              : sel && sel.kind === "helper"
+                ? `<div class="shop-preview-stage">${helperThumb(sel)}</div>
+                 <div class="shop-preview-meta">
+                   <span class="shop-tier-pill tier-rare">ไอเทม</span>
+                   <b>${esc(sel.name)}</b>
+                   <p class="muted tiny" style="margin:6px 0 0">${esc(sel.description || "")}</p>
+                   <p class="tiny muted" style="margin:8px 0 0">ในกระเป๋า: <b>×${Number(sel.quantity) || 0}</b></p>
+                   <p class="shop-preview-price">${sel.shopPrice != null ? sel.shopPrice + " pts" : "—"}</p>
+                 </div>
+                 <div class="shop-preview-actions">
+                   ${
+                     guest
+                       ? `<p class="tiny muted">เข้าสู่ระบบด้วยบัญชีจริงเพื่อซื้อ</p>`
+                       : `<button type="button" class="btn" id="shopBuyBtn">ซื้อ ${
+                           sel.shopPrice != null ? sel.shopPrice + " pts" : ""
+                         }</button>
+                          <a class="btn ghost" href="#inventory">ดูกระเป๋า</a>`
                    }
                  </div>`
               : sel
@@ -302,17 +338,20 @@ export async function renderShop(root, { user, onSaved } = {}) {
       buy.onclick = async () => {
         if (!confirm(`ซื้อ「${sel.name}」ราคา ${sel.shopPrice} pts?`)) return;
         buy.disabled = true;
-        const { res, data } = await api("/api/v1/shop/buy", {
+        const isHelper = sel.kind === "helper";
+        const { res, data } = await api(isHelper ? "/api/v1/inventory/buy" : "/api/v1/shop/buy", {
           method: "POST",
-          body: JSON.stringify({ cosmeticId: sel.id })
+          body: JSON.stringify(isHelper ? { itemId: sel.id } : { cosmeticId: sel.id })
         });
         if (!res.ok) {
           const err = (data && data.error) || "";
           setMsg(
             err === "insufficient_pts"
               ? "pts ไม่พอ"
-              : err === "already_owned"
-                ? "มีของชิ้นนี้อยู่แล้ว"
+              : err === "max_quantity"
+                ? "มีไอเทมนี้ครบจำนวนสูงสุดแล้ว"
+                : err === "already_owned"
+                  ? "มีของชิ้นนี้อยู่แล้ว"
                 : err === "registered_required"
                   ? "ต้องเข้าสู่ระบบด้วยบัญชีจริง"
                   : err === "shop_disabled"
@@ -328,8 +367,13 @@ export async function renderShop(root, { user, onSaved } = {}) {
         try {
           paintUser(user);
         } catch (_) {}
-        owned.add(sel.id);
-        setMsg("ซื้อสำเร็จ — ไปสวมใส่ได้ที่เมนู ตกแต่ง", true);
+        if (isHelper) {
+          sel.quantity = data.quantity != null ? data.quantity : (Number(sel.quantity) || 0) + 1;
+          setMsg("ซื้อสำเร็จ — ไอเทมอยู่ในเมนู กระเป๋า", true);
+        } else {
+          owned.add(sel.id);
+          setMsg("ซื้อสำเร็จ — ไปสวมใส่ได้ที่เมนู ตกแต่ง", true);
+        }
         paint();
       };
     }
@@ -402,6 +446,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
   enabled = data.enabled !== false && !data.comingSoon;
   items = Array.isArray(data.items) ? data.items : [];
   services = Array.isArray(data.services) ? data.services : [];
+  helpers = Array.isArray(data.helpers) ? data.helpers : [];
   owned = new Set(Array.isArray(data.ownedIds) ? data.ownedIds : []);
   shopPts = data.shopPts != null ? data.shopPts : shopPts;
   if (user) user.shopPts = shopPts;

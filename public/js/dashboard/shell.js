@@ -14,6 +14,7 @@ const TITLES = {
   friends: "Friends",
   decorate: "ตกแต่งโปรไฟล์",
   shop: "Shop",
+  inventory: "กระเป๋า",
   profile: "Profile & Settings"
 };
 

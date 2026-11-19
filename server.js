@@ -452,6 +452,11 @@ function clearTurnTimer(room) {
   room.turnTimer = null;
   room.turnUntil = 0;
 }
+function clearAngelGuards(room) {
+  (room.players || []).forEach((player) => {
+    if (player) player.angelGuard = false;
+  });
+}
 function blankRoom(code, visibility, host) {
   return {
     code,
@@ -603,9 +608,11 @@ function snap(room, player, opts) {
       host: item.id === room.hostId,
       bot: !!item.bot,
       auto: !!(item.auto || item.bot),
+      angelGuard: !!item.angelGuard,
       champion: Array.isArray(room.lastWinners) && room.lastWinners.includes(item.id)
     })),
     youAuto: !!(player && (player.auto || player.bot)),
+    youAngelGuard: !!(player && player.angelGuard),
     order: room.order,
     alive: room.alive,
     roundOrder: room.roundOrder,
@@ -616,7 +623,12 @@ function snap(room, player, opts) {
     hi: room.hi,
     secretsLeft: room.secrets.length,
     secretTotal: room.secretTotal,
-    picked: room.picked.map((item) => ({ n: item.n, who: item.who, hit: !!item.hit })),
+    picked: room.picked.map((item) => ({
+      n: item.n,
+      who: item.who,
+      hit: !!item.hit,
+      angelSaved: !!item.angelSaved
+    })),
     revealed: room.phase === "over" && room.cat !== "wheel" && room.cat !== "snake" ? room.secretAll.slice() : [],
     wheelMin: room.wheelMin,
     wheelMax: room.wheelMax,
@@ -837,18 +849,52 @@ function openPickNums(room) {
   for (let n = room.wheelMin; n <= room.wheelMax; n++) if (!used.has(n)) nums.push(n);
   return nums;
 }
+function finishRoundDraw(room, savedWho) {
+  clearTurnTimer(room);
+  room.phase = "over";
+  room.activeSpin = null;
+  room.over = {
+    title: "เสมอ — การ์ดนางฟ้าช่วยไว้!",
+    note: (savedWho || "ผู้เล่น") + " โดนเลขลับแต่ไม่มีผู้ชนะ",
+    outOrder: [],
+    secretLabel: "เลขลับคือ",
+    secretText: room.secretAll.join(", "),
+    many: room.secretAll.length > 3,
+    hist: null,
+    again: "เล่นอีกครั้ง",
+    reset: false,
+    winners: [],
+    winTarget: room.winTarget,
+    mode: "",
+    draw: true
+  };
+}
+
 function applyPlayChoice(room, who, n) {
   const hit = room.secrets.includes(n);
-  room.picked.push({ n, who, hit });
+  const player = byName(room, who);
+  const angelSave = !!(hit && player && player.angelGuard);
+  room.picked.push({ n, who, hit, angelSaved: angelSave });
   if (hit) {
     room.secrets = room.secrets.filter((secret) => secret !== n);
-    const index = room.alive.indexOf(who);
-    if (index >= 0) room.alive.splice(index, 1);
-    room.turn = room.alive.length ? index % room.alive.length : 0;
-    if (room.alive.length <= 1 || !room.secrets.length) {
-      clearTurnTimer(room);
-      finishRound(room);
-      return;
+    if (angelSave) {
+      player.angelGuard = false;
+      // โดนเลขลับแล้วเกมจะจบ → เสมอ ไม่มีผู้ชนะ
+      if (!room.secrets.length || room.alive.length <= 1) {
+        clearTurnTimer(room);
+        finishRoundDraw(room, who);
+        return;
+      }
+      // เกมยังไปต่อได้ — กันระเบิดครั้งนี้ ไม่ถูกคัดออก
+    } else {
+      const index = room.alive.indexOf(who);
+      if (index >= 0) room.alive.splice(index, 1);
+      room.turn = room.alive.length ? index % room.alive.length : 0;
+      if (room.alive.length <= 1 || !room.secrets.length) {
+        clearTurnTimer(room);
+        finishRound(room);
+        return;
+      }
     }
   } else if (room.alive.length) {
     room.turn = (room.turn + 1) % room.alive.length;
@@ -1042,9 +1088,15 @@ function applyLand(room, plan) {
   if (!Array.isArray(room.wheelGone)) room.wheelGone = [];
   if (!room.wheelGone.includes(plan.n)) room.wheelGone.push(plan.n);
   if (plan.hit) {
-    const index = room.wheelAlive.indexOf(plan.owner);
-    if (index >= 0) room.wheelAlive.splice(index, 1);
-    room.wheelLog.push({ n: plan.n, who: plan.owner });
+    const player = byName(room, plan.owner);
+    if (player && player.angelGuard) {
+      player.angelGuard = false;
+      room.wheelLog.push({ n: plan.n, who: plan.owner, angelSaved: true });
+    } else {
+      const index = room.wheelAlive.indexOf(plan.owner);
+      if (index >= 0) room.wheelAlive.splice(index, 1);
+      room.wheelLog.push({ n: plan.n, who: plan.owner });
+    }
   } else {
     room.wheelLog.push({ n: plan.n, who: "" });
   }
@@ -1146,6 +1198,7 @@ function dropFromRound(room, name) {
     if (room.wheelOrder.length < 2) {
       cancelSpin(room);
       room.phase = "lobby";
+      clearAngelGuards(room);
     }
   } else if (room.phase === "wheel") {
     cancelSpin(room);
@@ -1459,6 +1512,7 @@ function onAgain(ws) {
     room.phase = "lobby";
     room.order = [];
     room.over = null;
+    clearAngelGuards(room);
     if (resetScores) clearPoints(room);
     broadcast(room);
     return fail(ws, "ผู้เล่นในห้องเปลี่ยน กลับไปสุ่มลำดับใหม่");
@@ -1503,6 +1557,7 @@ function onAbort(ws) {
   room.picks = {};
   room.pickCursor = 0;
   snakeBridge.clearSnake(room);
+  clearAngelGuards(room);
   room.players.forEach((player) => {
     if (!isBot(player)) player.auto = false;
   });
@@ -2010,7 +2065,34 @@ function onMessage(ws, raw) {
   if (msg.t === "auto") return onAuto(ws, msg);
   if (msg.t === "rename") return onRename(ws, msg);
   if (msg.t === "renameRoom") return onRenameRoom(ws, msg);
+  if (msg.t === "useHelper") return void onUseHelper(ws, msg);
   if (msg.t === "roomChat") return onRoomChat(ws, msg);
+}
+
+async function onUseHelper(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || !ctx.player || !ctx.room) return fail(ws, "เข้าห้องก่อน");
+  if (ctx.room.phase !== "lobby") return fail(ws, "ใช้ไอเทมได้เฉพาะก่อนเริ่มเกม");
+  if (ctx.player.bot) return fail(ws, "บอทใช้ไอเทมไม่ได้");
+  if (!ws.accountType || ws.accountType !== "registered") {
+    return fail(ws, "เข้าสู่ระบบก่อนถึงจะใช้ไอเทมได้");
+  }
+  const itemId = String((msg && msg.itemId) || "").trim();
+  if (itemId !== "item.angel") return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
+  if (ctx.player.angelGuard) return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
+  try {
+    const { getPrisma, authEnabled } = require("./src/db");
+    if (!authEnabled()) return fail(ws, "ระบบไอเทมยังไม่พร้อม");
+    const prisma = await getPrisma();
+    const { consumeItem, ANGEL_ITEM_ID } = require("./src/dashboard/inventory");
+    const used = await consumeItem(prisma, ctx.player.id, itemId || ANGEL_ITEM_ID);
+    if (!used || !used.ok) return fail(ws, "ไม่มีการ์ดนางฟ้าในกระเป๋า");
+    ctx.player.angelGuard = true;
+    broadcast(ctx.room);
+    send(ws, { t: "helperUsed", itemId: ANGEL_ITEM_ID, quantity: used.quantity });
+  } catch (err) {
+    return fail(ws, "ใช้ไอเทมไม่สำเร็จ");
+  }
 }
 function onRoomChat(ws, msg) {
   const ctx = seat(ws);
@@ -2762,6 +2844,15 @@ server.listen(PORT, HOST, () => {
   console.log("Auth V1: " + (authEnabled() ? "on" : "off"));
   const base = String(process.env.APP_BASE_URL || "").replace(/\/$/, "");
   if (base) console.log("โดเมนสาธารณะ: " + base);
+  if (authEnabled()) {
+    getPrisma()
+      .then((prisma) => {
+        const { ensureInventoryCatalog } = require("./src/dashboard/inventory");
+        return ensureInventoryCatalog(prisma, { force: true });
+      })
+      .then(() => console.log("Inventory catalog: ready"))
+      .catch((err) => console.warn("[inventory] catalog ensure failed:", err && err.message ? err.message : err));
+  }
 });
 
 if (ADMIN_PORT > 0) {

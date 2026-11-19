@@ -115,8 +115,13 @@ function snakeCurrentSeat(room) {
  */
 function applySnakeRoll(room, userId, opts) {
   try {
-    const result = roll(room.snake, userId, opts);
+    const seat = (room.players || []).find((p) => p && p.id === userId);
+    const ignoreSnakes = !!(seat && seat.angelGuard);
+    const result = roll(room.snake, userId, Object.assign({}, opts || {}, { ignoreSnakes }));
     room.snake = result.state;
+    if (result.move && result.move.angelBlockedSnake && seat) {
+      seat.angelGuard = false;
+    }
     return { result };
   } catch (err) {
     return { error: err };
