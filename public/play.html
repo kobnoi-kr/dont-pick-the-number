@@ -25,7 +25,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp2">
+<link rel="stylesheet" href="/css/imposter.css?v=imp4">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -547,9 +547,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp2");
+    await import("/js/imposter/live-ui.js?v=imp4");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp3";
+    s.src = "/js/game.js?v=imp4";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

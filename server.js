@@ -2348,6 +2348,7 @@ function onMessage(ws, raw) {
   if (msg.t === "spinOrder") return onSpinOrder(ws);
   if (msg.t === "start") return onStart(ws);
   if (msg.t === "roll") return onRoll(ws, msg);
+  if (msg.t === "imposter:pickCard") return onImposterPickCard(ws, msg);
   if (msg.t === "imposter:confirm") return onImposterConfirm(ws);
   if (msg.t === "imposter:clue") return onImposterClue(ws, msg);
   if (msg.t === "imposter:skipClue") return onImposterSkipClue(ws);
@@ -2549,11 +2550,29 @@ async function onUseHelper(ws, msg) {
 
   return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
 }
+function onImposterPickCard(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.pickCard(ctx.room.imposter, ctx.player.id, msg && msg.cardId);
+  if (!res.ok) {
+    const map = {
+      not_your_turn: "ยังไม่ถึงตาคุณจั่วการ์ด",
+      taken: "การ์ดใบนี้มีคนจั่วแล้ว",
+      already_picked: "คุณจั่วไปแล้ว",
+      bad_card: "ไม่พบการ์ดนี้",
+      wrong_phase: "ตอนนี้ยังจั่วการ์ดไม่ได้"
+    };
+    return fail(ws, map[res.error] || "จั่วการ์ดไม่สำเร็จ");
+  }
+  imposterBridge.autoPlayBots(ctx.room);
+  afterImposterAction(ctx.room);
+}
 function onImposterConfirm(ws) {
   const ctx = seat(ws);
   if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
   const res = imposterBridge.confirmReveal(ctx.room.imposter, ctx.player.id);
   if (!res.ok) return fail(ws, "ยืนยันบทบาทไม่ได้");
+  imposterBridge.autoPlayBots(ctx.room);
   afterImposterAction(ctx.room);
 }
 function onImposterClue(ws, msg) {

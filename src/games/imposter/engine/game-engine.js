@@ -5,11 +5,13 @@ const { pickWord } = require("../config/words");
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 8;
 const ROLE_REVEAL_MS = 20_000;
+const CARD_PICK_MS = 30_000;
 const DEFAULT_CLUE_SEC = 45;
 const MAX_ROUNDS = 5;
 const CLUE_MAX_LEN = 32;
 
 const PHASE = {
+  CARD_PICK: "CARD_PICK",
   ROLE_REVEAL: "ROLE_REVEAL",
   CLUE_TURN: "CLUE_TURN",
   DISCUSSION: "DISCUSSION",
@@ -59,18 +61,22 @@ function createGame(opts) {
   const impostorCount = normalizeImpostorCount(opts.impostorCount, players.length);
   const picked = pickWord(opts.rng);
   const order = players.map((p) => String(p.id));
-  const roles = {};
-  const impostorIds = shuffle(order, opts.rng).slice(0, impostorCount);
-  const impostorSet = new Set(impostorIds);
-  for (const id of order) {
-    roles[id] = impostorSet.has(id) ? "imposter" : "villager";
-  }
   const names = {};
   for (const p of players) names[String(p.id)] = String(p.name || "Player");
 
+  const deck = [];
+  for (let i = 0; i < impostorCount; i++) deck.push("imposter");
+  while (deck.length < order.length) deck.push("villager");
+  const shuffled = shuffle(deck, opts.rng);
+  const cards = shuffled.map((role, i) => ({
+    id: i,
+    role,
+    takenBy: null
+  }));
+
   return {
     status: "playing",
-    phase: PHASE.ROLE_REVEAL,
+    phase: PHASE.CARD_PICK,
     round: 1,
     maxRounds: MAX_ROUNDS,
     word: picked.word,
@@ -82,7 +88,8 @@ function createGame(opts) {
     clueSec,
     order,
     names,
-    roles,
+    roles: {},
+    cards,
     alive: order.slice(),
     clueIndex: 0,
     clues: [],
@@ -90,7 +97,7 @@ function createGame(opts) {
     voteTallies: null,
     eliminated: [],
     confirmed: {},
-    phaseEndsAt: Date.now() + ROLE_REVEAL_MS,
+    phaseEndsAt: Date.now() + CARD_PICK_MS,
     winner: null,
     winReason: "",
     guessPlayerId: null,
@@ -98,26 +105,43 @@ function createGame(opts) {
   };
 }
 
+function nextPicker(state) {
+  if (!state) return null;
+  return state.order.find((id) => !state.roles[id]) || null;
+}
+
+function beginRoleReveal(state) {
+  state.confirmed = {};
+  return setPhase(state, PHASE.ROLE_REVEAL, ROLE_REVEAL_MS);
+}
+
 function privateView(state, playerId) {
   if (!state || !playerId) return null;
   const id = String(playerId);
-  if (!state.roles[id]) return null;
+  if (!state.order.includes(id)) return null;
+  if (!state.roles[id]) {
+    return {
+      role: null,
+      word: null,
+      category: null,
+      confirmed: false,
+      pendingPick: state.phase === PHASE.CARD_PICK
+    };
+  }
   const role = state.roles[id];
   const isImp = role === "imposter";
   const out = {
     role,
     word: null,
     category: null,
-    confirmed: !!state.confirmed[id]
+    confirmed: !!state.confirmed[id],
+    pendingPick: false
   };
   if (!isImp) {
     out.word = state.word;
     out.category = state.category;
   } else if (state.impostorInfo === "category") {
     out.category = state.category;
-  }
-  if (state.phase === PHASE.FINISHED || state.phase === PHASE.GUESS) {
-    /* still private until finished public reveal */
   }
   return out;
 }
@@ -132,6 +156,7 @@ function publicState(state, viewerId) {
       ? state.order.filter((id) => aliveSet.has(id))[state.clueIndex] || null
       : null;
   const voted = Object.keys(state.votes || {});
+  const pickTurnId = state.phase === PHASE.CARD_PICK ? nextPicker(state) : null;
   const out = {
     phase: state.phase,
     status: state.status,
@@ -142,6 +167,13 @@ function publicState(state, viewerId) {
     names: Object.assign({}, state.names),
     clueIndex: state.clueIndex,
     clueTurnId,
+    pickTurnId,
+    cards: (state.cards || []).map((c) => ({
+      id: c.id,
+      taken: !!c.takenBy,
+      takenBy: c.takenBy || null,
+      takenByName: c.takenBy ? state.names[c.takenBy] || null : null
+    })),
     clues: (state.clues || []).map((c) => ({
       playerId: c.playerId,
       name: c.name,
@@ -165,7 +197,15 @@ function publicState(state, viewerId) {
     winReason: state.winReason || "",
     guessPlayerId: state.guessPlayerId,
     lastVoteTarget: state.lastVoteTarget,
-    yourTurn: !!(viewerId && clueTurnId && String(viewerId) === String(clueTurnId)),
+    yourTurn:
+      state.phase === PHASE.CARD_PICK
+        ? !!(viewerId && pickTurnId && String(viewerId) === String(pickTurnId))
+        : !!(viewerId && clueTurnId && String(viewerId) === String(clueTurnId)),
+    canPickCard:
+      state.phase === PHASE.CARD_PICK &&
+      !!viewerId &&
+      pickTurnId &&
+      String(viewerId) === String(pickTurnId),
     canVote:
       state.phase === PHASE.VOTING &&
       !!viewerId &&
@@ -246,6 +286,34 @@ function beginVoting(state) {
   state.votes = {};
   state.voteTallies = null;
   return setPhase(state, PHASE.VOTING, state.voteSec * 1000);
+}
+
+function pickCard(state, playerId, cardId) {
+  if (state.phase !== PHASE.CARD_PICK) return { ok: false, error: "wrong_phase" };
+  const id = String(playerId);
+  const picker = nextPicker(state);
+  if (!picker || picker !== id) return { ok: false, error: "not_your_turn" };
+  if (state.roles[id]) return { ok: false, error: "already_picked" };
+  const cid = Number(cardId);
+  const card = (state.cards || []).find((c) => c.id === cid);
+  if (!card) return { ok: false, error: "bad_card" };
+  if (card.takenBy) return { ok: false, error: "taken" };
+  card.takenBy = id;
+  state.roles[id] = card.role === "imposter" ? "imposter" : "villager";
+  if (nextPicker(state)) {
+    setPhase(state, PHASE.CARD_PICK, CARD_PICK_MS);
+  } else {
+    beginRoleReveal(state);
+  }
+  return { ok: true, state, role: state.roles[id] };
+}
+
+function autoPickCard(state, playerId) {
+  if (state.phase !== PHASE.CARD_PICK) return { ok: false, error: "wrong_phase" };
+  const free = (state.cards || []).filter((c) => !c.takenBy);
+  if (!free.length) return { ok: false, error: "no_cards" };
+  const card = free[Math.floor(Math.random() * free.length)];
+  return pickCard(state, playerId, card.id);
 }
 
 function confirmReveal(state, playerId) {
@@ -405,6 +473,11 @@ function tick(state, now = Date.now()) {
   if (!state.phaseEndsAt || state.phaseEndsAt <= 0) return state;
   if (now < state.phaseEndsAt) return state;
 
+  if (state.phase === PHASE.CARD_PICK) {
+    const picker = nextPicker(state);
+    if (picker) autoPickCard(state, picker);
+    return state;
+  }
   if (state.phase === PHASE.ROLE_REVEAL) {
     return beginClueTurn(state);
   }
@@ -442,6 +515,9 @@ module.exports = {
   createGame,
   privateView,
   publicState,
+  nextPicker,
+  pickCard,
+  autoPickCard,
   confirmReveal,
   submitClue,
   skipClue,
@@ -453,6 +529,7 @@ module.exports = {
   beginDiscussion,
   beginVoting,
   beginClueTurn,
+  beginRoleReveal,
   applyElimination,
   resolveVotes,
   finish,

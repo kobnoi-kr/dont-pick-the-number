@@ -88,6 +88,47 @@
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.04);
 }
+.imp-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 10px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.imp-face-card {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(30, 41, 70, 0.95), rgba(12, 18, 36, 0.98));
+  color: inherit;
+  min-height: 118px;
+  cursor: default;
+  padding: 10px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.imp-face-card.is-pickable {
+  cursor: pointer;
+  border-color: rgba(120, 170, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(120, 170, 255, 0.2);
+}
+.imp-face-card.is-pickable:hover {
+  transform: translateY(-3px) scale(1.02);
+}
+.imp-face-card.is-taken {
+  opacity: 0.55;
+  background: rgba(255, 255, 255, 0.04);
+}
+.imp-face-card:disabled {
+  cursor: default;
+}
+.imp-face-inner {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
 .imp-role-card {
   padding: 14px 16px;
   border-radius: 12px;

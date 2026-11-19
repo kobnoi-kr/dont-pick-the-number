@@ -9,6 +9,7 @@
 
   function phaseLabel(phase) {
     const map = {
+      CARD_PICK: "จั่วการ์ด",
       ROLE_REVEAL: "เปิดบทบาท",
       CLUE_TURN: "ให้คำใบ้",
       DISCUSSION: "พูดคุย",
@@ -42,6 +43,7 @@
           <div class="imp-timer" data-imp="timer">—</div>
         </div>
         <p class="sub" data-imp="sub"></p>
+        <div class="imp-card-grid hidden" data-imp="cardGrid" role="group" aria-label="การ์ดบทบาท"></div>
         <div class="imp-role-card hidden" data-imp="roleCard">
           <p class="imp-role-kicker" data-imp="roleKicker"></p>
           <p class="imp-role-main" data-imp="roleMain"></p>
@@ -129,7 +131,7 @@
     }
 
     function showPopup(priv) {
-      if (!priv) return;
+      if (!priv || !priv.role) return;
       const isImp = fillRoleCopy(priv, $p("popTitle"), $p("popWord"), $p("popHint"));
       popup.classList.toggle("is-imposter", isImp);
       overlay.classList.remove("hidden");
@@ -139,12 +141,41 @@
     function paintRoleCard(priv, phase) {
       const card = $("roleCard");
       if (!card) return;
-      const show = phase === "ROLE_REVEAL" && priv;
+      const show = phase === "ROLE_REVEAL" && priv && priv.role;
       card.classList.toggle("hidden", !show);
       if (!show) return;
       const isImp = fillRoleCopy(priv, $("roleKicker"), $("roleMain"), $("roleHint"));
       card.classList.toggle("is-imposter", isImp);
       $("roleOk").classList.toggle("hidden", !!priv.confirmed);
+    }
+
+    function paintCards(state) {
+      const grid = $("cardGrid");
+      if (!grid) return;
+      const show = state.phase === "CARD_PICK";
+      grid.classList.toggle("hidden", !show);
+      if (!show) {
+        grid.innerHTML = "";
+        return;
+      }
+      const canPick = !!state.canPickCard;
+      grid.innerHTML = (state.cards || [])
+        .map((c) => {
+          const taken = !!c.taken;
+          const cls = "imp-face-card" + (taken ? " is-taken" : canPick ? " is-pickable" : "");
+          const label = taken ? esc(c.takenByName || "จั่วแล้ว") : "??";
+          const disabled = taken || !canPick ? " disabled" : "";
+          return `<button type="button" class="${cls}" data-card="${c.id}"${disabled} aria-label="${
+            taken ? "การ์ดถูกจั่วแล้ว" : "จั่วการ์ด"
+          }"><span class="imp-face-inner">${label}</span></button>`;
+        })
+        .join("");
+      grid.querySelectorAll("[data-card]").forEach((btn) => {
+        btn.onclick = () => {
+          if (!canPick || btn.disabled) return;
+          send({ t: "imposter:pickCard", cardId: Number(btn.getAttribute("data-card")) });
+        };
+      });
     }
 
     function paint(state, priv) {
@@ -156,9 +187,19 @@
       $("timer").textContent = state.phaseEndsAt ? formatLeft(state.phaseLeft) : "—";
 
       const turnName =
-        state.clueTurnId && state.names ? state.names[state.clueTurnId] || "—" : "";
+        state.phase === "CARD_PICK"
+          ? state.pickTurnId && state.names
+            ? state.names[state.pickTurnId] || "—"
+            : ""
+          : state.clueTurnId && state.names
+            ? state.names[state.clueTurnId] || "—"
+            : "";
       let sub = "";
-      if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณด้านล่าง / หน้าต่างกลางจอ";
+      if (state.phase === "CARD_PICK")
+        sub = state.canPickCard
+          ? "ถึงตาคุณ — เลือกการ์ด 1 ใบ (ซ่อนไว้ ไม่รู้ว่าเป็น Imposter หรือคนปกติ)"
+          : "รอ " + turnName + " จั่วการ์ด";
+      else if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณด้านล่าง / หน้าต่างกลางจอ";
       else if (state.phase === "CLUE_TURN")
         sub = state.yourTurn ? "ถึงตาคุณให้คำใบ้" : "รอ " + turnName + " ให้คำใบ้";
       else if (state.phase === "DISCUSSION") sub = "คุยกันผ่านแชทในห้อง";
@@ -168,6 +209,7 @@
       else if (state.phase === "FINISHED") sub = state.winReason || "";
       $("sub").textContent = sub;
 
+      paintCards(state);
       paintRoleCard(lastPrivate, state.phase);
 
       const aliveSet = new Set(state.alive || []);
@@ -230,7 +272,12 @@
       $("guessInput").disabled = !guessOn;
       guessForm.querySelector("button[type=submit]").disabled = !guessOn;
 
-      if (state.phase === "ROLE_REVEAL" && lastPrivate && !lastPrivate.confirmed) {
+      if (
+        state.phase === "ROLE_REVEAL" &&
+        lastPrivate &&
+        lastPrivate.role &&
+        !lastPrivate.confirmed
+      ) {
         if (!popupOpen || overlay.classList.contains("hidden")) showPopup(lastPrivate);
       } else {
         popupOpen = false;

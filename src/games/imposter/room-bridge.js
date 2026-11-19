@@ -12,6 +12,9 @@ const {
   createGame,
   publicState,
   privateView,
+  nextPicker,
+  pickCard,
+  autoPickCard,
   confirmReveal,
   submitClue,
   skipClue,
@@ -61,8 +64,47 @@ function orderedPlayers(room) {
     const p = (room.players || []).find((x) => x.name === name);
     if (p) list.push(p);
   }
-  if (!list.length) return (room.players || []).filter((p) => !p.bot || true);
+  if (!list.length) return (room.players || []).slice();
   return list;
+}
+
+function isBotPlayer(room, playerId) {
+  const p = (room.players || []).find((x) => String(x.id) === String(playerId));
+  return !!(p && p.bot);
+}
+
+/** Advance bot card picks / reveal confirms so humans are not blocked. */
+function autoPlayBots(room) {
+  const state = room && room.imposter;
+  if (!state) return false;
+  let changed = false;
+  let guard = 24;
+  while (guard-- > 0) {
+    if (state.phase === PHASE.CARD_PICK) {
+      const picker = nextPicker(state);
+      if (!picker || !isBotPlayer(room, picker)) break;
+      const res = autoPickCard(state, picker);
+      if (!res.ok) break;
+      changed = true;
+      continue;
+    }
+    if (state.phase === PHASE.ROLE_REVEAL) {
+      let did = false;
+      for (const p of room.players || []) {
+        if (!p || !p.bot) continue;
+        const id = String(p.id);
+        if (state.roles[id] && !state.confirmed[id]) {
+          confirmReveal(state, id);
+          did = true;
+          changed = true;
+        }
+      }
+      if (!did) break;
+      continue;
+    }
+    break;
+  }
+  return changed;
 }
 
 function startImposter(room) {
@@ -86,10 +128,7 @@ function startImposter(room) {
   room.over = null;
   room.startedAt = room.startedAt || Date.now();
   room._persisted = false;
-  // Bots cannot click the reveal popup — auto-confirm so humans are not blocked.
-  for (const p of ordered) {
-    if (p && p.bot) confirmReveal(state, p.id);
-  }
+  autoPlayBots(room);
   return state;
 }
 
@@ -110,6 +149,7 @@ function privateImposter(room, player) {
 function chatAllowed(room) {
   if (!room || !room.imposter) return true;
   const phase = room.imposter.phase;
+  if (phase === PHASE.CARD_PICK) return false;
   if (phase === PHASE.ROLE_REVEAL) return false;
   if (phase === PHASE.CLUE_TURN) return false;
   if (phase === PHASE.VOTING) return false;
@@ -122,6 +162,7 @@ function tickImposter(room) {
   const before = room.imposter.phase;
   const beforeEnds = room.imposter.phaseEndsAt;
   tick(room.imposter);
+  autoPlayBots(room);
   return room.imposter.phase !== before || room.imposter.phaseEndsAt !== beforeEnds;
 }
 
@@ -172,6 +213,10 @@ module.exports = {
   chatAllowed,
   tickImposter,
   finishIfDone,
+  autoPlayBots,
+  nextPicker,
+  pickCard,
+  autoPickCard,
   confirmReveal,
   submitClue,
   skipClue,

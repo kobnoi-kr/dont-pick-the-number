@@ -17,9 +17,23 @@ function run() {
     clueSec: 30,
     rng: () => 0.1
   });
-  assert.strictEqual(state.phase, eng.PHASE.ROLE_REVEAL);
+  assert.strictEqual(state.phase, eng.PHASE.CARD_PICK);
   assert.strictEqual(state.clueSec, 30);
   assert.strictEqual(state.order.length, 4);
+  assert.strictEqual(state.cards.length, 4);
+  assert.strictEqual(state.cards.filter((c) => c.role === "imposter").length, 1);
+  assert.deepStrictEqual(state.roles, {});
+
+  const pub0 = eng.publicState(state, state.order[0]);
+  assert.ok(pub0.canPickCard);
+  assert.ok(!pub0.cards.some((c) => c.role));
+
+  for (let i = 0; i < state.order.length; i++) {
+    const free = state.cards.find((c) => !c.takenBy);
+    const r = eng.pickCard(state, state.order[i], free.id);
+    assert.ok(r.ok, r.error);
+  }
+  assert.strictEqual(state.phase, eng.PHASE.ROLE_REVEAL);
   const imposters = state.order.filter((id) => state.roles[id] === "imposter");
   assert.strictEqual(imposters.length, 1);
 
@@ -68,27 +82,19 @@ function run() {
   assert.ok(finishedPub.word);
   assert.ok(finishedPub.roles);
 
-  // 2 impostors when >= 6
   const s2 = eng.createGame({
     players: players(6),
     impostorCount: 2,
     rng: () => 0.2
   });
-  assert.strictEqual(
-    s2.order.filter((id) => s2.roles[id] === "imposter").length,
-    2
-  );
+  assert.strictEqual(s2.cards.filter((c) => c.role === "imposter").length, 2);
 
-  // clamp to 1 when < 6
   const s3 = eng.createGame({
     players: players(5),
     impostorCount: 2,
     rng: () => 0.3
   });
-  assert.strictEqual(
-    s3.order.filter((id) => s3.roles[id] === "imposter").length,
-    1
-  );
+  assert.strictEqual(s3.cards.filter((c) => c.role === "imposter").length, 1);
 
   console.log("imposter engine ok");
 }
