@@ -2,7 +2,7 @@ import { ensureGuest, api, playUrl } from "./api.js";
 import { paintUser, wireShell, logout } from "./shell.js";
 import { connectDashboardWs, onDashboardMessage, disconnectDashboardWs } from "./ws.js";
 import { renderOverview } from "./overview.js";
-import { renderLibrary } from "./library.js?v=soon2";
+import { renderLibrary } from "./library.js?v=lastplay1";
 import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";
@@ -42,10 +42,52 @@ function setCreateCat(cat) {
   }
 }
 
+function createCatKey() {
+  const id = state.user && state.user.id ? String(state.user.id) : "guest";
+  return "nv-create-cat:" + id;
+}
+function lastPlayedKey() {
+  const id = state.user && state.user.id ? String(state.user.id) : "";
+  return id ? "nv-last-played:" + id : "";
+}
+function readCreateCat() {
+  try {
+    return localStorage.getItem(createCatKey()) || localStorage.getItem("nv-last-game") || "secret";
+  } catch (_) {
+    return "secret";
+  }
+}
+function writeCreateCat(cat) {
+  try {
+    localStorage.setItem(createCatKey(), cat);
+  } catch (_) {}
+}
+function readLastPlayedLocal() {
+  const key = lastPlayedKey();
+  if (!key) return "";
+  try {
+    const v = localStorage.getItem(key) || "";
+    return v === "wheel" || v === "snake" || v === "secret" ? v : "";
+  } catch (_) {
+    return "";
+  }
+}
+function writeLastPlayedLocal(mode) {
+  const key = lastPlayedKey();
+  if (!key) return;
+  try {
+    if (mode) localStorage.setItem(key, mode);
+    else localStorage.removeItem(key);
+  } catch (_) {}
+}
+function normalizeMode(mode) {
+  return mode === "wheel" || mode === "snake" || mode === "secret" ? mode : "";
+}
+
 function openCreateModal(opts = {}) {
   document.getElementById("createModal").classList.remove("hidden");
   document.getElementById("crMsg").textContent = "";
-  const cat = opts.cat || localStorage.getItem("nv-last-game") || "secret";
+  const cat = opts.cat || readCreateCat() || "secret";
   setCreateCat(cat);
   const lockCat = !!opts.lockCat;
   const catField = document.getElementById("crCatField");
@@ -91,7 +133,7 @@ async function createRoomFromModal() {
   const raw = (catEl && catEl.value) || state.pendingCat || "secret";
   const cat = raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : "secret";
   state.pendingCat = cat;
-  localStorage.setItem("nv-last-game", cat);
+  writeCreateCat(cat);
   const body = {
     visibility: document.getElementById("crVis").value || "public",
     title: document.getElementById("crName").value.trim(),
@@ -127,15 +169,7 @@ async function navigate(view) {
     user: state.user,
     openCreate: openCreateModal,
     openRooms: () => navigate("rooms"),
-    lastPlayedMode:
-      state.lastPlayedMode ||
-      (() => {
-        try {
-          return localStorage.getItem("nv-last-game") || "";
-        } catch (_) {
-          return "";
-        }
-      })(),
+    lastPlayedMode: state.lastPlayedMode || readLastPlayedLocal(),
     summaryData: state.view === "overview" ? state.summaryData : null,
     onSaved: (user) => {
       state.user = user;
@@ -222,6 +256,9 @@ onDashboardMessage((msg) => {
   try {
     const data = await ensureGuest();
     state.user = data.user || data;
+    try {
+      window.__nvUserId = state.user && state.user.id ? state.user.id : "";
+    } catch (_) {}
     // Working session means ban overlay must not stick after unban.
     clearBanNotice();
     if (state.user && state.user.id) localStorage.setItem("dpn-token", state.user.id);
@@ -262,27 +299,14 @@ onDashboardMessage((msg) => {
     if (summary.data.stats && summary.data.stats.favoriteMode) {
       state.favoriteMode = summary.data.stats.favoriteMode;
     }
-    // "เล่นล่าสุด" follows last finished match; fall back to local create/play pick
-    const fromServer = summary.data.lastGame && summary.data.lastGame.gameMode;
-    const normalized =
-      fromServer === "wheel"
-        ? "wheel"
-        : fromServer === "snake"
-          ? "snake"
-          : fromServer === "secret"
-            ? "secret"
-            : "";
-    try {
-      const local = localStorage.getItem("nv-last-game") || "";
-      const localOk = local === "wheel" || local === "snake" || local === "secret" ? local : "";
-      if (normalized) {
-        state.lastPlayedMode = normalized;
-        localStorage.setItem("nv-last-game", normalized);
-      } else if (localOk) {
-        state.lastPlayedMode = localOk;
-      }
-    } catch (_) {
-      if (normalized) state.lastPlayedMode = normalized;
+    // "เล่นล่าสุด" = last finished match of THIS account only (never shared create preference)
+    const registered = !!(state.user && state.user.accountType === "registered" && state.user.id);
+    const fromServer = normalizeMode(summary.data.lastGame && summary.data.lastGame.gameMode);
+    if (registered) {
+      state.lastPlayedMode = fromServer || "";
+      writeLastPlayedLocal(fromServer || "");
+    } else {
+      state.lastPlayedMode = "";
     }
     if (summary.data.user && summary.data.user.roles) {
       state.user = Object.assign({}, state.user || {}, { roles: summary.data.user.roles });

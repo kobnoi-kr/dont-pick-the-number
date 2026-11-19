@@ -327,23 +327,30 @@ async function handleDashboardApi(req, res, pathname) {
             where: { metadata: { path: ["hostUserId"], equals: user.id } }
           })
           .catch(() => 0),
-        prisma.gamePlayer
+        // Per-user last finished match (not shared / not "create preference")
+        prisma.game
           .findFirst({
-            where: { userId: user.id },
-            orderBy: { game: { endedAt: "desc" } },
-            include: { game: true }
+            where: {
+              endedAt: { not: null },
+              players: { some: { userId: user.id } }
+            },
+            orderBy: { endedAt: "desc" },
+            include: {
+              players: { where: { userId: user.id }, take: 1 }
+            }
           })
           .catch(() => null)
       ]);
       stats = statsRow;
       roomsCreated = Number(hostedCount) || 0;
-      if (latest && latest.game) {
+      if (latest) {
+        const me = Array.isArray(latest.players) ? latest.players[0] : null;
         lastGame = {
-          roomName: latest.game.roomName,
-          gameMode: latest.game.gameMode,
-          endedAt: latest.game.endedAt,
-          won: latest.won,
-          points: latest.points
+          roomName: latest.roomName,
+          gameMode: latest.gameMode,
+          endedAt: latest.endedAt,
+          won: !!(me && me.won),
+          points: me ? me.points : 0
         };
       }
     }

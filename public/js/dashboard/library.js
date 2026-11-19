@@ -87,27 +87,36 @@ function thumbFor(id) {
   return "🎮";
 }
 
-function rememberLastGame(id) {
+function rememberCreateCat(id) {
   const mode =
     id === "wheel" ? "wheel" : id === "snake" ? "snake" : id === "secret" ? "secret" : "";
   if (!mode) return;
+  // Create preference only — does NOT drive the "เล่นล่าสุด" badge
   try {
-    localStorage.setItem("nv-last-game", mode);
+    const uid = (() => {
+      try {
+        return (window.__nvUserId && String(window.__nvUserId)) || "guest";
+      } catch (_) {
+        return "guest";
+      }
+    })();
+    localStorage.setItem("nv-create-cat:" + uid, mode);
   } catch (_) {}
 }
 
-export async function renderLibrary(root, { openCreate, lastPlayedMode } = {}) {
+export async function renderLibrary(root, { openCreate, lastPlayedMode, user } = {}) {
   const catRes = await api("/api/v1/games/catalog", { method: "GET" });
   const games = (catRes.data && catRes.data.games) || FALLBACK;
+  // Badge is per-account last finished game only
   const lastMode =
-    lastPlayedMode ||
-    (() => {
-      try {
-        return localStorage.getItem("nv-last-game") || "";
-      } catch (_) {
-        return "";
-      }
-    })();
+    user && user.accountType === "registered" && lastPlayedMode
+      ? lastPlayedMode === "wheel" || lastPlayedMode === "snake" || lastPlayedMode === "secret"
+        ? lastPlayedMode
+        : ""
+      : "";
+  try {
+    if (user && user.id) window.__nvUserId = user.id;
+  } catch (_) {}
 
   root.innerHTML = `
     <section class="page-head">
@@ -182,7 +191,7 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode } = {}) {
         const id = btn.getAttribute("data-play");
         const g = games.find((x) => x.id === id);
         if (!g || g.comingSoon) return;
-        rememberLastGame(id);
+        rememberCreateCat(id);
         if (openCreate) openCreate({ cat: id, lockCat: true });
         else location.href = playUrl({ create: "public", setup: { cat: id } });
       };
@@ -210,7 +219,7 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode } = {}) {
         const play2 = detail.querySelector("[data-play2]");
         if (play2) {
           play2.onclick = () => {
-            rememberLastGame(g.id);
+            rememberCreateCat(g.id);
             if (openCreate) openCreate({ cat: g.id, lockCat: true });
           };
         }
