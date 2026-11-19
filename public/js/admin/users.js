@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, fmtDate, statusPill, hasPerm } from "./util.js";
+import { esc, fmtDate, statusPill, hasPerm, confirmDialog } from "./util.js";
 
 function avHtml(u) {
   const name = u.displayName || u.username || "?";
@@ -286,7 +286,7 @@ export async function renderUsers(root, { user }) {
     panel.querySelectorAll("[data-status]").forEach((btn) => {
       btn.onclick = async () => {
         const status = btn.getAttribute("data-status");
-        if (!confirm(`ตั้งสถานะเป็น ${status}?`)) return;
+        if (!(await confirmDialog(`ตั้งสถานะเป็น ${status}?`))) return;
         await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, {
           method: "PATCH",
           body: JSON.stringify({ status })
@@ -335,7 +335,7 @@ export async function renderUsers(root, { user }) {
     if (resetExp) {
       resetExp.onclick = async () => {
         const msg = panel.querySelector("#uExpMsg");
-        if (!confirm("ลบ EXP ของผู้เล่นนี้และรีเซ็ตเลเวลเป็น 1?")) return;
+        if (!(await confirmDialog("ลบ EXP ของผู้เล่นนี้และรีเซ็ตเลเวลเป็น 1?", { danger: true }))) return;
         if (msg) msg.textContent = "กำลังลบ…";
         resetExp.disabled = true;
         const r = await api(`/api/v1/admin/users/${encodeURIComponent(id)}`, {

@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, hasPerm } from "./util.js";
+import { esc, hasPerm, confirmDialog } from "./util.js";
 
 const PAGE_SIZE = 10;
 
@@ -188,7 +188,7 @@ export async function renderLevels(root, { user }) {
     const packBtn = root.querySelector("#lvPack100");
     if (packBtn) {
       packBtn.onclick = async () => {
-        if (!confirm("แทนที่ตารางยศด้วยชุดมาตรฐาน 100 ขั้น (I/II/III · Lv.100 = NUMVERSE Elite)?")) return;
+        if (!(await confirmDialog("แทนที่ตารางยศด้วยชุดมาตรฐาน 100 ขั้น (I/II/III · Lv.100 = NUMVERSE Elite)?"))) return;
         const cfgRes = await api("/api/v1/levels/config", { method: "GET" });
         const ROMANS = ["I", "II", "III"];
         const BASES = [

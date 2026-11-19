@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, hasPerm } from "./util.js";
+import { esc, hasPerm, confirmDialog } from "./util.js";
 
 const KIND_LABEL = { frame: "กรอบ", effect: "เอฟเฟกต์" };
 const TIER_OPTS = [
@@ -624,7 +624,7 @@ export async function renderShopAdmin(root, { user }) {
         const card = btn.closest("[data-id]");
         const cosmeticId = card && card.getAttribute("data-id");
         if (!cosmeticId) return;
-        if (!confirm("ลบถาวรรายการนี้? ผู้เล่นที่สวมอยู่จะถูกถอดออก และกู้คืนไม่ได้")) return;
+        if (!(await confirmDialog("ลบถาวรรายการนี้? ผู้เล่นที่สวมอยู่จะถูกถอดออก และกู้คืนไม่ได้", { danger: true }))) return;
         const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
           method: "DELETE",
           body: JSON.stringify({ cosmeticId })
@@ -705,7 +705,7 @@ export async function renderShopAdmin(root, { user }) {
         const card = btn.closest("[data-id]");
         const cosmeticId = card && card.getAttribute("data-id");
         if (!cosmeticId) return;
-        if (!confirm("เอาออกจาก Shop? (ของยังอยู่ในระบบ แค่ไม่โชว์ราคา)")) return;
+        if (!(await confirmDialog("เอาออกจาก Shop? (ของยังอยู่ในระบบ แค่ไม่โชว์ราคา)"))) return;
         const { res, data } = await api("/api/v1/admin/cosmetics/shop", {
           method: "PATCH",
           body: JSON.stringify({ cosmeticId, shopPrice: null })

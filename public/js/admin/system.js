@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc } from "./util.js";
+import { esc, confirmDialog } from "./util.js";
 
 function mb(n) {
   return Math.round((Number(n) || 0) / 1024 / 1024);
@@ -68,7 +68,7 @@ export async function renderSystem(root, { user }) {
   loadCleanStats();
   if (cleanRun) {
     cleanRun.onclick = async () => {
-      if (!confirm("รัน cleanup ตอนนี้?")) return;
+      if (!(await confirmDialog("รัน cleanup ตอนนี้?"))) return;
       cleanRun.disabled = true;
       if (cleanMsg) cleanMsg.textContent = "กำลัง cleanup…";
       const r = await api("/api/v1/admin/system/cleanup", { method: "POST", body: "{}" });
@@ -88,7 +88,7 @@ export async function renderSystem(root, { user }) {
   const btn = root.querySelector("#sysClear");
   if (btn && isSuper) {
     btn.onclick = async () => {
-      if (!confirm("ลบ expired/revoked sessions?")) return;
+      if (!(await confirmDialog("ลบ expired/revoked sessions?", { danger: true }))) return;
       const r = await api("/api/v1/admin/system/clear-sessions", { method: "POST", body: "{}" });
       root.querySelector("#sysMsg").textContent = r.res.ok
         ? `ลบแล้ว ${r.data.deleted || 0} รายการ`

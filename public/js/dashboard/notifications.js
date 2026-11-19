@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { isAdminNotifMuted, playAdminNotifPing, toggleAdminNotifMuted } from "./sfx.js";
 import { showSystemToast } from "./toasts.js";
+import { confirmDialog } from "/js/ui/dialog.js";
 
 const CATS = [
   { id: "all", label: "ทั้งหมด" },
@@ -411,7 +412,7 @@ export function wireNotifications() {
   if (deleteAll) {
     deleteAll.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm("ลบการแจ้งเตือนทั้งหมด?")) return;
+      if (!(await confirmDialog("ลบการแจ้งเตือนทั้งหมด?", { danger: true }))) return;
       await api("/api/v1/notifications/delete-all", { method: "POST", body: "{}" });
       activeCat = "all";
       refreshNotifications();
@@ -423,7 +424,7 @@ export function wireNotifications() {
       e.stopPropagation();
       const ids = selectedIds();
       if (!ids.length) return;
-      if (!confirm(`ลบข้อความที่เลือก ${ids.length} รายการ?`)) return;
+      if (!(await confirmDialog(`ลบข้อความที่เลือก ${ids.length} รายการ?`, { danger: true }))) return;
       await api("/api/v1/notifications/delete-many", {
         method: "POST",
         body: JSON.stringify({ ids })

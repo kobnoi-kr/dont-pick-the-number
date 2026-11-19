@@ -22,6 +22,7 @@ html,body{background:#070b14}
 </style>
 <link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
 </head>
 <body>
@@ -481,10 +482,12 @@ html,body{background:#070b14}
     showAnnouncementToast
   } from "/js/dashboard/toasts.js";
   import { applyBanNotice, restoreBanNotice, clearBanNotice } from "/js/ban-gate.js";
+  import { confirmDialog, openItemDetailsDialog } from "/js/ui/dialog.js";
 
   window.NVToasts = { onLiveAnnouncement, loadAnnouncementToasts, showAnnouncementToast };
   window.NVMaint = { applyLiveMaintenance, applyMaintenanceCountdown };
   window.NVBan = { applyBanNotice, restoreBanNotice, clearBanNotice };
+  window.NVDialog = { confirmDialog, openItemDetailsDialog };
 
   const gate = await enforceMaintenanceGate({ hardBlock: true });
   if (!gate.blocked) {

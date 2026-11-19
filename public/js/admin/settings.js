@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, hasPerm } from "./util.js";
+import { esc, hasPerm, confirmDialog } from "./util.js";
 
 function isMaintOn(s) {
   const msg = String(s.maintenance_message || "").trim();
@@ -217,9 +217,10 @@ export async function renderSettings(root, { user }) {
         const message =
           root.querySelector("#sMaint").value.trim() || defaultDeployMsg;
         if (
-          !confirm(
-            `แจ้งเตือนผู้เล่นทุกคน และปิดเซิร์ฟใน ${sec} วินาที?\n\nหลังนับจบ ค่อยกด Deploy บน Render`
-          )
+          !(await confirmDialog(
+            `แจ้งเตือนผู้เล่นทุกคน และปิดเซิร์ฟใน ${sec} วินาที?\n\nหลังนับจบ ค่อยกด Deploy บน Render`,
+            { danger: true }
+          ))
         ) {
           return;
         }
@@ -334,7 +335,7 @@ export async function renderSettings(root, { user }) {
     const runClean = root.querySelector("#sRunClean");
     if (runClean) {
       runClean.onclick = async () => {
-        if (!confirm("รัน cleanup ตอนนี้? จะลบ session หมดอายุและ guest ที่ค้างตามค่าที่ตั้งไว้")) return;
+        if (!(await confirmDialog("รัน cleanup ตอนนี้? จะลบ session หมดอายุและ guest ที่ค้างตามค่าที่ตั้งไว้"))) return;
         runClean.disabled = true;
         root.querySelector("#sMsgClean").textContent = "กำลัง cleanup…";
         const r = await api("/api/v1/admin/system/cleanup", { method: "POST", body: "{}" });

@@ -3817,26 +3817,4 @@ body.modal-open {
 .inv-card-img { width: 110px; height: 150px; object-fit: contain; border-radius: 10px; }
 .inv-card-fallback { display: flex; align-items: center; justify-content: center; background: var(--nv-bg-2); font-weight: 800; }
 .item-desc-short { margin: 6px 0 0; }
-.item-desc-more {
-  margin: 6px 0 0;
-  text-align: left;
-  width: 100%;
-}
-.item-desc-more summary {
-  cursor: pointer;
-  color: var(--nv-accent, #8b9cff);
-  font-size: 0.8rem;
-  list-style: none;
-}
-.item-desc-more summary::-webkit-details-marker { display: none; }
-.item-desc-more summary::after { content: " ›"; }
-.item-desc-more[open] summary::after { content: " ˄"; }
-.item-desc-list {
-  margin: 8px 0 0;
-  padding-left: 1.1em;
-  color: var(--muted, #94a3b8);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-.shop-preview-meta .item-desc-more { text-align: left; }
 .inv-qty { position: absolute; right: -6px; bottom: -4px; padding: 2px 9px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; background: rgba(86, 119, 252, 0.9); color: #fff; }

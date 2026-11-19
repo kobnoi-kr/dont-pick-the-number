@@ -516,16 +516,7 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .bag-preview-stage .bag-card-img{width:110px;height:150px}
 .bag-preview-meta b{display:block;margin-top:4px}
 .bag-preview .item-desc-short{margin:6px 0 0;color:var(--muted);font-size:.82rem}
-.bag-preview .item-desc-more{margin:8px 0 0;text-align:left}
-.bag-preview .item-desc-more summary{
-  cursor:pointer;color:#8b9cff;font-size:.8rem;list-style:none;
-}
-.bag-preview .item-desc-more summary::-webkit-details-marker{display:none}
-.bag-preview .item-desc-more summary::after{content:" ›"}
-.bag-preview .item-desc-more[open] summary::after{content:" ˄"}
-.bag-preview .item-desc-list{
-  margin:8px 0 0;padding-left:1.1em;color:var(--muted);font-size:.8rem;line-height:1.45;
-}
+.bag-preview .item-desc-more-btn{display:inline-block}
 .bag-preview-actions{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 @media (max-width:720px){
   .bag-layout{grid-template-columns:1fr}

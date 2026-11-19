@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { paintUser } from "./shell.js";
-import { itemDescHtml } from "./inventory.js";
+import { itemDescHtml, wireItemDetailsButtons } from "./inventory.js";
+import { confirmDialog } from "/js/ui/dialog.js";
 
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
@@ -334,10 +335,12 @@ export async function renderShop(root, { user, onSaved } = {}) {
         paint();
       };
     });
+    wireItemDetailsButtons(body, helpers);
+
     const buy = body.querySelector("#shopBuyBtn");
     if (buy && sel) {
       buy.onclick = async () => {
-        if (!confirm(`ซื้อ「${sel.name}」ราคา ${sel.shopPrice} pts?`)) return;
+        if (!(await confirmDialog(`ซื้อ「${sel.name}」ราคา ${sel.shopPrice} pts?`))) return;
         buy.disabled = true;
         const isHelper = sel.kind === "helper";
         const { res, data } = await api(isHelper ? "/api/v1/inventory/buy" : "/api/v1/shop/buy", {
@@ -388,7 +391,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
           setMsg("Username ใช้ได้แค่ a–z 0–9 . _ - และยาว 2–64 ตัว", false);
           return;
         }
-        if (!confirm(`จ่าย ${sel.shopPrice} pts เพื่อเปลี่ยนเป็น @${next}?`)) return;
+        if (!(await confirmDialog(`จ่าย ${sel.shopPrice} pts เพื่อเปลี่ยนเป็น @${next}?`))) return;
         renameBtn.disabled = true;
         const { res, data } = await api("/api/v1/shop/username", {
           method: "POST",

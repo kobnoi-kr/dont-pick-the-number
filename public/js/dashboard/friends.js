@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { confirmDialog } from "/js/ui/dialog.js";
 
 const PAGE_SIZE = 24;
 
@@ -233,13 +234,13 @@ export async function renderFriends(root, { user } = {}) {
     }
     const r = makeBtn("ลบ", "danger-outline");
     r.onclick = async () => {
-      if (!confirm("ลบเพื่อนคนนี้?")) return;
+      if (!(await confirmDialog("ลบเพื่อนคนนี้?", { danger: true }))) return;
       await api("/api/v1/friends/" + item.friendshipId, { method: "DELETE" });
       refreshFriends();
     };
     const b = makeBtn("บล็อก", "danger-outline");
     b.onclick = async () => {
-      if (!confirm("บล็อกเพื่อนคนนี้? จะเลิกเป็นเพื่อนด้วย")) return;
+      if (!(await confirmDialog("บล็อกเพื่อนคนนี้? จะเลิกเป็นเพื่อนด้วย", { danger: true }))) return;
       const uid = item.user && item.user.id;
       if (!uid) return;
       const res = await api("/api/v1/friends/" + uid + "/block", {

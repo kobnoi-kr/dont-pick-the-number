@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, fmtDate } from "./util.js";
+import { esc, fmtDate, confirmDialog } from "./util.js";
 
 function statusLabel(s) {
   if (s === "open") return '<span class="pill ok">ใหม่</span>';
@@ -164,7 +164,7 @@ export async function renderInbox(root, opts = {}) {
         const card = btn.closest("[data-id]");
         const id = card && card.getAttribute("data-id");
         if (!id) return;
-        if (!confirm("ลบข้อความติดต่อนี้?")) return;
+        if (!(await confirmDialog("ลบข้อความติดต่อนี้?", { danger: true }))) return;
         btn.disabled = true;
         const r = await api(`/api/v1/admin/inbox/${encodeURIComponent(id)}`, {
           method: "DELETE",
@@ -212,7 +212,7 @@ export async function renderInbox(root, opts = {}) {
   root.querySelector("#inboxStatus").onchange = load;
 
   root.querySelector("#inboxClearClosed").onclick = async () => {
-    if (!confirm("ลบข้อความสถานะ “ปิดแล้ว” ทั้งหมด?")) return;
+    if (!(await confirmDialog("ลบข้อความสถานะ “ปิดแล้ว” ทั้งหมด?", { danger: true }))) return;
     const r = await api("/api/v1/admin/inbox/clear", {
       method: "POST",
       body: JSON.stringify({ scope: "closed" })
@@ -225,7 +225,7 @@ export async function renderInbox(root, opts = {}) {
   };
 
   root.querySelector("#inboxClearAll").onclick = async () => {
-    if (!confirm("ลบประวัติติดต่อทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้")) return;
+    if (!(await confirmDialog("ลบประวัติติดต่อทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้", { danger: true }))) return;
     const r = await api("/api/v1/admin/inbox/clear", {
       method: "POST",
       body: JSON.stringify({ scope: "all" })

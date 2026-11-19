@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, hasPerm } from "./util.js";
+import { esc, hasPerm, confirmDialog } from "./util.js";
 
 const KIND_LABEL = { title: "ยศ", frame: "กรอบ", effect: "เอฟเฟกต์", helper: "ไอเทม" };
 const PROTECTED_IDS = new Set(["frame.basic", "effect.none", "title.rookie"]);
@@ -557,9 +557,10 @@ export async function renderGift(root, { user }) {
             : owned.find((it) => it.id === selectedCosmeticId);
         if (!item || item.kind !== "title" || !item.deletable) return;
         if (
-          !window.confirm(
-            "ลบยศ「" + item.name + "」ถาวร?\nผู้เล่นที่ถือยศนี้จะเสียไปด้วย และกู้คืนไม่ได้"
-          )
+          !(await confirmDialog(
+            "ลบยศ「" + item.name + "」ถาวร?\nผู้เล่นที่ถือยศนี้จะเสียไปด้วย และกู้คืนไม่ได้",
+            { danger: true }
+          ))
         ) {
           return;
         }

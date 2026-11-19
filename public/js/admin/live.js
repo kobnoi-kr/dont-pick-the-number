@@ -1,5 +1,5 @@
 import { api, playUrl } from "/js/dashboard/api.js";
-import { esc, modeLabel, hasPerm } from "./util.js";
+import { esc, modeLabel, hasPerm, confirmDialog } from "./util.js";
 
 let timer = null;
 
@@ -67,7 +67,7 @@ export async function renderLive(root, { user }) {
     if (refresh) refresh.onclick = () => paint();
     root.querySelectorAll("[data-close]").forEach((btn) => {
       btn.onclick = async () => {
-        if (!confirm("ปิดห้อง " + btn.getAttribute("data-close") + "?")) return;
+        if (!(await confirmDialog("ปิดห้อง " + btn.getAttribute("data-close") + "?", { danger: true }))) return;
         await api(`/api/v1/admin/rooms/${encodeURIComponent(btn.getAttribute("data-close"))}/close`, {
           method: "POST",
           body: "{}"

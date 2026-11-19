@@ -1,5 +1,5 @@
 import { api } from "/js/dashboard/api.js";
-import { esc, fmtDate } from "./util.js";
+import { esc, fmtDate, confirmDialog } from "./util.js";
 
 const KINDS = [
   { id: "info", label: "เขียว · ประกาศทั่วไป" },
@@ -233,7 +233,7 @@ export async function renderAnnouncements(root) {
     });
     root.querySelectorAll("[data-del]").forEach((btn) => {
       btn.onclick = async () => {
-        if (!confirm("ลบประกาศ?")) return;
+        if (!(await confirmDialog("ลบประกาศ?", { danger: true }))) return;
         await api(`/api/v1/admin/announcements/${encodeURIComponent(btn.getAttribute("data-del"))}`, {
           method: "DELETE"
         });

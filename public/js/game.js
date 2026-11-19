@@ -1439,10 +1439,10 @@ function bagItemDescHtml(item){
   const short=String((item&&item.description)||"").trim();
   const details=String((item&&item.details)||"").trim();
   if(!short&&!details) return "";
-  if(!details) return `<p class="item-desc-short">${escBag(short)}</p>`;
-  const lines=details.split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>`<li>${escBag(l)}</li>`).join("");
-  return `<p class="item-desc-short">${escBag(short)}</p>
-    <details class="item-desc-more"><summary>รายละเอียดเพิ่มเติม</summary><ul class="item-desc-list">${lines}</ul></details>`;
+  const more=details
+    ?`<button type="button" class="item-desc-more-btn" data-bag-details="${escBag(item.id)}">รายละเอียดเพิ่มเติม</button>`
+    :"";
+  return `${short?`<p class="item-desc-short">${escBag(short)}</p>`:""}${more}`;
 }
 function bagThumbHtml(item){
   const url=item&&item.imageUrl?String(item.imageUrl):"";
@@ -1548,6 +1548,17 @@ function paintLobbyBagModal(){
       if(msg){ msg.textContent="กำลังใช้…"; msg.classList.add("ok"); }
     };
   }
+  preview.querySelectorAll("[data-bag-details]").forEach(btn=>{
+    btn.onclick=(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const id=btn.getAttribute("data-bag-details");
+      const item=(lobbyBagItems||[]).find(it=>it&&it.id===id);
+      if(item&&window.NVDialog&&typeof window.NVDialog.openItemDetailsDialog==="function"){
+        window.NVDialog.openItemDetailsDialog(item);
+      }
+    };
+  });
 }
 function paintAutoButtons(){
   const show=onlineMode&&(netPhase==="play"||netPhase==="pick"||netPhase==="snake")&&!spectating;

@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { openItemDetailsDialog } from "/js/ui/dialog.js";
 
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
@@ -13,25 +14,29 @@ function itemThumb(item) {
     : `<div class="inv-card-img inv-card-fallback" aria-hidden="true">?</div>`;
 }
 
-/** Short blurb + optional expandable full details. */
+/** Short blurb + button that opens full details popup. */
 export function itemDescHtml(item) {
   const short = String((item && item.description) || "").trim();
   const details = String((item && item.details) || "").trim();
   if (!short && !details) return "";
-  if (!details) {
-    return `<p class="muted tiny item-desc-short">${esc(short)}</p>`;
-  }
-  const detailLines = details
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => `<li>${esc(line)}</li>`)
-    .join("");
-  return `<p class="muted tiny item-desc-short">${esc(short)}</p>
-    <details class="item-desc-more">
-      <summary>รายละเอียดเพิ่มเติม</summary>
-      <ul class="item-desc-list">${detailLines}</ul>
-    </details>`;
+  const more = details
+    ? `<button type="button" class="item-desc-more-btn" data-item-details="${esc(item.id)}">รายละเอียดเพิ่มเติม</button>`
+    : "";
+  return `${short ? `<p class="muted tiny item-desc-short">${esc(short)}</p>` : ""}${more}`;
+}
+
+export function wireItemDetailsButtons(root, items) {
+  if (!root) return;
+  const list = Array.isArray(items) ? items : [];
+  root.querySelectorAll("[data-item-details]").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute("data-item-details");
+      const item = list.find((it) => it && it.id === id);
+      if (item) openItemDetailsDialog(item);
+    };
+  });
 }
 
 export async function renderInventory(root, { user } = {}) {
@@ -72,4 +77,5 @@ export async function renderInventory(root, { user } = {}) {
       </article>`
     )
     .join("")}</div>`;
+  wireItemDetailsButtons(body, items);
 }
