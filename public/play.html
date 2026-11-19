@@ -176,7 +176,6 @@ html,body{background:#070b14}
     <button class="btn ghost" type="button" id="autoSnake" aria-pressed="false">เล่นอัตโนมัติ</button>
     <button class="btn ghost" type="button" id="snakeLeave">กลับห้อง</button>
   </section>
-<button type="button" id="inGameBagBtn" class="in-game-bag-btn hidden" aria-label="เปิดกระเป๋าไอเทม" title="ไอเทม">🎒 ไอเทม</button>
 
   <section id="wheelGame" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
@@ -213,7 +212,10 @@ html,body{background:#070b14}
 </main>
 
 <aside class="side hidden">
-  <h2 class="side-title">ผู้เล่นในห้อง</h2>
+  <div class="side-head">
+    <h2 class="side-title">ผู้เล่นในห้อง</h2>
+    <button type="button" id="inGameBagBtn" class="in-game-bag-btn hidden" aria-label="เปิดกระเป๋าไอเทม" title="ไอเทม">🎒 ไอเทม</button>
+  </div>
   <p class="sub">ลำดับการเล่นและสถานะรอบนี้</p>
   <form id="addForm" class="addrow hidden">
     <input id="pname" type="text" maxlength="24" autocomplete="off" placeholder="ชื่อผู้เล่น">
