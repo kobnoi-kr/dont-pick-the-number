@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { paintUser } from "./shell.js";
+import { itemDescHtml } from "./inventory.js";
 
 function esc(s) {
   return String(s || "").replace(/[&<>"']/g, (c) =>
@@ -273,7 +274,7 @@ export async function renderShop(root, { user, onSaved } = {}) {
                  <div class="shop-preview-meta">
                    <span class="shop-tier-pill tier-rare">ไอเทม</span>
                    <b>${esc(sel.name)}</b>
-                   <p class="muted tiny" style="margin:6px 0 0">${esc(sel.description || "")}</p>
+                   ${itemDescHtml(sel)}
                    <p class="tiny muted" style="margin:8px 0 0">ในกระเป๋า: <b>×${Number(sel.quantity) || 0}</b></p>
                    <p class="shop-preview-price">${sel.shopPrice != null ? sel.shopPrice + " pts" : "—"}</p>
                  </div>

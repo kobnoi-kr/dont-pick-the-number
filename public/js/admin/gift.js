@@ -350,7 +350,7 @@ export async function renderGift(root, { user }) {
         ${
           mode === "gift"
             ? selected && selected.kind === "helper"
-              ? `<p class="tiny muted" style="margin:10px 0 0">ไอเทมจะเข้ากระเป๋าผู้เล่นทันที — ใช้ก่อนเริ่มเกมในล็อบบี้</p>`
+              ? `<p class="tiny muted" style="margin:10px 0 0">ไอเทมจะเข้ากระเป๋าผู้เล่นทันที</p>`
               : `<label class="check-row" style="margin-top:10px">
                  <input type="checkbox" id="giftAutoEquip">
                  <span>สวมให้อัตโนมัติหลังมอบ</span>

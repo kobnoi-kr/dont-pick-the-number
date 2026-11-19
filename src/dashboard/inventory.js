@@ -11,13 +11,18 @@ const CATALOG_ITEMS = [
   {
     id: ANGEL_ITEM_ID,
     name: "การ์ดนางฟ้า",
-    description:
-      "กันแพ้ 1 ครั้ง/เกม (ใช้ก่อนเริ่ม) · เลข/วงล้อ: ชุบต่อถ้าเลข>1 และผู้เล่นอื่น>2 · ไม่ครบ=เสมอ · งูกันไหล",
+    description: "กันแพ้ 1 ครั้งต่อเกม",
+    details:
+      "หาเลขลับ: เลขลับเหลือ ≤1 แล้วโดน → เสมอ · เลขลับเหลือ >1 และผู้เล่นอื่น >2 → ชุบเล่นต่อ\n" +
+      "วงล้อ: เลือกเลข ≤1 แล้วโดน → เสมอ · เลือกเลข >1 และผู้เล่น >2 → ชุบเล่นต่อ\n" +
+      "งูและบันได: กันไหลลงงู 1 ครั้ง",
     shopPrice: 399,
     imageUrl: "/images/items/angel-card.png",
     effect: "angel_guard"
   }
 ];
+
+const CATALOG_BY_ID = Object.fromEntries(CATALOG_ITEMS.map((it) => [it.id, it]));
 
 const INVENTORY_TTL_MS = 15 * 60 * 1000;
 let catalogEnsuredAt = 0;
@@ -29,11 +34,13 @@ function method(req) {
 
 function publicItem(item, quantity) {
   if (!item) return null;
+  const catalog = CATALOG_BY_ID[item.id] || null;
   const out = {
     id: item.id,
     kind: "helper",
     name: item.name,
-    description: item.description || null,
+    description: (catalog && catalog.description) || item.description || null,
+    details: (catalog && catalog.details) || item.details || null,
     shopPrice: item.shopPrice == null ? null : item.shopPrice,
     imageUrl: item.imageUrl || null,
     effect: item.effect || null
@@ -62,7 +69,14 @@ async function ensureInventoryCatalog(prisma, opts) {
               imageUrl: item.imageUrl,
               effect: item.effect
             },
-            create: item
+            create: {
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              shopPrice: item.shopPrice,
+              imageUrl: item.imageUrl,
+              effect: item.effect
+            }
           })
         )
       );
