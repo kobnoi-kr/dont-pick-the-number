@@ -90,7 +90,14 @@ body.room-bg .roombar.in-game .quit-power-btn{
   box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
 h1{margin:0 0 6px;font-size:1.7rem;text-align:center;letter-spacing:.5px}
-h2.side-title{margin:0;font-size:1.15rem;text-align:center}
+.side-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 2px;
+}
+h2.side-title{margin:0;font-size:1.15rem;text-align:left;flex:1 1 auto;min-width:0}
 .brand{display:flex;justify-content:center;margin:0 0 10px}
 .brand-logo{display:block;width:min(100%,320px);height:auto;filter:drop-shadow(0 0 16px rgba(59,130,246,.35))}
 .brand.compact{margin:0 0 6px}
