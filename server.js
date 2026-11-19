@@ -849,6 +849,13 @@ function openPickNums(room) {
   for (let n = room.wheelMin; n <= room.wheelMax; n++) if (!used.has(n)) nums.push(n);
   return nums;
 }
+function othersAliveExcluding(aliveList, who) {
+  return (aliveList || []).filter((name) => name && name !== who).length;
+}
+/** Angel revive only if >2 other players still in (excluding the one who hit). */
+function angelCanRevive(aliveList, who) {
+  return othersAliveExcluding(aliveList, who) > 2;
+}
 function finishRoundDraw(room, savedWho) {
   clearTurnTimer(room);
   room.phase = "over";
@@ -869,6 +876,30 @@ function finishRoundDraw(room, savedWho) {
     draw: true
   };
 }
+function finishWheelDraw(room, savedWho) {
+  clearTurnTimer(room);
+  room.phase = "over";
+  room.activeSpin = null;
+  const outOrder = [];
+  (room.wheelLog || []).forEach((item) => {
+    if (item && item.who && !outOrder.includes(item.who)) outOrder.push(item.who);
+  });
+  room.over = {
+    title: "เสมอ — การ์ดนางฟ้าช่วยไว้!",
+    note: (savedWho || "ผู้เล่น") + " โดนระเบิดแต่ไม่มีผู้ชนะ",
+    outOrder,
+    secretLabel: "",
+    secretText: "",
+    many: false,
+    hist: (room.wheelLog || []).map((item) => ({ n: item.n, who: item.who, angelSaved: !!item.angelSaved })),
+    again: "เล่นอีกครั้ง",
+    reset: false,
+    winners: [],
+    winTarget: room.winTarget,
+    mode: "wheel",
+    draw: true
+  };
+}
 
 function applyPlayChoice(room, who, n) {
   const hit = room.secrets.includes(n);
@@ -876,16 +907,19 @@ function applyPlayChoice(room, who, n) {
   const angelSave = !!(hit && player && player.angelGuard);
   room.picked.push({ n, who, hit, angelSaved: angelSave });
   if (hit) {
+    const secretsBefore = room.secrets.length;
     room.secrets = room.secrets.filter((secret) => secret !== n);
     if (angelSave) {
       player.angelGuard = false;
-      // โดนเลขลับแล้วเกมจะจบ → เสมอ ไม่มีผู้ชนะ
-      if (!room.secrets.length || room.alive.length <= 1) {
+      // ≤1 เลขลับเหลือตอนโดน → เสมอ
+      // >1 เลขลับ: ชุบต่อได้เฉพาะเมื่อเหลือผู้เล่นอื่น > 2 คน (ไม่นับตัวเอง)
+      const canRevive = secretsBefore > 1 && angelCanRevive(room.alive, who);
+      if (!canRevive) {
         clearTurnTimer(room);
         finishRoundDraw(room, who);
         return;
       }
-      // เกมยังไปต่อได้ — กันระเบิดครั้งนี้ ไม่ถูกคัดออก
+      // ชุบมาเล่นต่อ — ไม่ถูกคัดออก
     } else {
       const index = room.alive.indexOf(who);
       if (index >= 0) room.alive.splice(index, 1);
@@ -1087,11 +1121,15 @@ function applyLand(room, plan) {
   room.activeSpin = null;
   if (!Array.isArray(room.wheelGone)) room.wheelGone = [];
   if (!room.wheelGone.includes(plan.n)) room.wheelGone.push(plan.n);
+  let angelDraw = false;
   if (plan.hit) {
     const player = byName(room, plan.owner);
     if (player && player.angelGuard) {
       player.angelGuard = false;
       room.wheelLog.push({ n: plan.n, who: plan.owner, angelSaved: true });
+      // pickEach ≤ 1 → เสมอ; pickEach > 1 และผู้เล่นในวงล้อ > 2 → ชุบต่อ
+      const canRevive = Math.max(room.pickEach, 1) > 1 && (room.wheelAlive || []).length > 2;
+      if (!canRevive) angelDraw = true;
     } else {
       const index = room.wheelAlive.indexOf(plan.owner);
       if (index >= 0) room.wheelAlive.splice(index, 1);
@@ -1100,6 +1138,7 @@ function applyLand(room, plan) {
   } else {
     room.wheelLog.push({ n: plan.n, who: "" });
   }
+  return { angelDraw };
 }
 function beginNumSpin(room) {
   if (room.phase !== "wheel") return;
@@ -1129,12 +1168,15 @@ function beginNumSpin(room) {
   broadcast(room);
   room.timer = setTimeout(() => {
     if (!room.activeSpin || room.activeSpin.id !== id) return;
-    applyLand(room, plan);
-    const delay = !plan.hit ? 450 : room.wheelAlive.length <= 1 ? 1100 : 1400;
+    const land = applyLand(room, plan) || {};
+    const delay = !plan.hit ? 450 : land.angelDraw || room.wheelAlive.length <= 1 ? 1100 : 1400;
     broadcast(room);
     room.timer = setTimeout(() => {
       if (room.phase !== "wheel") return;
-      if (room.wheelAlive.length <= 1) {
+      if (land.angelDraw) {
+        finishWheelDraw(room, plan.owner);
+        broadcast(room);
+      } else if (room.wheelAlive.length <= 1) {
         finishWheel(room);
         broadcast(room);
       } else beginNumSpin(room);

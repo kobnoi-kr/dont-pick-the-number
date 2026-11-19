@@ -12,7 +12,7 @@ const CATALOG_ITEMS = [
     id: ANGEL_ITEM_ID,
     name: "การ์ดนางฟ้า",
     description:
-      "กันแพ้ 1 ครั้งต่อเกม (ใช้ก่อนเริ่ม) · หาเลข/วงล้อกันโดนระเบิด · งูกันไหลลง",
+      "กันแพ้ 1 ครั้ง/เกม (ใช้ก่อนเริ่ม) · เลข/วงล้อ: ชุบต่อถ้าเลข>1 และผู้เล่นอื่น>2 · ไม่ครบ=เสมอ · งูกันไหล",
     shopPrice: 399,
     imageUrl: "/images/items/angel-card.png",
     effect: "angel_guard"

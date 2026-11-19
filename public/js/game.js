@@ -1461,7 +1461,7 @@ function paintLobbyAngel(){
   if(hint){
     hint.textContent=armed
       ?"พร้อมกันแพ้ 1 ครั้งในเกมนี้"
-      :"กันแพ้ 1 ครั้ง · หาเลข/วงล้อกันระเบิด · งูกันไหล";
+      :"กันแพ้ 1 ครั้ง · เลข/วงล้อชุบต่อได้ถ้าเลข>1 และผู้เล่นอื่น>2 · ไม่ครบ=เสมอ · งูกันไหล";
   }
   if(btn){
     const canUse=!armed&&Number(angelQtyCache)>0&&!spinning;
