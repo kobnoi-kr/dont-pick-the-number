@@ -248,12 +248,25 @@ export function createLiveBoard(opts) {
       el.innerHTML = av
         ? `<span class="sl-token-glow"></span><img class="sl-token-face" src="${escAttr(
             av
-          )}" alt="" referrerpolicy="no-referrer" draggable="false">`
-        : `<span class="sl-token-glow"></span><span class="sl-token-face sl-token-blank" aria-hidden="true"></span>`;
+          )}" alt="" referrerpolicy="no-referrer" draggable="false"><span class="sl-pause-tag hidden">Pause</span>`
+        : `<span class="sl-token-glow"></span><span class="sl-token-face sl-token-blank" aria-hidden="true"></span><span class="sl-pause-tag hidden">Pause</span>`;
       el.title = p.username || p.userId;
       els.tokens.appendChild(el);
       tokenEls.set(p.userId, el);
     });
+  }
+
+  function syncPauseTags(players) {
+    for (const p of players || []) {
+      const el = tokenEls.get(p.userId);
+      if (!el) continue;
+      const paused = !!p.skipNextTurn;
+      el.classList.toggle("is-paused", paused);
+      const tag = el.querySelector(".sl-pause-tag");
+      if (tag) tag.classList.toggle("hidden", !paused);
+      if (paused) el.title = (p.username || p.userId) + " · Pause";
+      else el.title = p.username || p.userId;
+    }
   }
 
   function placeTokens(state, visualOverride) {
@@ -293,6 +306,7 @@ export function createLiveBoard(opts) {
         p.turnOrder === state.currentTurn && state.status === "playing"
       );
     }
+    syncPauseTags(players);
   }
 
   function pulseDice() {
@@ -319,25 +333,30 @@ export function createLiveBoard(opts) {
       .forEach((p) => {
         const li = document.createElement("li");
         const isAuto = !!(p.auto && !p.bot);
+        const paused = !!p.skipNextTurn;
         li.className =
           "sl-player" +
           (active && active.userId === p.userId ? " is-turn" : "") +
-          (isAuto ? " is-auto" : "");
+          (isAuto ? " is-auto" : "") +
+          (paused ? " is-paused" : "");
         if (p.userId) li.dataset.pid = p.userId;
         const posLabel = p.position > 0 ? `ช่อง ${p.position}` : "เริ่ม";
         const color = TOKEN_COLORS[p.turnOrder % TOKEN_COLORS.length];
         const av = p.avatar
           ? `<img class="sl-player-av" src="${escAttr(p.avatar)}" alt="" referrerpolicy="no-referrer" width="28" height="28">`
           : `<span class="sl-player-av sl-player-av-ph" style="--token:${color}" aria-hidden="true"></span>`;
-        const autoTag = isAuto
-          ? `<span class="pavatar-auto-tag" title="เล่นอัตโนมัติ">AUTO</span>`
-          : "";
+        const headTag = paused
+          ? `<span class="sl-pause-tag" title="ข้ามเทิร์น">Pause</span>`
+          : isAuto
+            ? `<span class="pavatar-auto-tag" title="เล่นอัตโนมัติ">AUTO</span>`
+            : "";
         const tags = [];
         if (p.userId === youId) tags.push("คุณ");
         if (p.bot) tags.push("บอท");
         else if (isAuto) tags.push("ออโต้");
+        if (paused) tags.push("Pause");
         li.innerHTML = `
-          <span class="sl-player-av-wrap${isAuto ? " is-auto" : ""}">${av}${autoTag}</span>
+          <span class="sl-player-av-wrap${isAuto ? " is-auto" : ""}${paused ? " is-paused" : ""}">${av}${headTag}</span>
           <span class="sl-player-name">${escapeHtml(p.username)}${
             tags.length ? ` · ${escapeHtml(tags.join(" · "))}` : ""
           }</span>

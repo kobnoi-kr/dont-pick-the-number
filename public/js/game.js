@@ -34,6 +34,39 @@ function ensureSnakeBoard(){
   });
   return snakeLive;
 }
+function pauseFlashActive(pid){
+  const id=String(pid||"");
+  if(!id) return false;
+  const entry=pauseFlashUntil.get(id);
+  const until=entry&&typeof entry==="object"?Number(entry.until)||0:Number(entry)||0;
+  if(until>Date.now()) return true;
+  if(entry) pauseFlashUntil.delete(id);
+  return false;
+}
+function playerHasPause(metaOrId){
+  if(metaOrId&&typeof metaOrId==="object"){
+    if(metaOrId.skipNextTurn) return true;
+    return pauseFlashActive(metaOrId.id||metaOrId.userId);
+  }
+  return pauseFlashActive(metaOrId);
+}
+function flashPlayerPause(pid, ms){
+  const id=String(pid||"");
+  if(!id) return;
+  const dur=Math.max(1200, Number(ms)||4500);
+  const prev=pauseFlashUntil.get(id);
+  if(prev&&prev.timer) clearTimeout(prev.timer);
+  const until=Date.now()+dur;
+  const timer=setTimeout(()=>{
+    const cur=pauseFlashUntil.get(id);
+    if(cur&&cur.until===until) pauseFlashUntil.delete(id);
+    renderPlayers();
+    if(netPhase==="snake"&&lastNetSnap) updateSnakeBoard(lastNetSnap);
+  }, dur+40);
+  pauseFlashUntil.set(id,{until,timer});
+  renderPlayers();
+  if(netPhase==="snake"&&lastNetSnap) updateSnakeBoard(lastNetSnap);
+}
 function updateSnakeBoard(s){
   const board=ensureSnakeBoard();
   if(!board) return Promise.resolve();
@@ -47,8 +80,18 @@ function updateSnakeBoard(s){
   const evenOddCharges=s&&s.youEvenOddCharges!=null
     ?Number(s.youEvenOddCharges)||0
     :(me?Number(me.evenOddCharges)||0:0);
+  const snake=s&&s.snake?s.snake:null;
+  const snakeView=snake&&Array.isArray(snake.players)
+    ?Object.assign({}, snake, {
+      players:snake.players.map(p=>{
+        const flash=playerHasPause(p.userId);
+        if(!flash||p.skipNextTurn) return p;
+        return Object.assign({}, p, {skipNextTurn:true});
+      })
+    })
+    :snake;
   return Promise.resolve(
-    board.update(s&&s.snake?s.snake:null,{
+    board.update(snakeView,{
       youId:s&&s.youId||myId||"",
       spectator:!!spectating,
       auto:!!myAuto,
@@ -69,6 +112,7 @@ const SNAKE_HIT_SOUND="/audio/gunshot-meme.mp3";
 const YOUR_TURN_SOUND="/audio/correct-gameshow.mp3";
 const ROOM_CHAT_MS=6000;
 const roomChatBubbles=new Map(); /* pid -> { body, until, timer } */
+const pauseFlashUntil=new Map(); /* pid -> expiry ms — brief Pause after instant skip */
 const VOL_STORE="dpn-volume";
 const BG_BASE=0.08, SPIN_BASE=0.18, SFX_BASE=0.35;
 const BG_SRC=encodeURI("/audio/Copyright Free Background Music Mix for Content Creators Royalty Free - (original Kbps).mp3");
@@ -288,6 +332,7 @@ function stopSpinSound(){
   spinNode=null;
 }
 let onlineMode=true, myId="", hostId="", myTurn=false, myAuto=false, playerMeta=[], roomCode="", applying=false, netPhase="gate";
+let lastNetSnap=null;
 let roomVisibility="";
 let onlineFriendIds=new Set();
 let pendingRoomInvite=null;
@@ -1384,7 +1429,14 @@ function renderPlayers(){
     avWrap.className="pavatar-wrap"+(isAutoUser?" is-auto":"")+(champ?" champion":"");
     if(meta&&meta.id) avWrap.dataset.pid=meta.id;
     avWrap.appendChild(face);
-    if(isAutoUser){
+    if(playerHasPause(meta)){
+      row.classList.add("is-paused");
+      const pauseTag=document.createElement("span");
+      pauseTag.className="ppause-tag";
+      pauseTag.textContent="Pause";
+      pauseTag.title="ข้ามเทิร์น";
+      avWrap.appendChild(pauseTag);
+    }else if(isAutoUser){
       const autoTag=document.createElement("span");
       autoTag.className="pavatar-auto-tag";
       autoTag.textContent="AUTO";
@@ -3461,6 +3513,7 @@ function applySnap(s){
   wantRoom=true;
   enterIntent=false;
   applying=true;
+  lastNetSnap=s||null;
   myId=s.youId||"";
   hostId=s.hostId||"";
   roomCode=s.code||"";
@@ -4036,6 +4089,7 @@ function connect(){
         closeSkipTargetModal();
         const tip=$("skipTargetMsg");
         if(tip) tip.textContent="";
+        if(msg.targetUserId) flashPlayerPause(msg.targetUserId);
       }
       refreshAngelQty();
     }else if(msg.t==="roomChat"){

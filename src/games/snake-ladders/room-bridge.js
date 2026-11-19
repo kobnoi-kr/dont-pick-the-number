@@ -89,7 +89,8 @@ function snapSnake(room) {
     return Object.assign({}, p, {
       avatar: rp.avatarUrl || p.avatar || null,
       auto: !!(rp.auto || rp.bot),
-      bot: !!rp.bot
+      bot: !!rp.bot,
+      skipNextTurn: !!rp.skipNextTurn
     });
   });
   if (!pub.mapId) {
