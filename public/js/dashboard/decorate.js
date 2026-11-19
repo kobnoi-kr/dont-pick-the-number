@@ -319,8 +319,8 @@ export async function renderDecorate(root, { user } = {}) {
         const levelLocked = item.kind === "title" && isLevelTitleItem(item);
         const wearLabel = levelLocked
           ? isOn
-            ? "ล็อกตามเลเวล"
-            : "เก็บตามเลเวล"
+            ? "ยศเลเวลสูงสุด"
+            : "ยศเลเวล"
           : item.kind === "title" && isOn
             ? "ถอดยศ"
             : isOn

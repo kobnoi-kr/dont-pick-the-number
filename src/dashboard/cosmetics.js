@@ -560,7 +560,7 @@ async function syncLevelTitleCosmetics(prisma, levels, opts) {
           id,
           kind: "title",
           name,
-          description: "ยศเลเวล " + level + " (เก็บได้ถาวร)",
+          description: "ยศเลเวล " + level + " (อิงเลเวลสูงสุด · ยศเก่าจะถูกลบ)",
           shopPrice: null,
           cssClass: "title-level-" + level,
           meta: { color, level, source: "level" }
@@ -588,22 +588,26 @@ async function syncLevelTitleCosmetics(prisma, levels, opts) {
   return levelTitlesSyncPromise;
 }
 
-/** Grant every unlocked level title up to current level — keeps forever. */
+/**
+ * Keep only the highest level title.
+ * Lower titles are deleted so decorate inventory stays clean.
+ */
 async function grantLevelTitlesUpTo(prisma, userId, level) {
   const max = Math.max(0, Number(level) || 0);
   if (max < 1) return;
-  const owned = await prisma.userCosmetic.findMany({
-    where: { userId, cosmeticId: { startsWith: "title.level." } },
-    select: { cosmeticId: true }
-  });
-  const have = new Set(owned.map((row) => row.cosmeticId));
-  const missing = [];
-  for (let lv = 1; lv <= max; lv++) {
-    const id = levelTitleCosmeticId(lv);
-    if (!have.has(id)) missing.push(id);
+  const wantId = levelTitleCosmeticId(max);
+  await grantCosmetic(prisma, userId, wantId, "level");
+  try {
+    await prisma.userCosmetic.deleteMany({
+      where: {
+        userId,
+        cosmeticId: { startsWith: "title.level." },
+        NOT: { cosmeticId: wantId }
+      }
+    });
+  } catch {
+    /* ignore prune failures */
   }
-  if (!missing.length) return;
-  await Promise.all(missing.map((id) => grantCosmetic(prisma, userId, id, "level")));
 }
 
 /**
@@ -672,7 +676,7 @@ async function ensureLevelOneTitleCosmetic(prisma) {
       id,
       kind: "title",
       name: title,
-      description: "ยศเลเวล 1 (เก็บได้ถาวร)",
+      description: "ยศเลเวล 1 (อิงเลเวลสูงสุด · ยศเก่าจะถูกลบ)",
       shopPrice: null,
       cssClass: "title-level-1",
       meta: { color, level: 1, source: "level" }
@@ -700,12 +704,12 @@ async function ensureStarterCosmetics(prisma, userId) {
   if (!user) return;
 
   const have = new Set((user.cosmetics || []).map((row) => row.cosmeticId));
-  const needsLevel1 = !have.has(level1);
   const needsFrame = !have.has("frame.basic");
   const needsEffect = !have.has("effect.none");
   const hasRookie = have.has("title.rookie");
   const peak = Math.max(1, Number(user.maxLevel) || 1, Number(user.level) || 1);
   const wantLevelTitle = levelTitleCosmeticId(peak);
+  const needsPeakTitle = !have.has(wantLevelTitle);
   const levelTitleOk = user.equippedTitleId === wantLevelTitle;
   const needsEquipFix =
     !levelTitleOk ||
@@ -713,14 +717,16 @@ async function ensureStarterCosmetics(prisma, userId) {
     !user.equippedEffectId;
 
   // Fast path: ของเริ่มต้นครบและสวมถูกต้องแล้ว
-  if (!needsLevel1 && !needsFrame && !needsEffect && !hasRookie && !needsEquipFix) return;
+  if (!needsPeakTitle && !needsFrame && !needsEffect && !hasRookie && !needsEquipFix) return;
 
   await ensureLevelOneTitleCosmetic(prisma);
   const grants = [];
-  if (needsLevel1) grants.push(grantCosmetic(prisma, userId, level1, "level"));
+  if (needsPeakTitle) grants.push(grantCosmetic(prisma, userId, wantLevelTitle, "level"));
   if (needsFrame) grants.push(grantCosmetic(prisma, userId, "frame.basic", "starter"));
   if (needsEffect) grants.push(grantCosmetic(prisma, userId, "effect.none", "starter"));
   if (grants.length) await Promise.all(grants);
+  // Drop older level titles — only the highest remains
+  await grantLevelTitlesUpTo(prisma, userId, peak);
 
   if (hasRookie) {
     try {

@@ -848,13 +848,13 @@ td.row-actions > a.btn:last-child {
 .btn.danger-text:hover { color: #fecaca !important; }
 
 .notif-panel {
-  position: absolute;
-  right: 18px;
-  top: 58px;
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  top: max(58px, calc(12px + env(safe-area-inset-top, 0px)));
   width: min(420px, calc(100vw - 20px));
   max-height: min(560px, calc(100vh - 80px));
   overflow: auto;
-  z-index: 40;
+  z-index: 80;
   padding: 14px !important;
   border-radius: 18px !important;
   background:
