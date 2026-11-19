@@ -353,7 +353,7 @@ function applySpectatorUi(){
   document.body.classList.add("spectating");
   const note=$("roomNote");
   if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
-  ["spin","clearScores","addBot","inviteFriendsBtn","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave"].forEach(id=>{
+  ["spin","clearScores","addBot","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave"].forEach(id=>{
     const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
   });
 }
@@ -1140,8 +1140,18 @@ function renderLobbyGrid(){
     const name=list[i];
     const slot=document.createElement("div");
     if(!name){
-      slot.className="lobby-slot empty";
-      slot.innerHTML=`<div class="lobby-empty-circle" aria-hidden="true"><span class="lobby-empty-plus">+</span></div><div class="lobby-slot-name">รอผู้เล่น…</div>`;
+      const canInvite=onlineMode&&canUseFriends()&&roomVisibility==="private"&&netPhase==="lobby"&&!spectating;
+      slot.className="lobby-slot empty"+(canInvite?" inviteable":"");
+      slot.innerHTML=`<div class="lobby-empty-circle" aria-hidden="true"><span class="lobby-empty-plus">+</span></div><div class="lobby-slot-name">${canInvite?"เชิญเพื่อน":"รอผู้เล่น…"}</div>`;
+      if(canInvite){
+        slot.setAttribute("role","button");
+        slot.tabIndex=0;
+        slot.title="เชิญเพื่อนเข้าห้อง";
+        slot.onclick=()=>openInviteModal();
+        slot.onkeydown=(e)=>{
+          if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openInviteModal(); }
+        };
+      }
       grid.appendChild(slot);
       continue;
     }
@@ -1402,12 +1412,6 @@ function renderPlayers(){
   const gear=$("settingsGearBtn");
   if(gear) gear.classList.toggle("hidden",!(isHost()&&netPhase==="lobby"));
   const hostLobby=isHost()&&netPhase==="lobby"&&!spinning;
-  const transferBtn=$("transferHostBtn");
-  if(transferBtn){
-    const canTransfer=hostLobby&&playerMeta.some(p=>p.id!==myId&&p.connected&&!p.bot);
-    transferBtn.classList.toggle("hidden",!isHost()||netPhase!=="lobby");
-    transferBtn.disabled=!canTransfer;
-  }
   const deleteBtn=$("deleteRoomBtn");
   if(deleteBtn){
     deleteBtn.classList.toggle("hidden",!isHost()||netPhase!=="lobby");
@@ -2753,10 +2757,8 @@ async function openPlayerProfileModal(userId){
   acts.appendChild(add);
 }
 function paintInviteBtn(){
-  const btn=$("inviteFriendsBtn");
-  if(!btn) return;
-  const show=onlineMode&&canUseFriends()&&roomVisibility==="private"&&netPhase==="lobby";
-  btn.classList.toggle("hidden",!show);
+  // Invite is opened from empty lobby "+" slots — refresh grid affordance.
+  if(netPhase==="lobby") renderLobbyGrid();
 }
 async function loadFriendsCache(){
   if(!canUseFriends()){ friendsCache=[]; return []; }
@@ -3941,10 +3943,6 @@ async function bootOnline(){
     });
     modal.classList.remove("hidden");
   }
-  if($("transferHostBtn")) $("transferHostBtn").onclick=()=>{
-    if(!isHost()||netPhase!=="lobby") return;
-    openTransferHostModal();
-  };
   if($("transferHostClose")) $("transferHostClose").onclick=()=>$("transferHostModal").classList.add("hidden");
   if($("transferHostModal")) $("transferHostModal").addEventListener("click",e=>{
     if(e.target===$("transferHostModal")) $("transferHostModal").classList.add("hidden");
@@ -4122,11 +4120,6 @@ async function bootOnline(){
   };
   if(authChoiceCancel) authChoiceCancel.onclick=()=>closeAuthChoiceModal();
   if(authChoiceModal) authChoiceModal.addEventListener("click",e=>{ if(e.target===authChoiceModal) closeAuthChoiceModal(); });
-  const inviteBtn=$("inviteFriendsBtn");
-  if(inviteBtn){
-    inviteBtn.classList.add("hidden");
-    inviteBtn.onclick=()=>openInviteModal();
-  }
   $("inviteModalClose").onclick=()=>closeInviteModal();
   $("inviteModal").addEventListener("click",e=>{ if(e.target===$("inviteModal")) closeInviteModal(); });
   const acceptBtn=$("roomInviteAccept");
