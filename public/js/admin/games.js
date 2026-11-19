@@ -89,7 +89,7 @@ export async function renderGames(root, { user }) {
       <h2>จัดการเกมในคลัง</h2>
       <p class="muted" style="margin-top:0">
         หน้านี้คุมว่าเกมไหน <b>โชว์ใน Game Library</b> ชื่อที่ผู้เล่นเห็น ป้าย <b>Beta</b> และ <b>Coming Soon</b>
-        — ไม่ได้สร้างเกมใหม่ แค่เปิด/ปิด ตั้งชื่อ และทำเครื่องหมายสถานะ
+        — Coming Soon = ผู้เล่นกดเล่นไม่ได้ (แอดมินทดสอบได้) จนเอาติ๊กออก
       </p>
       <div class="game-admin-grid" id="gCat">
         ${GAMES.map((g) => {
@@ -120,9 +120,9 @@ export async function renderGames(root, { user }) {
               <input type="checkbox" data-id="${g.id}" data-field="beta" ${beta ? "checked" : ""} ${canManage ? "" : "disabled"}/>
               <span>เกม Beta</span>
             </label>
-            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Coming Soon และยังสร้างห้องไม่ได้">
+            <label class="switch-row" style="margin:0 0 10px" title="โชว์ป้าย Coming Soon — ผู้เล่นกดเล่นไม่ได้ แอดมินทดสอบได้">
               <input type="checkbox" data-id="${g.id}" data-field="comingSoon" ${comingSoon ? "checked" : ""} ${canManage ? "" : "disabled"}/>
-              <span>Coming Soon</span>
+              <span>Coming Soon (แอดมินทดสอบได้)</span>
             </label>
             <label class="field">
               <span>ชื่อที่แสดงให้ผู้เล่น</span>

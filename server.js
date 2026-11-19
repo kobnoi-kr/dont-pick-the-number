@@ -1394,7 +1394,7 @@ function setInt(patch, key, min, max) {
   if (!Number.isInteger(value)) return null;
   return Math.min(max, Math.max(min, value));
 }
-function onSetup(ws, msg) {
+async function onSetup(ws, msg) {
   const ctx = seat(ws);
   if (!ctx) return;
   if (!hostOnly(ctx)) return fail(ws, "เฉพาะโฮสต์ที่ตั้งค่าห้องได้");
@@ -1406,6 +1406,7 @@ function onSetup(ws, msg) {
     if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
       return fail(ws, "บันไดงูรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
     }
+    if (!(await assertComingSoonPlayable(ws, ctx.player, nextCat))) return;
     room.cat = nextCat;
   }
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
@@ -1882,6 +1883,22 @@ async function assertNotMaintenance(ws, msg) {
     return true;
   }
 }
+async function assertComingSoonPlayable(ws, player, cat) {
+  try {
+    if (!authEnabled()) return true;
+    const { assertCatPlayable } = require("./src/dashboard/game-catalog-flags");
+    const prisma = await getPrisma();
+    const check = await assertCatPlayable(prisma, cat, {
+      roles: player && player.roles,
+      isAdmin: !!(ws && ws.isAdmin)
+    });
+    if (check.ok) return true;
+    fail(ws, "เกมนี้ Coming Soon — เปิดให้แอดมินทดสอบเท่านั้น");
+    return false;
+  } catch {
+    return true;
+  }
+}
 async function onCreate(ws, msg) {
   if (!(await assertNotMaintenance(ws, msg))) return;
   const { name, token, avatarUrl } = identity(ws, msg);
@@ -1896,6 +1913,7 @@ async function onCreate(ws, msg) {
   const room = blankRoom(code, msg.visibility === "private" ? "private" : "public", player);
   if (msg.title) room.title = cleanRoomTitle(msg.title) || room.title;
   applyRoomSetup(room, msg.setup);
+  if (!(await assertComingSoonPlayable(ws, player, room.cat))) return;
   rooms.set(code, room);
   attach(ws, room, player);
   try {
@@ -1976,6 +1994,7 @@ async function onJoin(ws, msg) {
   if (old) takeOut(old.room, old.player, ws);
   const player = { id: token, name, avatarUrl, ws: null, connected: true, bot: false, auto: false, scoreSecret: 0, scoreWheel: 0, lastSeen: Date.now() };
   await hydratePlayerProfile(player);
+  if (!(await assertComingSoonPlayable(ws, player, room.cat))) return;
   room.players.push(player);
   if (room.phase === "lobby") {
     cancelSpin(room);
@@ -2880,6 +2899,16 @@ attachGameApi({
     const room = blankRoom(code, visibility === "private" ? "private" : "public", player);
     if (title) room.title = cleanRoomTitle(title) || "";
     applyRoomSetup(room, setup);
+    try {
+      if (authEnabled()) {
+        const { assertCatPlayable } = require("./src/dashboard/game-catalog-flags");
+        const prisma = await getPrisma();
+        const check = await assertCatPlayable(prisma, room.cat, { roles: player.roles });
+        if (!check.ok) return { error: "coming_soon" };
+      }
+    } catch {
+      /* ignore catalog check failures */
+    }
     room.holdUntil = Date.now() + 120000;
     rooms.set(code, room);
     scheduleDelete(room);

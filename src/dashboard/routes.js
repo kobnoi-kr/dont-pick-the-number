@@ -535,6 +535,13 @@ async function handleDashboardApi(req, res, pathname) {
       sendJson(res, 500, { error: "create_failed" });
       return true;
     }
+    if (created.error === "coming_soon") {
+      sendJson(res, 403, {
+        error: "coming_soon",
+        message: "เกมนี้ Coming Soon — เปิดให้แอดมินทดสอบเท่านั้น"
+      });
+      return true;
+    }
     sendJson(res, 201, created);
     return true;
   }

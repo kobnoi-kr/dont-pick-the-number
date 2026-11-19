@@ -104,9 +104,15 @@ function rememberCreateCat(id) {
   } catch (_) {}
 }
 
+function isElevatedAdmin(user) {
+  const roles = (user && user.roles) || [];
+  return roles.includes("admin") || roles.includes("super_admin") || roles.includes("moderator");
+}
+
 export async function renderLibrary(root, { openCreate, lastPlayedMode, user } = {}) {
   const catRes = await api("/api/v1/games/catalog", { method: "GET" });
   const games = (catRes.data && catRes.data.games) || FALLBACK;
+  const admin = isElevatedAdmin(user);
   // Badge is per-account last finished game only
   const lastMode =
     user && user.accountType === "registered" && lastPlayedMode
@@ -136,6 +142,17 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
   const detail = root.querySelector("#libDetail");
   let q = "";
 
+  function canPlay(g) {
+    if (!g) return false;
+    if (!g.comingSoon) return true;
+    return admin;
+  }
+
+  function playLabel(g) {
+    if (g && g.comingSoon && admin) return "ทดสอบ (แอดมิน)";
+    return "เล่นเลย";
+  }
+
   function filtered() {
     const qq = q.trim().toLowerCase();
     let list = games.slice();
@@ -150,6 +167,14 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
     return list;
   }
 
+  function startPlay(id) {
+    const g = games.find((x) => x.id === id);
+    if (!canPlay(g)) return;
+    rememberCreateCat(id);
+    if (openCreate) openCreate({ cat: id, lockCat: true });
+    else location.href = playUrl({ create: "public", setup: { cat: id } });
+  }
+
   function paint() {
     const list = filtered();
     if (!list.length) {
@@ -159,6 +184,7 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
     grid.innerHTML = list
       .map((g) => {
         const soon = !!g.comingSoon;
+        const playable = canPlay(g);
         return `
       <article class="lib-card${g.id === lastMode ? " is-recent" : ""}${soon ? " is-soon" : ""}" data-id="${esc(g.id)}">
         <div class="lib-thumb">${thumbFor(g.id)}</div>
@@ -175,9 +201,11 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
           <div class="tiny">ผู้เล่นสูงสุด ${g.maxPlayers || 12}</div>
           <div class="lib-actions">
             ${
-              soon
-                ? `<button type="button" class="btn sm" disabled title="ยังไม่เปิดเล่น">เร็วๆ นี้</button>`
-                : `<button type="button" class="btn sm" data-play="${esc(g.id)}">เล่นเลย</button>`
+              playable
+                ? `<button type="button" class="btn sm" data-play="${esc(g.id)}"${
+                    soon ? ' title="Coming Soon — แอดมินทดสอบได้"' : ""
+                  }>${esc(playLabel(g))}</button>`
+                : `<button type="button" class="btn sm" disabled title="ยังไม่เปิดเล่น">เร็วๆ นี้</button>`
             }
             <button type="button" class="btn ghost sm" data-info="${esc(g.id)}">รายละเอียด</button>
           </div>
@@ -187,20 +215,14 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
       .join("");
 
     grid.querySelectorAll("[data-play]").forEach((btn) => {
-      btn.onclick = () => {
-        const id = btn.getAttribute("data-play");
-        const g = games.find((x) => x.id === id);
-        if (!g || g.comingSoon) return;
-        rememberCreateCat(id);
-        if (openCreate) openCreate({ cat: id, lockCat: true });
-        else location.href = playUrl({ create: "public", setup: { cat: id } });
-      };
+      btn.onclick = () => startPlay(btn.getAttribute("data-play"));
     });
     grid.querySelectorAll("[data-info]").forEach((btn) => {
       btn.onclick = () => {
         const g = games.find((x) => x.id === btn.getAttribute("data-info"));
         if (!g) return;
         const soon = !!g.comingSoon;
+        const playable = canPlay(g);
         detail.classList.remove("hidden");
         detail.innerHTML = `
           <h2 style="margin-top:0">${esc(g.name)}${
@@ -209,19 +231,25 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
           <p class="muted">${esc(g.description)}</p>
           <h3>วิธีเล่น</h3>
           <p>${esc(g.howTo)}</p>
+          ${
+            soon && !admin
+              ? `<p class="tiny">เกมนี้ยัง Coming Soon — ผู้เล่นทั่วไปยังกดเล่นไม่ได้</p>`
+              : soon && admin
+                ? `<p class="tiny">Coming Soon — แอดมินทดสอบได้ จนเอาติ๊กออกในหน้าจัดการเกม</p>`
+                : ""
+          }
           <div class="lib-actions">
             ${
-              soon
-                ? `<button type="button" class="btn" disabled>เร็วๆ นี้</button>`
-                : `<button type="button" class="btn" data-play2="${esc(g.id)}">สร้างห้องเกมนี้</button>`
+              playable
+                ? `<button type="button" class="btn" data-play2="${esc(g.id)}">${
+                    soon && admin ? "ทดสอบสร้างห้อง (แอดมิน)" : "สร้างห้องเกมนี้"
+                  }</button>`
+                : `<button type="button" class="btn" disabled>เร็วๆ นี้</button>`
             }
           </div>`;
         const play2 = detail.querySelector("[data-play2]");
         if (play2) {
-          play2.onclick = () => {
-            rememberCreateCat(g.id);
-            if (openCreate) openCreate({ cat: g.id, lockCat: true });
-          };
+          play2.onclick = () => startPlay(g.id);
         }
         detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
       };
