@@ -89,7 +89,15 @@ function thumbFor(id) {
 
 function rememberCreateCat(id) {
   const mode =
-    id === "wheel" ? "wheel" : id === "snake" ? "snake" : id === "secret" ? "secret" : "";
+    id === "wheel"
+      ? "wheel"
+      : id === "snake"
+        ? "snake"
+        : id === "imposter"
+          ? "imposter"
+          : id === "secret"
+            ? "secret"
+            : "";
   if (!mode) return;
   // Create preference only — does NOT drive the "เล่นล่าสุด" badge
   try {
@@ -116,7 +124,10 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
   // Badge is per-account last finished game only
   const lastMode =
     user && user.accountType === "registered" && lastPlayedMode
-      ? lastPlayedMode === "wheel" || lastPlayedMode === "snake" || lastPlayedMode === "secret"
+      ? lastPlayedMode === "wheel" ||
+        lastPlayedMode === "snake" ||
+        lastPlayedMode === "secret" ||
+        lastPlayedMode === "imposter"
         ? lastPlayedMode
         : ""
       : "";

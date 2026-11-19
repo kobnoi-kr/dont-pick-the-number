@@ -9,6 +9,28 @@ let roomMaxPlayers=12;
 let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, wheelAnim=0, wheelEndTimer=0, wheelGen=0;
 let snakeLive=null;
 let snakeSnapSeq=0;
+let imposterLive=null;
+function ensureImposterUi(){
+  if(imposterLive) return imposterLive;
+  const root=$("imposterRoot");
+  if(!root||!window.NVImposter||typeof window.NVImposter.createLiveUi!=="function") return null;
+  imposterLive=window.NVImposter.createLiveUi({
+    root,
+    send:(payload)=>{ if(onlineMode&&!spectating) send(payload); },
+    youId:()=>myId||""
+  });
+  return imposterLive;
+}
+function updateImposterUi(s){
+  const ui=ensureImposterUi();
+  if(!ui) return;
+  const note=$("imposterSpectateNote");
+  if(note){
+    note.classList.toggle("hidden",!spectating);
+    if(spectating) note.textContent="โหมด Spectator — ดูได้อย่างเดียว ไม่เห็นบทบาท/คำศัพท์ของใคร";
+  }
+  ui.paint(s&&s.imposter, s&&s.youImposter);
+}
 function ensureSnakeBoard(){
   if(snakeLive) return snakeLive;
   const root=$("snakeRoot");
@@ -411,17 +433,19 @@ function applySpectatorUi(){
   document.body.classList.add("spectating");
   const note=$("roomNote");
   if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
-  ["spin","clearScores","addBot","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave"].forEach(id=>{
+  ["spin","clearScores","addBot","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave","imposterLeave"].forEach(id=>{
     const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
   });
 }
 function show(n){
-  ["gate","start","play","pick","wheelGame","snakeGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
+  ["gate","start","play","pick","wheelGame","snakeGame","imposterGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
   const inRoom=n!=="gate";
   const lobby=n==="start";
   const snakePlay=n==="snakeGame";
+  const imposterPlay=n==="imposterGame";
   const inGame=inRoom&&!lobby;
   document.body.classList.toggle("snake-play", snakePlay);
+  document.body.classList.toggle("imposter-play", imposterPlay);
   document.body.classList.toggle("in-game", inGame);
   if(!snakePlay){
     try{ delete document.body.dataset.snakeMap; }catch(e){}
@@ -718,7 +742,11 @@ function resetWinCelebration(){
 function paintOverScreen(s){
   if(!s||!s.over) return;
   $("overTitle").textContent=s.over.title||"";
-  $("overNote").textContent=s.over.note||"";
+  let note=s.over.note||"";
+  if(s.over.mode==="imposter"&&Array.isArray(s.over.imposters)&&s.over.imposters.length){
+    note=(note?note+" · ":"")+"Imposter: "+s.over.imposters.join(", ");
+  }
+  $("overNote").textContent=note;
   setOverOutOrder(s.over.outOrder||[]);
   $("secretLabel").textContent=s.over.secretLabel||"";
   const shown=$("secret");
@@ -744,6 +772,7 @@ function winnersFromOver(s){
 function shouldCelebrateOver(s){
   if(!s||!s.over) return false;
   if(s.over.mode==="snake"||s.cat==="snake") return true;
+  if(s.over.mode==="imposter"||s.cat==="imposter") return true;
   return !!s.over.reset;
 }
 function celebrateOverSnap(s){
@@ -2346,12 +2375,12 @@ function paintGameModeBadge(cat){
   const ico=$("gameModeIco");
   const name=$("gameModeName");
   const hint=$("gameModeHint");
-  if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":"🔢";
-  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"บันไดงู":"หาเลข";
-  if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":"ห้ามโดนเลขลับ";
+  if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":cat==="imposter"?"🕵️":"🔢";
+  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"บันไดงู":cat==="imposter"?"Imposter":"หาเลข";
+  if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":cat==="imposter"?"หา Imposter ด้วยคำใบ้":"ห้ามโดนเลขลับ";
 }
 function normalizeCat(next){
-  if(next==="wheel"||next==="snake"||next==="secret") return next;
+  if(next==="wheel"||next==="snake"||next==="secret"||next==="imposter") return next;
   return "secret";
 }
 function applyCat(next){
@@ -2364,10 +2393,12 @@ function applyCat(next){
   try{ localStorage.setItem("nv-last-game", cat); }catch(e){}
   const wheel=cat==="wheel";
   const snake=cat==="snake";
-  if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake);
+  const imposter=cat==="imposter";
+  if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake||imposter);
   if($("wheelOnly")) $("wheelOnly").classList.toggle("hidden", !wheel);
   if($("snakeOnly")) $("snakeOnly").classList.toggle("hidden", !snake);
-  if($("numberSetup")) $("numberSetup").classList.toggle("hidden", snake);
+  if($("imposterOnly")) $("imposterOnly").classList.toggle("hidden", !imposter);
+  if($("numberSetup")) $("numberSetup").classList.toggle("hidden", snake||imposter);
   const cats=$("cats");
   if(cats){
     for(const x of cats.querySelectorAll("[data-cat]")){
@@ -2382,7 +2413,9 @@ function applyCat(next){
       ?"เลือกได้หลายเลข แล้วอย่าให้วงล้อลงเลขนั้น"
       :snake
         ?"ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ถึงช่อง 100 ชนะ"
-        :"ทายเลข… แต่ห้ามโดนเลขนั้น!";
+        :imposter
+          ?"ให้คำใบ้ คุยในแชท โหวตหา Imposter"
+          :"ทายเลข… แต่ห้ามโดนเลขนั้น!";
   }
   if(changed){
     loadScores();
@@ -2412,6 +2445,20 @@ $("restModes").onclick=e=>{
     x.setAttribute("aria-pressed",on?"true":"false");
   }
   if(onlineMode&&!applying&&isHost()) send({t:"setup",patch:{pointAll:!!$("restModes").querySelector("[data-rest='all'].on")}});
+};
+if($("impostorInfoModes")) $("impostorInfoModes").onclick=e=>{
+  if(onlineMode&&!isHost()) return;
+  const b=e.target.closest("button");
+  if(!b) return;
+  for(const x of $("impostorInfoModes").children){
+    const on=x===b;
+    x.classList.toggle("on",on);
+    x.setAttribute("aria-pressed",on?"true":"false");
+  }
+  if(onlineMode&&!applying&&isHost()){
+    const info=b.getAttribute("data-impostor-info")==="category"?"category":"none";
+    send({t:"setup",patch:{impostorInfo:info}});
+  }
 };
 $("modes").onclick=e=>{
   if(onlineMode&&!isHost()) return;
@@ -2520,6 +2567,7 @@ $("pickGo").onclick=openWheel;
 $("pickUndo").onclick=undoPick;
 $("pickLeave").onclick=leaveGame;
 if($("snakeLeave")) $("snakeLeave").onclick=leaveGame;
+if($("imposterLeave")) $("imposterLeave").onclick=leaveGame;
 $("doSpin").onclick=spinNumber;
 $("wheelRepick").onclick=repickNumbers;
 $("wheelLeave").onclick=leaveGame;
@@ -3332,7 +3380,7 @@ function leaveCurrentRoom(){
   send({t:"leave"});
 }
 function openQuitGameModal(){
-  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="over";
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
   if(!onlineMode||!inGame) return;
   const modal=$("quitGameModal");
   if(modal) modal.classList.remove("hidden");
@@ -3441,13 +3489,33 @@ function syncSetup(s){
   }
   $("rangeLabel").textContent=s.min+"–"+s.max;
   paintSnakeMapSelect(s);
+  const info=s.impostorInfo==="category"?"category":"none";
+  const infoModes=$("impostorInfoModes");
+  if(infoModes){
+    for(const x of infoModes.children){
+      const on=x.dataset.impostorInfo===info;
+      x.classList.toggle("on",on);
+      x.setAttribute("aria-pressed",on?"true":"false");
+    }
+  }
+  if($("impostorCount")&&document.activeElement!==$("impostorCount")){
+    $("impostorCount").value=Number(s.impostorCount)===2?"2":"1";
+  }
+  if($("discussionSec")&&document.activeElement!==$("discussionSec")){
+    $("discussionSec").value=Number(s.discussionSec)||60;
+  }
+  if($("voteSec")&&document.activeElement!==$("voteSec")){
+    $("voteSec").value=Number(s.voteSec)||45;
+  }
 }
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
-    ["cats","modes","restModes"].forEach(id=>{
-      for(const btn of $(id).querySelectorAll("button")) btn.disabled=false;
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
+      const wrap=$(id);
+      if(!wrap) return;
+      for(const btn of wrap.querySelectorAll("button")) btn.disabled=false;
     });
     return;
   }
@@ -3456,19 +3524,21 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","discussionSec","voteSec"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
-  ["cats","modes","restModes"].forEach(id=>{
-    for(const btn of $(id).querySelectorAll("button")) btn.disabled=!canSetup;
+  ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
+    const wrap=$(id);
+    if(!wrap) return;
+    for(const btn of wrap.querySelectorAll("button")) btn.disabled=!canSetup;
   });
   const setupSubmit=$("setup")&&($("setup").querySelector("button.btn[type='submit']")||$("setup").querySelector("button.btn"));
   if(setupSubmit){
     setupSubmit.disabled=!canSetup;
     setupSubmit.textContent="บันทึกการตั้งค่า";
   }
-  ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{
+  ["leave","back","wheelLeave","pickLeave","snakeLeave","imposterLeave"].forEach(id=>{
     const el=$(id);
     if(!el) return;
     // Spectators use quit (unwatch); hide host abort buttons.
@@ -3477,7 +3547,7 @@ function hostLocks(){
     el.textContent="กลับห้อง";
   });
   if($("quitGameBtn")){
-    const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="over";
+    const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
     $("quitGameBtn").classList.toggle("hidden",!(onlineMode&&inGame));
   }
   const canRenameRoom=host&&lobby&&!spectating;
@@ -3637,6 +3707,16 @@ function applySnap(s){
         :"ทอยลูกเต๋า · ปีนบันได · เลี่ยงงู · ถึง 100 ชนะ · ผู้เล่นสูงสุด "+(s.maxPlayers||6)+(mapName?" · แมพ "+mapName:"");
     }
     updateSnakeBoard(s);
+    if(spectating) applySpectatorUi();
+    renderPlayers();
+  }else if(s.phase==="imposter"){
+    show("imposterGame");
+    if($("imposterMode")){
+      $("imposterMode").textContent=spectating
+        ?"กำลังชม · Imposter"
+        :"ให้คำใบ้ · คุย · โหวต · ผู้เล่น 4–"+(s.maxPlayers||8);
+    }
+    updateImposterUi(s);
     if(spectating) applySpectatorUi();
     renderPlayers();
   }else if(s.phase==="wheel"){
@@ -3989,6 +4069,14 @@ function pushNums(){
   }
   const mapEl=$("snakeMap");
   if(mapEl&&mapEl.value) patch.snakeMapId=String(mapEl.value);
+  const infoBtn=$("impostorInfoModes")&&$("impostorInfoModes").querySelector(".on[data-impostor-info]");
+  if(infoBtn) patch.impostorInfo=infoBtn.getAttribute("data-impostor-info")==="category"?"category":"none";
+  const impCount=parseIntStrict(($("impostorCount")&&$("impostorCount").value)||"1");
+  if(impCount!=null) patch.impostorCount=impCount===2?2:1;
+  const disc=parseIntStrict(($("discussionSec")&&$("discussionSec").value)||"");
+  if(disc!=null) patch.discussionSec=disc;
+  const vote=parseIntStrict(($("voteSec")&&$("voteSec").value)||"");
+  if(vote!=null) patch.voteSec=vote;
   send({t:"setup",patch});
 }
 function pushSnakeMap(){
@@ -4291,7 +4379,7 @@ async function bootOnline(){
   if($("winnerModal")) $("winnerModal").addEventListener("click",e=>{
     if(e.target===$("winnerModal")) closeWinnerModal();
   });
-  ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
+  ["leave","back","wheelLeave","pickLeave","snakeLeave","imposterLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };

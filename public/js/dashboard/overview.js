@@ -7,6 +7,7 @@ function esc(s) {
 function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "snake") return "บันไดงู";
+  if (mode === "imposter") return "Imposter";
   return "หาเลข";
 }
 
@@ -109,7 +110,9 @@ export async function renderOverview(root, { user, openCreate, openRooms, summar
               ? "wheel"
               : lastGame.gameMode === "snake"
                 ? "snake"
-                : "secret"
+                : lastGame.gameMode === "imposter"
+                  ? "imposter"
+                  : "secret"
         });
   }
 

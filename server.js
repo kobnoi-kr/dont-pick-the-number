@@ -30,6 +30,7 @@ const {
   userBypassesMaintenance
 } = require("./src/system/public-settings");
 const snakeBridge = require("./src/games/snake-ladders/room-bridge");
+const imposterBridge = require("./src/games/imposter/room-bridge");
 
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
@@ -51,7 +52,11 @@ const PUBLIC_DASHBOARD =
 const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 function roomMaxPlayers(room) {
+  if (room && room.cat === "imposter") return imposterBridge.MAX_PLAYERS;
   return snakeBridge.roomCap(room, MAX_PLAYERS);
+}
+function normalizeGameCat(cat) {
+  return imposterBridge.normalizeCat(cat) || snakeBridge.normalizeCat(cat);
 }
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
@@ -517,21 +522,44 @@ function blankRoom(code, visibility, host) {
     startedAt: null,
     _persisted: false,
     snake: null,
-    snakeMapId: snakeBridge.DEFAULT_MAP_ID || "classic"
+    snakeMapId: snakeBridge.DEFAULT_MAP_ID || "classic",
+    imposter: null,
+    impostorInfo: "none",
+    impostorCount: 1,
+    discussionSec: 60,
+    voteSec: 45,
+    imposterTimer: null
   };
 }
 function applyRoomSetup(room, setup) {
   if (!setup || typeof setup !== "object") return;
-  const nextCat = snakeBridge.normalizeCat(setup.cat);
+  const nextCat = normalizeGameCat(setup.cat);
   if (nextCat) {
     if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
       /* keep previous cat — too many seated for snake */
+    } else if (nextCat === "imposter" && room.players.length > imposterBridge.MAX_PLAYERS) {
+      /* keep previous cat */
     } else {
       room.cat = nextCat;
     }
   }
   if (setup.snakeMapId != null) {
     room.snakeMapId = snakeBridge.normalizeMapId(setup.snakeMapId);
+  }
+  if (setup.impostorInfo != null) {
+    room.impostorInfo = imposterBridge.normalizeInfo(setup.impostorInfo);
+  }
+  if (setup.impostorCount != null) {
+    room.impostorCount = imposterBridge.normalizeImpostorCount(
+      setup.impostorCount,
+      (room.players && room.players.length) || 4
+    );
+  }
+  if (Number.isInteger(setup.discussionSec)) {
+    room.discussionSec = Math.min(180, Math.max(30, setup.discussionSec));
+  }
+  if (Number.isInteger(setup.voteSec)) {
+    room.voteSec = Math.min(120, Math.max(20, setup.voteSec));
   }
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
@@ -599,6 +627,12 @@ function snap(room, player, opts) {
     snakeMapId: snakeBridge.normalizeMapId(room.snakeMapId || snakeBridge.DEFAULT_MAP_ID),
     snakeMaps: snakeBridge.listMaps(),
     snake: snakeBridge.snapSnake(room),
+    impostorInfo: room.impostorInfo === "category" ? "category" : "none",
+    impostorCount: Number(room.impostorCount) === 2 ? 2 : 1,
+    discussionSec: Number(room.discussionSec) || 60,
+    voteSec: Number(room.voteSec) || 45,
+    imposter: imposterBridge.snapImposter(room, spectator ? null : player),
+    youImposter: spectator ? null : imposterBridge.privateImposter(room, player),
     players: room.players.map((item) => ({
       id: item.id,
       name: item.name,
@@ -1401,13 +1435,31 @@ async function onSetup(ws, msg) {
   if (ctx.room.phase !== "lobby" || ctx.room.activeSpin) return;
   const patch = msg.patch && typeof msg.patch === "object" ? msg.patch : {};
   const room = ctx.room;
-  const nextCat = snakeBridge.normalizeCat(patch.cat);
+  const nextCat = normalizeGameCat(patch.cat);
   if (nextCat) {
     if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
       return fail(ws, "บันไดงูรองรับได้สูงสุด " + snakeBridge.MAX_PLAYERS + " คน");
     }
+    if (nextCat === "imposter" && room.players.length > imposterBridge.MAX_PLAYERS) {
+      return fail(ws, "Imposter รองรับได้สูงสุด " + imposterBridge.MAX_PLAYERS + " คน");
+    }
     if (!(await assertComingSoonPlayable(ws, ctx.player, nextCat))) return;
     room.cat = nextCat;
+  }
+  if (patch.impostorInfo != null) {
+    room.impostorInfo = imposterBridge.normalizeInfo(patch.impostorInfo);
+  }
+  if (patch.impostorCount != null) {
+    room.impostorCount = imposterBridge.normalizeImpostorCount(
+      patch.impostorCount,
+      room.players.length
+    );
+  }
+  if (Number.isInteger(patch.discussionSec)) {
+    room.discussionSec = Math.min(180, Math.max(30, patch.discussionSec));
+  }
+  if (Number.isInteger(patch.voteSec)) {
+    room.voteSec = Math.min(120, Math.max(20, patch.voteSec));
   }
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
     room.rangeMode = patch.rangeMode;
@@ -1467,6 +1519,61 @@ function finishSnakeMatch(room, winnerId) {
     at: Date.now()
   };
 }
+function clearImposterTimer(room) {
+  if (room && room.imposterTimer) {
+    clearTimeout(room.imposterTimer);
+    room.imposterTimer = null;
+  }
+}
+function applyImposterOver(room, over) {
+  clearTurnTimer(room);
+  clearImposterTimer(room);
+  room.phase = "over";
+  room.activeSpin = null;
+  const winners = Array.isArray(over.winners) ? over.winners : [];
+  for (const name of winners) addPoint(room, name);
+  if (winners.length) setChampions(room, winners);
+  room.over = Object.assign(
+    {
+      outOrder: [],
+      many: false,
+      hist: null,
+      again: "เล่นอีกครั้ง",
+      reset: true,
+      winTarget: 1,
+      at: Date.now()
+    },
+    over
+  );
+}
+function armImposterTimer(room) {
+  clearImposterTimer(room);
+  if (!room || room.phase !== "imposter" || !room.imposter) return;
+  const ends = room.imposter.phaseEndsAt;
+  if (!ends) return;
+  const delay = Math.max(50, ends - Date.now() + 20);
+  room.imposterTimer = setTimeout(() => onImposterTick(room), delay);
+}
+function onImposterTick(room) {
+  if (!room || room.phase !== "imposter" || !room.imposter) return;
+  imposterBridge.tickImposter(room);
+  if (imposterBridge.finishIfDone(room, applyImposterOver)) {
+    clearImposterTimer(room);
+    broadcast(room);
+    return;
+  }
+  armImposterTimer(room);
+  broadcast(room);
+}
+function afterImposterAction(room) {
+  if (imposterBridge.finishIfDone(room, applyImposterOver)) {
+    clearImposterTimer(room);
+    broadcast(room);
+    return;
+  }
+  armImposterTimer(room);
+  broadcast(room);
+}
 
 function onStart(ws) {
   const ctx = seat(ws);
@@ -1490,6 +1597,26 @@ function onStart(ws) {
       return fail(ws, err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่มเกมบันไดงูไม่สำเร็จ");
     }
     armTurnTimer(room);
+    broadcast(room);
+    return;
+  }
+  if (room.cat === "imposter") {
+    if (room.players.length > imposterBridge.MAX_PLAYERS) {
+      return fail(ws, "Imposter รองรับได้สูงสุด " + imposterBridge.MAX_PLAYERS + " คน");
+    }
+    if (room.players.length < imposterBridge.MIN_PLAYERS) {
+      return fail(ws, "ต้องมีผู้เล่นอย่างน้อย " + imposterBridge.MIN_PLAYERS + " คน");
+    }
+    try {
+      clearChampions(room);
+      imposterBridge.startImposter(room);
+    } catch (err) {
+      return fail(
+        ws,
+        err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่มเกม Imposter ไม่สำเร็จ"
+      );
+    }
+    armImposterTimer(room);
     broadcast(room);
     return;
   }
@@ -1656,6 +1783,17 @@ function onAgain(ws) {
       snakeBridge.clearSnake(room);
       return fail(ws, "เริ่มบันไดงูรอบใหม่ไม่สำเร็จ");
     }
+  } else if (room.over.mode === "imposter" || room.cat === "imposter") {
+    try {
+      clearChampions(room);
+      imposterBridge.startImposter(room);
+      armImposterTimer(room);
+    } catch (err) {
+      room.phase = "lobby";
+      room.over = null;
+      imposterBridge.clearImposter(room);
+      return fail(ws, "เริ่ม Imposter รอบใหม่ไม่สำเร็จ");
+    }
   } else begin(room);
   broadcast(room);
 }
@@ -1682,6 +1820,8 @@ function onAbort(ws) {
   room.picks = {};
   room.pickCursor = 0;
   snakeBridge.clearSnake(room);
+  clearImposterTimer(room);
+  imposterBridge.clearImposter(room);
   clearAngelGuards(room);
   room.players.forEach((player) => {
     if (!isBot(player)) player.auto = false;
@@ -1693,7 +1833,15 @@ function onClear(ws) {
   const ctx = seat(ws);
   if (!hostOnly(ctx)) return;
   const room = ctx.room;
-  if (room.phase === "play" || room.phase === "pick" || room.phase === "wheel" || room.phase === "snake") return;
+  if (
+    room.phase === "play" ||
+    room.phase === "pick" ||
+    room.phase === "wheel" ||
+    room.phase === "snake" ||
+    room.phase === "imposter"
+  ) {
+    return;
+  }
   clearPoints(room);
   broadcast(room);
 }
@@ -2191,6 +2339,11 @@ function onMessage(ws, raw) {
   if (msg.t === "spinOrder") return onSpinOrder(ws);
   if (msg.t === "start") return onStart(ws);
   if (msg.t === "roll") return onRoll(ws, msg);
+  if (msg.t === "imposter:confirm") return onImposterConfirm(ws);
+  if (msg.t === "imposter:clue") return onImposterClue(ws, msg);
+  if (msg.t === "imposter:skipClue") return onImposterSkipClue(ws);
+  if (msg.t === "imposter:vote") return onImposterVote(ws, msg);
+  if (msg.t === "imposter:guess") return onImposterGuess(ws, msg);
   if (msg.t === "pick") return onPick(ws, msg);
   if (msg.t === "pickNum") return onPickNum(ws, msg);
   if (msg.t === "undo") return onUndo(ws);
@@ -2387,10 +2540,65 @@ async function onUseHelper(ws, msg) {
 
   return fail(ws, "ไอเทมนี้ใช้ในห้องไม่ได้");
 }
+function onImposterConfirm(ws) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.confirmReveal(ctx.room.imposter, ctx.player.id);
+  if (!res.ok) return fail(ws, "ยืนยันบทบาทไม่ได้");
+  afterImposterAction(ctx.room);
+}
+function onImposterClue(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.submitClue(ctx.room.imposter, ctx.player.id, msg && (msg.text || msg.body));
+  if (!res.ok) {
+    const map = {
+      not_your_turn: "ยังไม่ถึงตาคุณ",
+      empty: "พิมพ์คำใบ้ก่อน",
+      secret_word: "ห้ามพิมพ์คำศัพท์จริง",
+      wrong_phase: "ตอนนี้ยังให้คำใบ้ไม่ได้"
+    };
+    return fail(ws, map[res.error] || "ส่งคำใบ้ไม่สำเร็จ");
+  }
+  afterImposterAction(ctx.room);
+}
+function onImposterSkipClue(ws) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.skipClue(ctx.room.imposter, ctx.player.id);
+  if (!res.ok) return fail(ws, "ข้ามตาไม่ได้");
+  afterImposterAction(ctx.room);
+}
+function onImposterVote(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.submitVote(ctx.room.imposter, ctx.player.id, msg && msg.targetId);
+  if (!res.ok) {
+    const map = {
+      self_vote: "โหวตตัวเองไม่ได้",
+      already_voted: "โหวตไปแล้ว",
+      bad_target: "เลือกเป้าหมายไม่ได้",
+      not_alive: "คุณถูกโหวตออกแล้ว",
+      wrong_phase: "ยังไม่ถึงช่วงโหวต"
+    };
+    return fail(ws, map[res.error] || "โหวตไม่สำเร็จ");
+  }
+  afterImposterAction(ctx.room);
+}
+function onImposterGuess(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "imposter" || !ctx.room.imposter) return;
+  const res = imposterBridge.submitGuess(ctx.room.imposter, ctx.player.id, msg && (msg.word || msg.text));
+  if (!res.ok) return fail(ws, "ทายคำไม่สำเร็จ");
+  afterImposterAction(ctx.room);
+}
 function onRoomChat(ws, msg) {
   const ctx = seat(ws);
   if (!ctx || !ctx.player || !ctx.room) return fail(ws, "เข้าห้องก่อน");
   if (ctx.player.bot) return;
+  if (ctx.room.phase === "imposter" && !imposterBridge.chatAllowed(ctx.room)) {
+    return fail(ws, "ช่วงนี้ยังแชทไม่ได้");
+  }
   // Guests cannot send room chat — registered accounts only.
   if (!ws.accountType || ws.accountType !== "registered") {
     return fail(ws, "เข้าสู่ระบบก่อนถึงจะพิมพ์แชทในห้องได้");

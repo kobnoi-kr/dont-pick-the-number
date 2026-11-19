@@ -262,7 +262,7 @@ function skipSnakeTurn(room) {
 }
 
 function normalizeCat(cat) {
-  if (cat === "wheel" || cat === "secret" || cat === "snake") return cat;
+  if (cat === "wheel" || cat === "secret" || cat === "snake" || cat === "imposter") return cat;
   return null;
 }
 

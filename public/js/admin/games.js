@@ -30,7 +30,7 @@ const GAMES = [
     id: "imposter",
     defaultName: "Imposter",
     en: "Find the Imposter",
-    blurb: "เกมแนวหาคนเป็น Imposter — ยังไม่เปิดเล่น ใส่ในคลังเป็น Coming Soon ได้",
+    blurb: "Classic Imposter — คำใบ้ · แชท · โหวต (Coming Soon = แอดมินทดสอบได้)",
     defaultBeta: false,
     defaultComingSoon: true
   },

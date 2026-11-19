@@ -31,7 +31,8 @@ const state = {
 };
 
 function setCreateCat(cat) {
-  const next = cat === "wheel" ? "wheel" : cat === "snake" ? "snake" : "secret";
+  const next =
+    cat === "wheel" ? "wheel" : cat === "snake" ? "snake" : cat === "imposter" ? "imposter" : "secret";
   state.pendingCat = next;
   const hidden = document.getElementById("crCat");
   if (hidden) hidden.value = next;
@@ -68,7 +69,7 @@ function readLastPlayedLocal() {
   if (!key) return "";
   try {
     const v = localStorage.getItem(key) || "";
-    return v === "wheel" || v === "snake" || v === "secret" ? v : "";
+    return v === "wheel" || v === "snake" || v === "secret" || v === "imposter" ? v : "";
   } catch (_) {
     return "";
   }
@@ -82,7 +83,9 @@ function writeLastPlayedLocal(mode) {
   } catch (_) {}
 }
 function normalizeMode(mode) {
-  return mode === "wheel" || mode === "snake" || mode === "secret" ? mode : "";
+  return mode === "wheel" || mode === "snake" || mode === "secret" || mode === "imposter"
+    ? mode
+    : "";
 }
 
 function openCreateModal(opts = {}) {
@@ -132,7 +135,8 @@ async function createRoomFromModal() {
     "Player";
   const catEl = document.getElementById("crCat");
   const raw = (catEl && catEl.value) || state.pendingCat || "secret";
-  const cat = raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : "secret";
+  const cat =
+    raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : raw === "imposter" ? "imposter" : "secret";
   state.pendingCat = cat;
   writeCreateCat(cat);
   const body = {

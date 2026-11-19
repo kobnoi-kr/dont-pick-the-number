@@ -12,6 +12,7 @@ function statusPill(room) {
 function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "snake") return "บันไดงู";
+  if (mode === "imposter") return "Imposter";
   return "หาเลข";
 }
 

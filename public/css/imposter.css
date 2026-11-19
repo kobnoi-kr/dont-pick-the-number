@@ -1,0 +1,179 @@
+/* Imposter Classic — NUMVERSE */
+.imp-root {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 4px 24px;
+}
+.imp-phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.imp-phase-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+}
+.imp-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.08);
+}
+.imp-clue-board {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.imp-clue-board li {
+  display: grid;
+  grid-template-columns: minmax(72px, 120px) 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.imp-clue-board .who {
+  font-weight: 600;
+  opacity: 0.85;
+}
+.imp-clue-board .text {
+  font-weight: 700;
+  word-break: break-word;
+}
+.imp-clue-form,
+.imp-guess-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.imp-clue-form input,
+.imp-guess-form input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.imp-vote-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.imp-vote-grid button {
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+}
+.imp-vote-grid button.is-picked {
+  outline: 2px solid currentColor;
+}
+.imp-tallies {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.imp-tallies li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+}
+.imp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 10, 18, 0.55);
+  backdrop-filter: blur(4px);
+  animation: impFadeIn 0.22s ease;
+}
+.imp-overlay.hidden {
+  display: none;
+}
+.imp-popup {
+  width: min(420px, 100%);
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  animation: impPopIn 0.28s cubic-bezier(0.2, 0.9, 0.2, 1);
+  text-align: center;
+}
+.imp-popup h2 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+.imp-popup .imp-word {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 12px 0;
+}
+.imp-popup.is-imposter {
+  background: linear-gradient(160deg, #1a1220, #2a1528);
+  color: #ffe8f0;
+}
+.imp-popup.is-imposter .btn {
+  background: #fff;
+  color: #1a1220;
+}
+.imp-hint {
+  opacity: 0.8;
+  font-size: 0.92rem;
+  margin: 0 0 14px;
+}
+.imp-alive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.imp-alive span {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.imp-alive span.is-out {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+@keyframes impFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes impPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 640px) {
+  .imp-clue-board li {
+    grid-template-columns: 1fr;
+  }
+  .imp-popup {
+    padding: 18px 14px 14px;
+  }
+}
