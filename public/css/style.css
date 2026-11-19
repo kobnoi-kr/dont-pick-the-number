@@ -869,9 +869,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .modal-card h3{margin:0 0 6px;text-align:center}
 .modal-card .sub{margin-bottom:14px}
 .modal-card .btn.ghost{margin-top:8px}
-.helpbtn{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));z-index:45;width:48px;height:48px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12);display:grid;place-items:center;cursor:pointer;padding:0;touch-action:manipulation}
-.helpbtn img{width:28px;height:28px;display:block;pointer-events:none}
+.helpbtn{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));z-index:45;width:36px;height:36px;border:1px solid var(--line);border-radius:11px;background:var(--card);box-shadow:0 4px 14px rgba(30,50,100,.12);display:grid;place-items:center;cursor:pointer;padding:0;touch-action:manipulation}
+.helpbtn img{width:20px;height:20px;display:block;pointer-events:none}
 .helpbtn:hover{border-color:var(--blue)}
+body.room-bg .helpbtn{
+  background:rgba(12,16,28,.92);
+  border-color:rgba(255,255,255,.12);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  backdrop-filter:blur(10px);
+}
 .guide-card{width:min(100%,520px);max-height:min(86vh,720px);display:flex;flex-direction:column}
 .guide-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .guide-head h3{margin:0;text-align:left}
@@ -898,11 +904,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .host-only-note{display:none;margin:0 0 10px;color:var(--muted);font-size:.92rem}
 .setup.locked .host-only-note{display:block}
 /* Volume — top-left (away from in-game chat) */
-.volbar{position:fixed;left:max(12px,env(safe-area-inset-left));right:auto;top:max(12px,env(safe-area-inset-top));bottom:auto;z-index:40;display:flex;align-items:center;gap:6px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 6px 20px rgba(30,50,100,.12);touch-action:manipulation;-webkit-user-select:none;user-select:none}
-.volbtn{width:44px;height:44px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:1.35rem;font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.volbar{position:fixed;left:max(12px,env(safe-area-inset-left));right:auto;top:max(12px,env(safe-area-inset-top));bottom:auto;z-index:40;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--card);box-shadow:0 4px 14px rgba(30,50,100,.12);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.volbtn{width:30px;height:30px;border:0;border-radius:50%;background:var(--chip);color:var(--text);font-size:1.05rem;font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .volbtn:hover{background:var(--blue);color:#fff}
 .volbtn:disabled{opacity:.4;cursor:not-allowed}
-.vollabel{min-width:3.2em;text-align:center;font-size:.85rem;font-weight:700;color:var(--muted);pointer-events:none}
+.vollabel{min-width:2.6em;text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);pointer-events:none}
 body.room-bg .volbar{
   background:rgba(12,16,28,.92);
   border-color:rgba(255,255,255,.12);
