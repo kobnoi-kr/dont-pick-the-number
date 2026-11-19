@@ -25,6 +25,7 @@ function tokenOffset(index, total) {
  *   onRoll?: (parity?: 'even'|'odd'|null) => void,
  *   onToggleAuto?: () => void,
  *   onSnakeHit?: () => void,
+ *   onBombHit?: (effect: object) => void,
  *   onYourTurn?: () => void,
  *   onOpenBag?: () => void
  * }} opts
@@ -34,6 +35,7 @@ export function createLiveBoard(opts) {
   const onRoll = typeof opts.onRoll === "function" ? opts.onRoll : null;
   const onToggleAuto = typeof opts.onToggleAuto === "function" ? opts.onToggleAuto : null;
   const onSnakeHit = typeof opts.onSnakeHit === "function" ? opts.onSnakeHit : null;
+  const onBombHit = typeof opts.onBombHit === "function" ? opts.onBombHit : null;
   const onYourTurn = typeof opts.onYourTurn === "function" ? opts.onYourTurn : null;
   const onOpenBag = typeof opts.onOpenBag === "function" ? opts.onOpenBag : null;
   root.innerHTML = `
@@ -594,14 +596,17 @@ export function createLiveBoard(opts) {
     ensureTokens(state.players);
 
     const moveKey = state.lastMove
-      ? `${state.version}:${state.lastDice}:${state.lastMove.from}:${state.lastMove.final}:${state.lastMoverId || ""}`
+      ? `${state.version}:${state.lastDice}:${state.lastMove.from}:${state.lastMove.final}:${state.lastMoverId || ""}:${
+          (state.lastMove.bombEffect && state.lastMove.bombEffect.type) || ""
+        }`
       : "";
+    const isNewMove = !!(moveKey && moveKey !== lastMoveKey);
     const shouldAnim =
-      moveKey &&
-      moveKey !== lastMoveKey &&
+      isNewMove &&
       state.lastMove &&
       Array.isArray(state.lastMove.steps) &&
       state.lastMove.steps.length;
+    const bombFx = state.lastMove && state.lastMove.bombEffect;
 
     if (shouldAnim) {
       lastMoveKey = moveKey;
@@ -619,15 +624,24 @@ export function createLiveBoard(opts) {
           msg += state.lastMove.portal.type === "ladder" ? " 🪜" : " 🐍";
           msg += ` → ${state.lastMove.final}`;
         }
-        const bomb = state.lastMove.bombEffect;
-        if (bomb && bomb.type === "angel") msg += " · 👼 โมฆะบอม";
-        else if (bomb && bomb.type === "back") msg += ` · 💣 ถอย ${bomb.steps} ช่อง`;
-        else if (bomb && bomb.type === "pause") msg += ` · 💣 Pause ${bomb.turns} เทิร์น`;
+        if (bombFx && bombFx.type === "angel") msg += " · 👼 โมฆะบอม";
+        else if (bombFx && bombFx.type === "back") msg += ` · 💣 ถอย ${bombFx.steps} ช่อง`;
+        else if (bombFx && bombFx.type === "pause") msg += ` · 💣 Pause ${bombFx.turns} เทิร์น`;
         log(msg);
       }
+      if (bombFx && onBombHit) onBombHit(bombFx);
       await animateLastMove(state);
-    } else if (moveKey) {
+    } else if (isNewMove) {
       lastMoveKey = moveKey;
+      if (bombFx) {
+        const who =
+          (state.players || []).find((p) => p.userId === state.lastMoverId) || null;
+        const name = who ? who.username : "?";
+        if (bombFx.type === "angel") log(`${name} · 👼 โมฆะบอม`);
+        else if (bombFx.type === "back") log(`${name} · 💣 ถอย ${bombFx.steps} ช่อง`);
+        else if (bombFx.type === "pause") log(`${name} · 💣 Pause ${bombFx.turns} เทิร์น`);
+        if (onBombHit) onBombHit(bombFx);
+      }
     }
 
     syncBombMarkers(state.bombs);

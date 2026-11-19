@@ -1027,14 +1027,16 @@ function armTurnTimer(room) {
   const player = turnPlayer(room);
   if (!player || !canTakeTurn(player)) return;
   const autoNow = !!(player.auto || player.bot);
-  // Snake: bots/auto always tick (delay lets board walk anim finish); humans only if turnSec > 0
+  // Snake: bots/auto always tick (delay lets board walk anim finish).
+  // Humans: host turnSec if set, otherwise AFK → auto after 15s.
+  const configuredSec = Number.isInteger(room.turnSec) && room.turnSec > 0 ? room.turnSec : 0;
   const sec = autoNow
     ? room.phase === "snake"
       ? 1.7
       : 0.4
-    : Number.isInteger(room.turnSec) && room.turnSec > 0
-      ? room.turnSec
-      : 0;
+    : room.phase === "snake"
+      ? configuredSec || 15
+      : configuredSec;
   if (sec < 0.1) return;
   const until = Date.now() + Math.round(sec * 1000);
   room.turnUntil = until;

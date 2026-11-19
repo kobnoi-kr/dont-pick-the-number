@@ -26,6 +26,7 @@ function ensureSnakeBoard(){
       send({t:"auto",on:!myAuto});
     },
     onSnakeHit:()=>playClip(SNAKE_HIT_SOUND),
+    onBombHit:()=>playClip(BOMB_SOUND),
     onYourTurn:()=>playClip(YOUR_TURN_SOUND),
     onOpenBag:()=>{
       if(!onlineMode||spectating||!canUseFriends()) return;
@@ -3266,7 +3267,8 @@ const GUIDE={
 <section><h4>เคล็ดลับ</h4><ul>
 <li>ระหว่างเกมกดปุ่ม <b>🎒 ไอเทม</b> เพื่อใช้ Skip Turn / วางบอม จากกระเป๋า</li>
 <li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบเล่นแทนคุณได้</li>
-<li>ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น</li>
+<li>บันไดงู: AFK เกิน 15 วินาที ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น (หรือตามเวลานับถอยหลังที่โฮสต์ตั้ง)</li>
+<li>โหมดอื่น: ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น</li>
 <li>ปรับเสียงได้ที่ปุ่ม − / + มุมซ้ายบน · คู่มืออยู่ปุ่มมุมขวาบน</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
