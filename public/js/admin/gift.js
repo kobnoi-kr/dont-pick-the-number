@@ -345,9 +345,7 @@ export async function renderGift(root, { user }) {
             : ""
         }
         <label style="display:block;margin-top:12px">หมายเหตุถึงผู้เล่น (ถ้ามี)
-          <input class="input" id="giftNote" maxlength="200" placeholder="${
-            mode === "gift" ? "เช่น ชดเชยยศ Weekly ที่ระบบพลาด" : "เช่น ดึงของที่ให้ผิดคน"
-          }">
+          <input class="input" id="giftNote" maxlength="200" placeholder="">
         </label>
         ${
           mode === "gift"
