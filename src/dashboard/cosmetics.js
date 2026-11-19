@@ -1588,6 +1588,134 @@ async function handleAdminCosmeticsApi(req, res, pathname) {
     return true;
   }
 
+  if (pathname === "/api/v1/admin/cosmetics/gift-all" && method(req) === "POST") {
+    const auth = await requireAdmin(req, res);
+    if (!auth) return true;
+    if (!userHasPermission(auth.user, "cosmetics.gift") && !userHasPermission(auth.user, "users.ban")) {
+      sendJson(res, 403, { error: "permission_denied", permission: "cosmetics.gift" });
+      return true;
+    }
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendJson(res, 400, { error: "invalid_json" });
+      return true;
+    }
+    const cosmeticId = String((body && body.cosmeticId) || "").trim();
+    if (!cosmeticId) {
+      sendJson(res, 400, { error: "invalid_input" });
+      return true;
+    }
+    if (isRankingTitleId(cosmeticId)) {
+      sendJson(res, 400, { error: "ranking_title_earn_only" });
+      return true;
+    }
+    await ensureCosmeticsCatalog(prisma);
+    const cosmetic = await prisma.cosmetic.findUnique({ where: { id: cosmeticId } });
+    if (!cosmetic) {
+      sendJson(res, 404, { error: "cosmetic_not_found" });
+      return true;
+    }
+    const autoEquip = !!(body && body.autoEquip);
+    const note = String((body && body.note) || "").trim().slice(0, 200);
+    const targets = await prisma.user.findMany({
+      where: { accountType: "registered", status: "active" },
+      select: { id: true, username: true },
+      orderBy: { createdAt: "asc" }
+    });
+    let granted = 0;
+    let alreadyOwned = 0;
+    let equipped = 0;
+    let failed = 0;
+    const notifRows = [];
+    const kindLabel = KIND_TH[cosmetic.kind] || cosmetic.kind;
+    for (const target of targets) {
+      try {
+        const result = await adminGiftCosmetic(prisma, {
+          targetUserId: target.id,
+          cosmeticId,
+          autoEquip,
+          source: "admin_gift"
+        });
+        if (result.alreadyOwned) alreadyOwned += 1;
+        else granted += 1;
+        if (result.equipped) equipped += 1;
+        const bodyText = result.alreadyOwned
+          ? `แอดมินยืนยันของ ${kindLabel}「${result.cosmetic.name}」ให้คุณแล้ว` +
+            (result.equipped ? " และสวมให้แล้ว" : "")
+          : `แอดมินมอบ ${kindLabel}「${result.cosmetic.name}」ให้คุณ` +
+            (result.equipped ? " และสวมให้แล้ว" : " — ไปสวมได้ที่เมนู ตกแต่ง");
+        notifRows.push({
+          userId: target.id,
+          type: "system_grant",
+          title: "ได้รับของจากแอดมิน",
+          body: bodyText,
+          payload: {
+            kind: "admin_gift_all",
+            fullBody:
+              bodyText +
+              (note ? "\n\nข้อความจากแอดมิน: " + note : "") +
+              "\n\nเปิดเมนู ตกแต่ง เพื่อดูของในคลัง",
+            cosmeticId: cosmetic.id,
+            cosmeticKind: cosmetic.kind,
+            cosmeticName: cosmetic.name,
+            autoEquip: result.equipped,
+            note: note || null,
+            href: "/app#decorate"
+          }
+        });
+      } catch {
+        failed += 1;
+      }
+    }
+    if (notifRows.length) {
+      try {
+        await prisma.notification.createMany({ data: notifRows });
+      } catch {
+        /* ignore notification batch failures */
+      }
+    }
+    const gameApi = getGameApi();
+    if (gameApi && typeof gameApi.notifyUser === "function") {
+      for (const row of notifRows) {
+        try {
+          gameApi.notifyUser(row.userId, { type: "system_grant" });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    await writeAdminLog(prisma, {
+      adminId: auth.user.id,
+      action: "cosmetics.gift_all",
+      targetId: null,
+      metadata: {
+        cosmeticId: cosmetic.id,
+        kind: cosmetic.kind,
+        name: cosmetic.name,
+        autoEquip,
+        note: note || null,
+        targets: targets.length,
+        granted,
+        alreadyOwned,
+        equipped,
+        failed
+      },
+      ipAddress: clientIp(req)
+    });
+    sendJson(res, 200, {
+      ok: true,
+      cosmetic: publicCosmetic(cosmetic),
+      targets: targets.length,
+      granted,
+      alreadyOwned,
+      equipped,
+      failed
+    });
+    return true;
+  }
+
   function canManageShop(user, userHasPermission) {
     return (
       userHasPermission(user, "cosmetics.gift") ||

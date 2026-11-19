@@ -362,6 +362,13 @@ export async function renderGift(root, { user }) {
             canAct ? "" : "disabled"
           }>${mode === "gift" ? "มอบของ" : "ดึงของกลับ"}</button>
           ${
+            mode === "gift"
+              ? `<button type="button" class="btn ghost" id="giftSendAll" ${
+                  selected ? "" : "disabled"
+                }>แจกทุกคน</button>`
+              : ""
+          }
+          ${
             selected && selected.kind === "title" && selected.deletable
               ? `<button type="button" class="btn ghost danger sm" id="titleDeleteBtn">ลบยศนี้ถาวร</button>`
               : ""
@@ -595,6 +602,101 @@ export async function renderGift(root, { user }) {
         const n = Math.floor(Number(qtyEl.value) || 1);
         giftQty = Math.min(99, Math.max(1, n));
         qtyEl.value = String(giftQty);
+      };
+    }
+
+    const sendAllBtn = root.querySelector("#giftSendAll");
+    if (sendAllBtn) {
+      sendAllBtn.onclick = async () => {
+        if (mode !== "gift" || !selectedCosmeticId) return;
+        const selectedItem = items.find((it) => it.id === selectedCosmeticId);
+        if (!selectedItem) return;
+        const isHelper = selectedItem.kind === "helper";
+        const qtyInput = root.querySelector("#giftQty");
+        const quantity = Math.min(
+          99,
+          Math.max(1, Math.floor(Number(qtyInput && qtyInput.value) || giftQty || 1))
+        );
+        giftQty = quantity;
+        const label = (KIND_LABEL[selectedItem.kind] || selectedItem.kind) + " · " + selectedItem.name;
+        const qtyLine = isHelper ? " ×" + quantity : "";
+        if (
+          !(await confirmDialog(
+            "แจก「" + label + "」" + qtyLine + " ให้ผู้เล่น registered ที่ active ทุกคน?\nการกระทำนี้ส่งถึงทุกคนในระบบ",
+            { danger: true }
+          ))
+        ) {
+          return;
+        }
+        sendAllBtn.disabled = true;
+        const giftSend = root.querySelector("#giftSend");
+        if (giftSend) giftSend.disabled = true;
+        setMsg("กำลังแจกทุกคน…", true);
+        const note = (root.querySelector("#giftNote") && root.querySelector("#giftNote").value.trim()) || "";
+        let r;
+        if (isHelper) {
+          r = await api("/api/v1/admin/inventory/gift-all", {
+            method: "POST",
+            body: JSON.stringify({ itemId: selectedCosmeticId, quantity, note })
+          });
+        } else {
+          const autoEquip = !!(root.querySelector("#giftAutoEquip") || {}).checked;
+          r = await api("/api/v1/admin/cosmetics/gift-all", {
+            method: "POST",
+            body: JSON.stringify({
+              cosmeticId: selectedCosmeticId,
+              autoEquip,
+              note
+            })
+          });
+        }
+        sendAllBtn.disabled = false;
+        if (giftSend) giftSend.disabled = !canAct;
+        if (!r.res.ok) {
+          const err = (r.data && r.data.error) || "";
+          setMsg(
+            err === "ranking_title_earn_only"
+              ? "ยศ Ranking มอบผ่าน Gift ไม่ได้"
+              : err === "cosmetic_not_found" || err === "item_not_found"
+                ? "ไม่พบของที่เลือก"
+                : "แจกทุกคนไม่สำเร็จ",
+            false
+          );
+          return;
+        }
+        const name =
+          (r.data && (r.data.item || r.data.cosmetic) && (r.data.item || r.data.cosmetic).name) ||
+          selectedItem.name;
+        if (isHelper) {
+          setMsg(
+            "แจก「" +
+              name +
+              "」×" +
+              quantity +
+              " ให้ " +
+              (r.data.granted || 0) +
+              "/" +
+              (r.data.targets || 0) +
+              " คนแล้ว" +
+              (r.data.skippedMax ? " · เต็มโควต้า " + r.data.skippedMax + " คน" : "") +
+              (r.data.failed ? " · ล้มเหลว " + r.data.failed + " คน" : ""),
+            true
+          );
+        } else {
+          setMsg(
+            "แจก「" +
+              name +
+              "」ให้ " +
+              ((r.data.granted || 0) + (r.data.alreadyOwned || 0)) +
+              "/" +
+              (r.data.targets || 0) +
+              " คนแล้ว" +
+              (r.data.alreadyOwned ? " · มีอยู่แล้ว " + r.data.alreadyOwned + " คน" : "") +
+              (r.data.equipped ? " · สวมให้ " + r.data.equipped + " คน" : "") +
+              (r.data.failed ? " · ล้มเหลว " + r.data.failed + " คน" : ""),
+            true
+          );
+        }
       };
     }
 
