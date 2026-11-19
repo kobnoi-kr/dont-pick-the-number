@@ -124,8 +124,31 @@ body.snake-play #autoSnake {
   display: none !important;
 }
 
+/* Match map wood/sky theme — no blue glass strip over the board room */
 body.snake-play .roombar.in-game {
-  margin-bottom: 4px;
+  margin: 0 0 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+body.snake-play .roombar.in-game .badge {
+  background: rgba(0, 0, 0, 0.48);
+  border-color: color-mix(in srgb, var(--sl-border) 65%, transparent);
+  color: #f8fafc;
+}
+body.snake-play .roombar.in-game .badge.private {
+  border-color: color-mix(in srgb, var(--sl-border) 80%, #fb923c);
+  color: #fdba74;
+}
+body.snake-play .roombar.in-game .roomcount {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: color-mix(in srgb, var(--sl-border) 45%, transparent);
+  color: #e2e8f0;
+}
+body.snake-play .roombar.in-game .quit-power-btn {
+  background: rgba(0, 0, 0, 0.48);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
 }
 
 #snakeGame .sl-board-wrap {
