@@ -26,7 +26,11 @@ function ensureSnakeBoard(){
       send({t:"auto",on:!myAuto});
     },
     onSnakeHit:()=>playClip(SNAKE_HIT_SOUND),
-    onYourTurn:()=>playClip(YOUR_TURN_SOUND)
+    onYourTurn:()=>playClip(YOUR_TURN_SOUND),
+    onOpenBag:()=>{
+      if(!onlineMode||spectating||!canUseFriends()) return;
+      openLobbyBagModal();
+    }
   });
   return snakeLive;
 }
@@ -1480,12 +1484,18 @@ async function refreshAngelQty(){
 }
 function paintLobbyAngel(){
   const btn=$("lobbyItemBtn");
-  if(!btn) return;
   const inLobby=netPhase==="lobby";
   const inGame=netPhase==="play"||netPhase==="snake"||netPhase==="wheel";
-  const show=onlineMode&&!spectating&&canUseFriends()&&(inLobby||inGame);
-  btn.classList.toggle("hidden",!show);
-  if(!show) closeLobbyBagModal();
+  const canBag=onlineMode&&!spectating&&canUseFriends();
+  const showLobby=canBag&&inLobby;
+  const showInGame=canBag&&inGame;
+  if(btn) btn.classList.toggle("hidden",!showLobby);
+  const fab=$("inGameBagBtn");
+  if(fab){
+    // Snake board has its own bag control — FAB for secret/wheel only.
+    fab.classList.toggle("hidden",!(showInGame&&netPhase!=="snake"));
+  }
+  if(!showLobby&&!showInGame) closeLobbyBagModal();
   else if($("lobbyBagModal")&&!$("lobbyBagModal").classList.contains("hidden")) paintLobbyBagModal();
 }
 function helperCanUseInBag(item){
@@ -4038,7 +4048,13 @@ async function bootOnline(){
   if($("clearScores")) $("clearScores").onclick=()=>{ if(isHost()) send({t:"clear"}); };
   if($("lobbyStartBtn")) $("lobbyStartBtn").onclick=()=>requestStartGame();
   if($("lobbyItemBtn")) $("lobbyItemBtn").onclick=()=>{
-    if(!onlineMode||netPhase!=="lobby"||spectating) return;
+    if(!onlineMode||spectating||!canUseFriends()) return;
+    if(netPhase!=="lobby"&&netPhase!=="play"&&netPhase!=="snake"&&netPhase!=="wheel") return;
+    openLobbyBagModal();
+  };
+  if($("inGameBagBtn")) $("inGameBagBtn").onclick=()=>{
+    if(!onlineMode||spectating||!canUseFriends()) return;
+    if(netPhase!=="play"&&netPhase!=="snake"&&netPhase!=="wheel") return;
     openLobbyBagModal();
   };
   if($("lobbyBagClose")) $("lobbyBagClose").onclick=()=>closeLobbyBagModal();

@@ -176,6 +176,7 @@ html,body{background:#070b14}
     <button class="btn ghost" type="button" id="autoSnake" aria-pressed="false">เล่นอัตโนมัติ</button>
     <button class="btn ghost" type="button" id="snakeLeave">กลับห้อง</button>
   </section>
+<button type="button" id="inGameBagBtn" class="in-game-bag-btn hidden" aria-label="เปิดกระเป๋าไอเทม" title="ไอเทม">🎒 ไอเทม</button>
 
   <section id="wheelGame" class="hidden">
     <div class="brand compact" aria-label="NUMVERSE">
@@ -506,7 +507,7 @@ html,body{background:#070b14}
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=items2";
+    s.src = "/js/game.js?v=baghide1";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

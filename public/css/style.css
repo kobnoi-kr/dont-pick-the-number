@@ -1197,7 +1197,49 @@ body.snake-play .room-chat-dock{
 @media (max-width:960px){
   body.in-game .room-chat-dock{
     width:min(100vw - 24px, 360px);
-    height:min(280px, 40vh);
+    height:min(220px, 32vh);
+  }
+  body.snake-play .room-chat-dock{
+    width:min(100vw - 24px, 360px);
+    height:auto;
+    max-height:min(180px, 28vh);
+  }
+  body.snake-play .room-chat-log{
+    display:none;
+  }
+}
+
+/* In-game bag FAB — secret / wheel / snake fallback */
+.in-game-bag-btn{
+  position:fixed;
+  left:max(12px, env(safe-area-inset-left));
+  bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  z-index:42;
+  appearance:none;
+  border:1px solid rgba(96,165,250,.4);
+  background:rgba(12,16,28,.92);
+  color:#e8edf8;
+  border-radius:999px;
+  padding:10px 14px;
+  font:inherit;
+  font-weight:800;
+  font-size:.88rem;
+  cursor:pointer;
+  box-shadow:0 10px 28px rgba(0,0,0,.4);
+  backdrop-filter:blur(8px);
+}
+.in-game-bag-btn:hover{border-color:#60a5fa;color:#93c5fd}
+.in-game-bag-btn.hidden{display:none !important}
+body.snake-play .in-game-bag-btn{
+  /* Snake board has its own bag control — keep FAB as backup on the left */
+  bottom:calc(88px + env(safe-area-inset-bottom,0px));
+}
+body.in-game .in-game-bag-btn{
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+}
+@media (max-width:960px){
+  body.in-game .in-game-bag-btn{
+    bottom:calc(64px + env(safe-area-inset-bottom,0px));
   }
 }
 

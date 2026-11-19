@@ -25,7 +25,8 @@ function tokenOffset(index, total) {
  *   onRoll?: (parity?: 'even'|'odd'|null) => void,
  *   onToggleAuto?: () => void,
  *   onSnakeHit?: () => void,
- *   onYourTurn?: () => void
+ *   onYourTurn?: () => void,
+ *   onOpenBag?: () => void
  * }} opts
  */
 export function createLiveBoard(opts) {
@@ -34,6 +35,7 @@ export function createLiveBoard(opts) {
   const onToggleAuto = typeof opts.onToggleAuto === "function" ? opts.onToggleAuto : null;
   const onSnakeHit = typeof opts.onSnakeHit === "function" ? opts.onSnakeHit : null;
   const onYourTurn = typeof opts.onYourTurn === "function" ? opts.onYourTurn : null;
+  const onOpenBag = typeof opts.onOpenBag === "function" ? opts.onOpenBag : null;
   root.innerHTML = `
     <div class="sl-live">
       <div class="sl-stage">
@@ -46,8 +48,14 @@ export function createLiveBoard(opts) {
           </div>
         </div>
       </div>
-      <aside class="sl-panel">
-        <div class="sl-panel-title">บันไดงู</div>
+      <aside class="sl-panel" data-el="panel">
+        <div class="sl-panel-head">
+          <div class="sl-panel-title">บันไดงู</div>
+          <div class="sl-panel-head-acts">
+            <button type="button" class="sl-icon-btn" data-el="bag" title="ไอเทม" aria-label="เปิดกระเป๋าไอเทม">🎒</button>
+            <button type="button" class="sl-icon-btn" data-el="hidePanel" title="ซ่อนแผง" aria-label="ซ่อนแผงควบคุม">ซ่อน</button>
+          </div>
+        </div>
         <div class="sl-meta">
           <div>แมพ: <strong data-el="map">—</strong></div>
           <div>สถานะ: <strong data-el="status">—</strong></div>
@@ -68,10 +76,24 @@ export function createLiveBoard(opts) {
         <p class="sl-wait" data-el="wait">รอกระดานจากเซิร์ฟเวอร์…</p>
         <div class="sl-log" data-el="log"></div>
       </aside>
+      <div class="sl-compact-bar hidden" data-el="compact">
+        <button type="button" class="sl-btn sl-btn-compact" data-el="compactRoll">ทอย</button>
+        <button type="button" class="sl-btn sl-btn-compact sl-btn-ghost" data-el="compactBag">ไอเทม</button>
+        <button type="button" class="sl-btn sl-btn-compact sl-btn-ghost" data-el="compactShow">แสดงแผง</button>
+      </div>
     </div>
   `;
 
+  const live = root.querySelector(".sl-live");
   const els = {
+    live,
+    panel: root.querySelector('[data-el="panel"]'),
+    compact: root.querySelector('[data-el="compact"]'),
+    hidePanel: root.querySelector('[data-el="hidePanel"]'),
+    compactShow: root.querySelector('[data-el="compactShow"]'),
+    compactRoll: root.querySelector('[data-el="compactRoll"]'),
+    compactBag: root.querySelector('[data-el="compactBag"]'),
+    bag: root.querySelector('[data-el="bag"]'),
     board: root.querySelector('[data-el="board"]'),
     paths: root.querySelector('[data-el="paths"]'),
     tokens: root.querySelector('[data-el="tokens"]'),
@@ -103,6 +125,7 @@ export function createLiveBoard(opts) {
   let autoPlay = false;
   let animating = false;
   let evenOddCharges = 0;
+  let panelHidden = false;
 
   function escAttr(s) {
     return String(s || "")
@@ -111,20 +134,40 @@ export function createLiveBoard(opts) {
       .replace(/</g, "&lt;");
   }
 
+  function setPanelHidden(hidden) {
+    panelHidden = !!hidden;
+    if (els.live) els.live.classList.toggle("is-panel-hidden", panelHidden);
+    if (els.compact) els.compact.classList.toggle("hidden", !panelHidden);
+    try {
+      sessionStorage.setItem("nv-snake-panel-hidden", panelHidden ? "1" : "0");
+    } catch (_) {}
+  }
+
+  function doRoll(parity) {
+    if (spectator || animating || autoPlay) return;
+    if (onRoll) onRoll(parity || null);
+  }
+
   els.roll.addEventListener("click", () => {
-    if (spectator || animating || autoPlay || els.roll.disabled) return;
-    if (onRoll) onRoll(null);
+    if (els.roll.disabled) return;
+    doRoll(null);
   });
+  if (els.compactRoll) {
+    els.compactRoll.addEventListener("click", () => {
+      if (els.compactRoll.disabled) return;
+      doRoll(null);
+    });
+  }
   if (els.even) {
     els.even.addEventListener("click", () => {
-      if (spectator || animating || autoPlay || els.even.disabled || evenOddCharges < 1) return;
-      if (onRoll) onRoll("even");
+      if (els.even.disabled || evenOddCharges < 1) return;
+      doRoll("even");
     });
   }
   if (els.odd) {
     els.odd.addEventListener("click", () => {
-      if (spectator || animating || autoPlay || els.odd.disabled || evenOddCharges < 1) return;
-      if (onRoll) onRoll("odd");
+      if (els.odd.disabled || evenOddCharges < 1) return;
+      doRoll("odd");
     });
   }
   if (els.auto) {
@@ -133,6 +176,21 @@ export function createLiveBoard(opts) {
       onToggleAuto();
     });
   }
+  if (els.hidePanel) els.hidePanel.addEventListener("click", () => setPanelHidden(true));
+  if (els.compactShow) els.compactShow.addEventListener("click", () => setPanelHidden(false));
+  if (els.bag) {
+    els.bag.addEventListener("click", () => {
+      if (onOpenBag) onOpenBag();
+    });
+  }
+  if (els.compactBag) {
+    els.compactBag.addEventListener("click", () => {
+      if (onOpenBag) onOpenBag();
+    });
+  }
+  try {
+    if (sessionStorage.getItem("nv-snake-panel-hidden") === "1") setPanelHidden(true);
+  } catch (_) {}
 
   function log(msg) {
     const line = document.createElement("div");
@@ -305,6 +363,7 @@ export function createLiveBoard(opts) {
       active &&
       active.userId === youId;
     els.roll.disabled = !can;
+    if (els.compactRoll) els.compactRoll.disabled = !can;
     if (spectator) els.roll.textContent = "ชมอย่างเดียว";
     else if (autoPlay && state.status === "playing") els.roll.textContent = "ออโต้กำลังทอย…";
     else if (can) els.roll.textContent = "ทอยลูกเต๋า";
@@ -312,6 +371,9 @@ export function createLiveBoard(opts) {
     else if (state.status === "finished") els.roll.textContent = "จบเกม";
     else if (active) els.roll.textContent = `รอ ${active.username}`;
     else els.roll.textContent = "ทอยลูกเต๋า";
+    if (els.compactRoll) {
+      els.compactRoll.textContent = can ? "ทอย" : autoPlay ? "ออโต้…" : "รอ";
+    }
 
     const showParity = !spectator && evenOddCharges > 0 && state.status === "playing";
     if (els.parity) els.parity.classList.toggle("hidden", !showParity);
@@ -320,6 +382,8 @@ export function createLiveBoard(opts) {
     if (els.parityLeft) {
       els.parityLeft.textContent = showParity ? `เหลือ ${evenOddCharges}/5` : "";
     }
+    if (els.bag) els.bag.classList.toggle("hidden", !!spectator);
+    if (els.compactBag) els.compactBag.classList.toggle("hidden", !!spectator);
 
     if (els.auto) {
       const showAuto = !spectator && state.status === "playing";
