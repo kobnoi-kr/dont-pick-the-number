@@ -17,7 +17,8 @@ function ensureImposterUi(){
   imposterLive=window.NVImposter.createLiveUi({
     root,
     send:(payload)=>{ if(onlineMode&&!spectating) send(payload); },
-    youId:()=>myId||""
+    youId:()=>myId||"",
+    onCountdown:()=>playClip(COOLDOWN_SOUND)
   });
   return imposterLive;
 }

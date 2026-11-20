@@ -43,6 +43,8 @@
     let popupOpen = false;
     let cluePopupOpen = false;
     let guessPopupOpen = false;
+    let clueDismissedKey = "";
+    let lastCountdownSec = -1;
 
     root.innerHTML = `
       <div class="imp-root">
@@ -54,6 +56,7 @@
         <div class="imp-card-grid hidden" data-imp="cardGrid" role="group" aria-label="การ์ดบทบาท"></div>
         <div class="imp-you-profile hidden" data-imp="youProfile" aria-live="polite"></div>
         <div class="imp-roster" data-imp="roster" role="list" aria-label="ผู้เล่นในห้อง"></div>
+        <button class="btn imp-clue-reopen hidden" type="button" data-imp="clueReopen">เขียนคำใบ้</button>
         <ul class="imp-clue-board" data-imp="clues"></ul>
         <button class="btn ghost hidden" type="button" data-imp="abstain">งดโหวต</button>
         <ul class="imp-tallies hidden" data-imp="tallies"></ul>
@@ -93,6 +96,7 @@
           <form class="imp-clue-popup-form" data-imp-clue="form" autocomplete="off">
             <input data-imp-clue="input" maxlength="32" placeholder="พิมพ์คำใบ้ 1 คำ/สั้นๆ" aria-label="คำใบ้">
             <div class="imp-clue-popup-actions">
+              <button class="btn ghost" type="button" data-imp-clue="peek">ดูคำใบ้คนอื่น</button>
               <button class="btn ghost" type="button" data-imp-clue="skip">ข้าม</button>
               <button class="btn" type="submit">ส่งคำใบ้</button>
             </div>
@@ -139,30 +143,88 @@
       send({ t: "imposter:confirm" });
     }
 
+    function clueTurnKey(state) {
+      if (!state) return "";
+      return [state.round || 0, state.clueIndex || 0, state.clueTurnId || ""].join(":");
+    }
+
+    function replayPop(el) {
+      if (!el) return;
+      const card = el.querySelector(".imp-popup");
+      el.classList.remove("is-pop");
+      if (card) card.classList.remove("is-pop");
+      void el.offsetWidth;
+      el.classList.add("is-pop");
+      if (card) card.classList.add("is-pop");
+    }
+
+    function syncClueReopen(state) {
+      const btn = $("clueReopen");
+      if (!btn) return;
+      const on = !!(
+        state &&
+        state.phase === "CLUE_TURN" &&
+        state.yourTurn &&
+        clueOverlay.classList.contains("hidden")
+      );
+      btn.classList.toggle("hidden", !on);
+      btn.setAttribute("aria-expanded", on ? "false" : "true");
+    }
+
     function hideCluePopup() {
       cluePopupOpen = false;
       clueOverlay.classList.add("hidden");
+      clueOverlay.classList.remove("is-pop");
+      const card = clueOverlay.querySelector(".imp-popup");
+      if (card) card.classList.remove("is-pop");
+    }
+
+    function syncClueSub(state) {
+      const el = $("sub");
+      if (!el || !state || state.phase !== "CLUE_TURN" || !state.yourTurn) return;
+      el.textContent = clueOverlay.classList.contains("hidden")
+        ? "ถึงตาคุณให้คำใบ้ — กดเขียนคำใบ้เมื่อพร้อม หรือดูคำใบ้ด้านล่าง"
+        : "ถึงตาคุณให้คำใบ้ — กรอกในหน้าต่าง หรือกดดูคำใบ้คนอื่น";
+    }
+
+    function dismissCluePopup() {
+      if (lastPublic && lastPublic.phase === "CLUE_TURN" && lastPublic.yourTurn) {
+        clueDismissedKey = clueTurnKey(lastPublic);
+      }
+      hideCluePopup();
+      syncClueReopen(lastPublic);
+      syncClueSub(lastPublic);
     }
 
     function showCluePopup() {
+      const wasHidden = clueOverlay.classList.contains("hidden");
+      clueDismissedKey = "";
       clueOverlay.classList.remove("hidden");
-      if (!cluePopupOpen) {
-        cluePopupOpen = true;
+      if (wasHidden) replayPop(clueOverlay);
+      cluePopupOpen = true;
+      if (wasHidden) {
         setTimeout(() => {
           try {
             clueInput.focus();
           } catch (_) {}
         }, 40);
       }
+      syncClueReopen(lastPublic);
+      syncClueSub(lastPublic);
     }
 
     function hideGuessPopup() {
       guessPopupOpen = false;
       guessOverlay.classList.add("hidden");
+      guessOverlay.classList.remove("is-pop");
+      const card = guessOverlay.querySelector(".imp-popup");
+      if (card) card.classList.remove("is-pop");
     }
 
     function showGuessPopup() {
+      const wasHidden = guessOverlay.classList.contains("hidden");
       guessOverlay.classList.remove("hidden");
+      if (wasHidden) replayPop(guessOverlay);
       if (!guessPopupOpen) {
         guessPopupOpen = true;
         setTimeout(() => {
@@ -178,13 +240,26 @@
       const text = (clueInput.value || "").trim();
       if (!text) return;
       send({ t: "imposter:clue", text });
-      clueInput.value = "";
-      hideCluePopup();
+      dismissCluePopup();
     });
     $c("skip").onclick = () => {
       send({ t: "imposter:skipClue" });
       clueInput.value = "";
-      hideCluePopup();
+      dismissCluePopup();
+    };
+    $c("peek").onclick = () => dismissCluePopup();
+    clueOverlay.addEventListener("click", (e) => {
+      if (e.target === clueOverlay) dismissCluePopup();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || clueOverlay.classList.contains("hidden")) return;
+      if (!lastPublic || lastPublic.phase !== "CLUE_TURN" || !lastPublic.yourTurn) return;
+      e.preventDefault();
+      dismissCluePopup();
+    });
+    $("clueReopen").onclick = () => {
+      if (!lastPublic || lastPublic.phase !== "CLUE_TURN" || !lastPublic.yourTurn) return;
+      showCluePopup();
     };
     $("abstain").onclick = () => {
       pickedVote = null;
@@ -231,10 +306,12 @@
 
     function showPopup(priv) {
       if (!priv || !priv.role) return;
+      const wasHidden = overlay.classList.contains("hidden");
       const isImp = fillRoleCopy(priv, $p("popTitle"), $p("popWord"), $p("popHint"));
       popup.classList.toggle("is-imposter", isImp);
       overlay.classList.remove("hidden");
       popupOpen = true;
+      if (wasHidden) replayPop(overlay);
     }
 
     function paintYouProfile(state, priv) {
@@ -415,8 +492,14 @@
           ? "ถึงตาคุณ — เลือกการ์ด 1 ใบ (ซ่อนไว้ ไม่รู้ว่าเป็น Imposter หรือคนปกติ)"
           : "รอ " + turnName + " จั่วการ์ด";
       else if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณด้านล่าง / หน้าต่างกลางจอ";
-      else if (state.phase === "CLUE_TURN")
-        sub = state.yourTurn ? "ถึงตาคุณให้คำใบ้ — กรอกในหน้าต่างกลางจอ" : "รอ " + turnName + " ให้คำใบ้";
+      else if (state.phase === "CLUE_TURN") {
+        const closed = !!(state.yourTurn && clueDismissedKey === clueTurnKey(state));
+        sub = state.yourTurn
+          ? closed
+            ? "ถึงตาคุณให้คำใบ้ — กดเขียนคำใบ้เมื่อพร้อม หรือดูคำใบ้ด้านล่าง"
+            : "ถึงตาคุณให้คำใบ้ — กรอกในหน้าต่าง หรือกดดูคำใบ้คนอื่น"
+          : "รอ " + turnName + " ให้คำใบ้";
+      }
       else if (state.phase === "DISCUSSION") sub = "คุยกันผ่านแชทในห้อง";
       else if (state.phase === "VOTING")
         sub = state.canVote
@@ -443,8 +526,14 @@
         .join("");
 
       const clueOn = state.phase === "CLUE_TURN" && state.yourTurn;
-      if (clueOn) showCluePopup();
-      else hideCluePopup();
+      if (!clueOn) {
+        clueDismissedKey = "";
+        clueInput.value = "";
+        hideCluePopup();
+      } else if (clueDismissedKey !== clueTurnKey(state)) {
+        showCluePopup();
+      }
+      syncClueReopen(state);
 
       const voteOn = state.phase === "VOTING" && state.canVote;
       $("abstain").classList.toggle("hidden", !voteOn);
@@ -478,9 +567,33 @@
     }
 
     function tickClock() {
-      if (!lastPublic || !lastPublic.phaseEndsAt) return;
+      const timer = $("timer");
+      if (!timer) return;
+      if (!lastPublic || !lastPublic.phaseEndsAt) {
+        lastCountdownSec = -1;
+        timer.classList.remove("is-urgent");
+        return;
+      }
       const left = Math.max(0, lastPublic.phaseEndsAt - Date.now());
-      $("timer").textContent = formatLeft(left);
+      timer.textContent = formatLeft(left);
+      const sec = left > 0 ? Math.ceil(left / 1000) : 0;
+      const phase = lastPublic.phase;
+      const countdownPhase =
+        phase === "CARD_PICK" ||
+        phase === "ROLE_REVEAL" ||
+        phase === "CLUE_TURN" ||
+        phase === "DISCUSSION" ||
+        phase === "VOTING" ||
+        phase === "GUESS";
+      const urgent = countdownPhase && sec > 0 && sec <= 5;
+      timer.classList.toggle("is-urgent", urgent);
+      if (!urgent) {
+        lastCountdownSec = -1;
+        return;
+      }
+      if (sec === lastCountdownSec) return;
+      lastCountdownSec = sec;
+      if (typeof opts.onCountdown === "function") opts.onCountdown(sec);
     }
     setInterval(tickClock, 250);
 
