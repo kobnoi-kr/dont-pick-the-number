@@ -397,6 +397,13 @@
 .imp-overlay.hidden {
   display: none !important;
 }
+body.imposter-play .room-chat-dock,
+body.imposter-play .room-chat-toggle,
+body.imposter-play .room-chat-scrim,
+body.imposter-play .room-emoji-panel,
+body.imposter-play .room-chat-hint {
+  z-index: 10060;
+}
 .imp-popup {
   width: min(420px, 100%);
   border-radius: 16px;

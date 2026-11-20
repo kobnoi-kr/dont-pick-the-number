@@ -45,9 +45,10 @@ const FALLBACK = [
     nameEn: "Find the Imposter",
     category: "social",
     categoryLabel: "สืบหา",
-    maxPlayers: 12,
+    maxPlayers: 8,
     description: "หาคนที่เป็น Imposter — คุย โหวต และจับคนร้ายก่อนสายเกินแก้",
-    howTo: "รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    howTo:
+      "ผู้เล่น 4–8 คน จั่วการ์ดปิดตาทีละคน ได้บทบาททีมปกติหรือ Imposter\nทีมปกติเห็นคำศัพท์ Imposter ไม่เห็นคำ หรือเห็นแค่หมวด ถ้าโฮสต์เปิดไว้\nจากนั้นให้คำใบ้ทีละคน วนจากคนแรกถึงคนท้ายตามจำนวนรอบที่ตั้ง ห้ามพิมพ์คำศัพท์ตรงๆ ข้ามตาได้\nครบรอบแล้วคุยในแชทช่วง Discussion แล้วโหวตครั้งเดียว โหวตตัวเองไม่ได้\nโหวตผิด โหวตเสมอ หรือ Imposter เหลือเท่ากับหรือมากกว่าทีมปกติ ฝ่าย Imposter ชนะ\nจับ Imposter คนสุดท้ายได้ ต้องทายคำใน 30 วินาที ทายถูก Imposter ชนะ ทายผิดหรือหมดเวลาทีมปกติชนะ\nถ้ายังเหลือ Imposter อีกคน จะเริ่มให้คำใบ้รอบใหม่\nการ์ดนางฟ้าใช้ในเกมนี้ไม่ได้",
     popular: false,
     comingSoon: true
   },
@@ -250,7 +251,7 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
           }${g.beta ? ` <span class="pill warn">Beta</span>` : ""}</h2>
           <p class="muted">${esc(g.description)}</p>
           <h3>วิธีเล่น</h3>
-          <p>${esc(g.howTo)}</p>
+          <p class="lib-howto">${esc(g.howTo)}</p>
           ${
             soon && playable && g.testInvite
               ? `<p class="tiny">Coming Soon — คุณได้รับคำเชิญทดสอบจากแอดมิน</p>`

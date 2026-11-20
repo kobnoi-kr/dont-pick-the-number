@@ -149,14 +149,7 @@ function privateImposter(room, player) {
   return privateView(room.imposter, player.id);
 }
 
-function chatAllowed(room) {
-  if (!room || !room.imposter) return true;
-  const phase = room.imposter.phase;
-  if (phase === PHASE.CARD_PICK) return false;
-  if (phase === PHASE.ROLE_REVEAL) return false;
-  if (phase === PHASE.CLUE_TURN) return false;
-  if (phase === PHASE.VOTING) return false;
-  if (phase === PHASE.GUESS) return false;
+function chatAllowed() {
   return true;
 }
 

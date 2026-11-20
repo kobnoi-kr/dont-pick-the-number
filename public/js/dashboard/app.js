@@ -2,7 +2,7 @@ import { ensureGuest, api, playUrl } from "./api.js";
 import { paintUser, wireShell, logout } from "./shell.js";
 import { connectDashboardWs, onDashboardMessage, disconnectDashboardWs } from "./ws.js";
 import { renderOverview } from "./overview.js";
-import { renderLibrary } from "./library.js?v=lastplay1";
+import { renderLibrary } from "./library.js?v=howto1";
 import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";

@@ -1476,6 +1476,10 @@ body.nav-open .sidebar .nav {
   border-color: rgba(167,139,250,0.45);
   box-shadow: 0 0 0 1px rgba(139,92,246,0.12);
 }
+.lib-howto {
+  white-space: pre-line;
+  line-height: 1.55;
+}
 .lib-thumb {
   width: 56px; height: 56px; border-radius: 14px;
   display: grid; place-items: center;

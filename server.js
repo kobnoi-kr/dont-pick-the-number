@@ -2633,9 +2633,6 @@ function onRoomChat(ws, msg) {
   const ctx = seat(ws);
   if (!ctx || !ctx.player || !ctx.room) return fail(ws, "เข้าห้องก่อน");
   if (ctx.player.bot) return;
-  if (ctx.room.phase === "imposter" && !imposterBridge.chatAllowed(ctx.room)) {
-    return fail(ws, "ช่วงนี้ยังแชทไม่ได้");
-  }
   // Guests cannot send room chat — registered accounts only.
   if (!ws.accountType || ws.accountType !== "registered") {
     return fail(ws, "เข้าสู่ระบบก่อนถึงจะพิมพ์แชทในห้องได้");

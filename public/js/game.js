@@ -3327,7 +3327,7 @@ const GUIDE={
 </ul></section>
 <section><h4>ตั้งค่าห้อง (โฮสต์)</h4><ul>
 <li>เฉพาะโฮสต์ตั้งค่าและเริ่มเกมได้</li>
-<li>เลือกเกมกระดานจากที่มีในคลัง (เช่น หาเลข · วงล้อ · บันไดงู)</li>
+<li>เลือกเกมกระดานจากที่มีในคลัง (เช่น หาเลข · วงล้อ · บันไดงู · Imposter)</li>
 <li>ตั้งกติกาตามเกมที่เลือก เช่น ช่วงตัวเลข / แต้มชนะ / แมพกระดาน / นับถอยหลังต่อตา</li>
 <li>กด <b>เพิ่มบอท</b> ได้ถ้าคนไม่ครบ (ล็อบบี้เท่านั้น)</li>
 <li>กดเฟืองตั้งค่าเพื่อเปลี่ยนชื่อห้อง / กติกา (ล็อบบี้เท่านั้น)</li>
@@ -3349,8 +3349,10 @@ const GUIDE={
 <li>โชว์ในล็อบบี้ออนไลน์แบบล็อก 🔒 แต่ไม่โชว์รหัส</li>
 <li>เพื่อนต้องกด “ใส่รหัส” แล้วกรอกรหัส 6 หลัก หรือรับคำเชิญจากเพื่อน</li>
 <li>โฮสต์แชร์รหัสจากแถบบนของห้องได้</li>
-</ul></section>`,
-  play:`<section><h4>ห้ามโดนเลขลับ</h4><ul>
+</ul></section>`
+};
+const GUIDE_GAMES={
+  secret:`<section><h4>ห้ามโดนเลขลับ</h4><ul>
 <li>ระบบสุ่มเลขลับตามจำนวนที่ตั้งไว้</li>
 <li>ผู้เล่นผลัดกันเลือกเลขในช่วงที่เหลือ</li>
 <li>ใครโดนเลขลับจะหลุดจากเทิร์น</li>
@@ -3358,43 +3360,68 @@ const GUIDE={
 <li>ใครถึงแต้มที่ชนะก่อนเป็นผู้ชนะ</li>
 <li><b>Skip Turn</b> ใช้ข้ามเทิร์นตัวเองหรือคนอื่นได้ระหว่างเกม</li>
 <li><b>การ์ดนางฟ้า</b> กันแพ้ 1 ครั้ง (ใช้คู่กับ Skip ได้)</li>
-</ul></section>
-<section><h4>วงล้อสุ่มเลข</h4><ul>
+<li>กด <b>เล่นอัตโนมัติ</b> ได้ · หมดเวลานับถอยหลังระบบจะเปิดออโต้ให้</li>
+</ul></section>`,
+  wheel:`<section><h4>วงล้อสุ่มเลข</h4><ul>
 <li>แต่ละคนเลือกเลขของตัวเองตามจำนวนที่กำหนด</li>
 <li>โฮสต์เริ่มหมุนวงล้อ สุ่มเลขจากที่ยังเหลือบนวงล้อ</li>
 <li>เลขที่ออกจะถูกตัดออกจากวงล้อทันที แล้วหมุนต่อ</li>
 <li>ถ้าวงล้อลงเลขของใคร คนนั้นออก</li>
 <li>คนสุดท้ายที่เหลือได้แต้ม</li>
 <li><b>Skip Turn</b> ติดเกราะละเว้นตัวเองเมื่อเลขตก · ใช้คู่กับนางฟ้าได้</li>
-</ul></section>
-<section><h4>บันไดงู</h4><ul>
+<li>กด <b>เล่นอัตโนมัติ</b> ได้ · หมดเวลานับถอยหลังระบบจะเปิดออโต้ให้</li>
+</ul></section>`,
+  snake:`<section><h4>บันไดงู</h4><ul>
 <li>ทอยลูกเต๋าปีนบันได เลี่ยงงู · ถึงช่อง 100 ชนะ · ผู้เล่น 2–6 คน</li>
 <li>เลือกแมพได้ตอนตั้งค่าห้อง (งู/บันไดอยู่คนละตำแหน่ง)</li>
 <li><b>การ์ดนางฟ้า</b> กันไหลลงงูได้ 3 ครั้งต่อเกม · กันระเบิดได้ (ใช้ชาร์จ 1)</li>
 <li><b>เลขคู่/คี่</b> ใช้ก่อนเริ่ม → ได้ปุ่มบังคับทอยคู่หรือคี่ 5 ครั้งต่อเกม</li>
 <li><b>Skip Turn</b> ข้ามเทิร์นตัวเองหรือคนอื่นได้ระหว่างเกม</li>
 <li><b>วางบอม</b> เลือกช่อง 1–99 · เหยียบแล้วสุ่มถอยสูงสุด 6 หรือ Pause สูงสุด 3 เทิร์น</li>
-</ul></section>
-<section><h4>เคล็ดลับ</h4><ul>
-<li>ระหว่างเกมกดปุ่ม <b>🎒 ไอเทม</b> เพื่อใช้ Skip Turn / วางบอม จากกระเป๋า</li>
-<li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบเล่นแทนคุณได้</li>
-<li>บันไดงู: AFK เกิน 15 วินาที ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น (หรือตามเวลานับถอยหลังที่โฮสต์ตั้ง)</li>
-<li>โหมดอื่น: ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น</li>
-<li>ปรับเสียงได้ที่เมนูมุมซ้ายบน · คู่มืออยู่ปุ่มหนังสือข้างปุ่มออกเกม</li>
-<li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
+<li>ระหว่างเกมกดปุ่ม <b>🎒 ไอเทม</b> เพื่อใช้ Skip Turn / วางบอม</li>
+<li>กด <b>เล่นอัตโนมัติ</b> ได้ · AFK เกิน 15 วินาทีระบบจะเปิดออโต้ให้ (หรือตามเวลาที่โฮสต์ตั้ง)</li>
+</ul></section>`,
+  imposter:`<section><h4>Imposter</h4><ul>
+<li>ผู้เล่น 4–8 คน จั่วการ์ดปิดตาทีละคน ได้บทบาททีมปกติหรือ Imposter</li>
+<li>ทีมปกติเห็นคำศัพท์ · Imposter ไม่เห็นคำ หรือเห็นแค่หมวด ถ้าโฮสต์เปิดไว้</li>
+<li>ให้คำใบ้ทีละคน วนจากคนแรกถึงคนท้ายตามจำนวนรอบที่ตั้ง แล้วค่อยคุยและโหวตครั้งเดียว</li>
+<li>คำใบ้ห้ามพิมพ์คำศัพท์ตรงๆ · หมดเวลาหรือกดข้ามได้</li>
+<li>ช่วงคุยใช้แชทในห้อง · แชทใช้ได้ตลอดเกมเหมือนเกมอื่น ต้องเข้าสู่ระบบด้วยบัญชีจริง</li>
+<li>โหวตคนที่สงสัย โหวตตัวเองไม่ได้ · ไม่โหวตถือว่างดออกเสียง</li>
+<li>โหวตผิด โหวตเสมอ หรือ Imposter เหลือเท่ากับหรือมากกว่าทีมปกติ ฝ่าย Imposter ชนะ และไม่กลับไปใบ้ใหม่</li>
+<li>จับ Imposter ได้แต่ยังเหลืออีกคน จะเริ่มให้คำใบ้รอบใหม่</li>
+<li>จับ Imposter คนสุดท้ายได้ ต้องทายคำใน 30 วินาที ทายถูก Imposter ชนะ ทายผิดหรือหมดเวลาทีมปกติชนะ</li>
+<li>การ์ดนางฟ้าใช้ในเกมนี้ไม่ได้</li>
 </ul></section>`
 };
+const GUIDE_TITLES={
+  secret:"คู่มือหาเลข",
+  wheel:"คู่มือวงล้อ",
+  snake:"คู่มือบันไดงู",
+  imposter:"คู่มือ Imposter"
+};
+function guideGameId(){
+  if(gameCat==="wheel"||gameCat==="snake"||gameCat==="imposter"||gameCat==="secret") return gameCat;
+  return "secret";
+}
 function renderGuide(cat){
-  const key=cat==="play"?"play":"room";
-  $("guideBody").innerHTML=GUIDE[key];
-  for(const btn of $("guideTabs").children){
-    const on=btn.dataset.guide===key;
+  const game=guideGameId();
+  const play=cat==="play";
+  const title=$("guideTitle");
+  if(title) title.textContent=play?(GUIDE_TITLES[game]||"คู่มือการเล่น"):"การใช้งานตั้งค่าห้อง";
+  $("guideBody").innerHTML=play?(GUIDE_GAMES[game]||GUIDE_GAMES.secret):GUIDE.room;
+  const tabs=$("guideTabs");
+  if(!tabs) return;
+  for(const btn of tabs.children){
+    const on=btn.dataset.guide===(play?"play":"room");
     btn.classList.toggle("on",on);
     btn.setAttribute("aria-pressed",on?"true":"false");
+    if(btn.dataset.guide==="play") btn.textContent=GUIDE_TITLES[game]||"คู่มือการเล่น";
   }
 }
 function openGuide(cat){
-  renderGuide(cat||"room");
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
+  renderGuide(cat||(inGame?"play":"room"));
   $("guideModal").classList.remove("hidden");
 }
 function closeGuide(){
@@ -4481,7 +4508,7 @@ async function bootOnline(){
     joinCode($("codeModalInput").value);
   };
   $("codeModalInput").addEventListener("input",()=>{ $("codeModalInput").value=$("codeModalInput").value.replace(/\D/g,"").slice(0,6); });
-  $("helpBtn").onclick=()=>openGuide("room");
+  $("helpBtn").onclick=()=>openGuide();
   $("guideClose").onclick=()=>closeGuide();
   $("guideModal").addEventListener("click",e=>{ if(e.target===$("guideModal")) closeGuide(); });
   $("guideTabs").onclick=e=>{
