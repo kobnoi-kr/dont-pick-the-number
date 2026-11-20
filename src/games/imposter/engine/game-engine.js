@@ -104,6 +104,7 @@ function createGame(opts) {
     roles: {},
     cards,
     alive: order.slice(),
+    cluePass: 1,
     clueIndex: 0,
     clues: [],
     votes: {},
@@ -174,6 +175,7 @@ function publicState(state, viewerId) {
     phase: state.phase,
     status: state.status,
     round: state.round,
+    cluePass: state.cluePass || 1,
     maxRounds: state.maxRounds,
     order: state.order.slice(),
     alive: state.alive.slice(),
@@ -190,7 +192,8 @@ function publicState(state, viewerId) {
     clues: (state.clues || []).map((c) => ({
       playerId: c.playerId,
       name: c.name,
-      text: c.text
+      text: c.text,
+      pass: c.pass || 1
     })),
     discussionSec: state.discussionSec,
     voteSec: state.voteSec,
@@ -282,11 +285,29 @@ function clueTurnMs(state) {
 
 function beginClueTurn(state) {
   state.clues = [];
+  state.cluePass = 1;
   state.clueIndex = 0;
   state.votes = {};
   state.voteTallies = null;
   state.lastVoteTarget = null;
   return setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
+}
+
+/** After one player clues: next seat, next pass around the table, or discussion. */
+function nextClueSeat(state) {
+  const turnOrder = aliveInOrder(state);
+  state.clueIndex += 1;
+  if (state.clueIndex < turnOrder.length) {
+    return setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
+  }
+  const pass = Number(state.cluePass) || 1;
+  const max = normalizeClueRounds(state.maxRounds);
+  if (pass < max) {
+    state.cluePass = pass + 1;
+    state.clueIndex = 0;
+    return setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
+  }
+  return beginDiscussion(state);
 }
 
 function beginDiscussion(state) {
@@ -353,10 +374,13 @@ function submitClue(state, playerId, text) {
   if (lower === String(state.word).toLowerCase()) {
     return { ok: false, error: "secret_word" };
   }
-  state.clues.push({ playerId: id, name: state.names[id] || "Player", text: clue });
-  state.clueIndex += 1;
-  if (state.clueIndex >= turnOrder.length) beginDiscussion(state);
-  else setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
+  state.clues.push({
+    playerId: id,
+    name: state.names[id] || "Player",
+    text: clue,
+    pass: state.cluePass || 1
+  });
+  nextClueSeat(state);
   return { ok: true, state };
 }
 
@@ -366,10 +390,13 @@ function skipClue(state, playerId) {
   const turnOrder = aliveInOrder(state);
   const current = turnOrder[state.clueIndex];
   if (!current || current !== id) return { ok: false, error: "not_your_turn" };
-  state.clues.push({ playerId: id, name: state.names[id] || "Player", text: "—" });
-  state.clueIndex += 1;
-  if (state.clueIndex >= turnOrder.length) beginDiscussion(state);
-  else setPhase(state, PHASE.CLUE_TURN, clueTurnMs(state));
+  state.clues.push({
+    playerId: id,
+    name: state.names[id] || "Player",
+    text: "—",
+    pass: state.cluePass || 1
+  });
+  nextClueSeat(state);
   return { ok: true, state };
 }
 
@@ -426,12 +453,7 @@ function resolveVotes(state) {
 function applyElimination(state) {
   const target = state.lastVoteTarget;
   if (!target) {
-    // tie / no votes → next round clues or finish
-    if (state.round >= state.maxRounds) {
-      return finish(state, "imposters", "ครบรอบแล้วยังจับไม่ได้");
-    }
-    state.round += 1;
-    return beginClueTurn(state);
+    return finish(state, "imposters", "โหวตเสมอ — จับ Imposter ไม่ได้");
   }
   const wasImposter = state.roles[target] === "imposter";
   state.alive = state.alive.filter((id) => id !== target);
@@ -449,19 +471,12 @@ function applyElimination(state) {
     }
     const checked = checkAutoWin(state);
     if (checked.phase === PHASE.FINISHED) return checked;
-    if (state.round >= state.maxRounds) {
-      return finish(state, "imposters", "ครบรอบแล้วยังจับไม่ได้");
-    }
     state.round += 1;
     return beginClueTurn(state);
   }
   const checked = checkAutoWin(state);
   if (checked.phase === PHASE.FINISHED) return checked;
-  if (state.round >= state.maxRounds) {
-    return finish(state, "imposters", "ครบรอบแล้วยังจับไม่ได้");
-  }
-  state.round += 1;
-  return beginClueTurn(state);
+  return finish(state, "imposters", "โหวตคนผิด");
 }
 
 function submitGuess(state, playerId, guess) {

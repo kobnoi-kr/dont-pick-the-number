@@ -15,11 +15,12 @@ function run() {
     discussionSec: 60,
     voteSec: 45,
     clueSec: 30,
+    clueRounds: 1,
     rng: () => 0.1
   });
   assert.strictEqual(state.phase, eng.PHASE.CARD_PICK);
   assert.strictEqual(state.clueSec, 30);
-  assert.strictEqual(state.maxRounds, 5);
+  assert.strictEqual(state.maxRounds, 1);
   assert.strictEqual(state.order.length, 4);
   assert.strictEqual(state.cards.length, 4);
   assert.strictEqual(state.cards.filter((c) => c.role === "imposter").length, 1);
@@ -89,6 +90,7 @@ function run() {
     rng: () => 0.2
   });
   assert.strictEqual(s2.cards.filter((c) => c.role === "imposter").length, 2);
+  assert.strictEqual(s2.maxRounds, 5);
 
   const s3 = eng.createGame({
     players: players(5),
@@ -103,6 +105,28 @@ function run() {
     rng: () => 0.4
   });
   assert.strictEqual(s4.maxRounds, 2);
+  for (const id of s4.order) {
+    const free = s4.cards.find((c) => !c.takenBy);
+    eng.pickCard(s4, id, free.id);
+  }
+  for (const id of s4.order) eng.confirmReveal(s4, id);
+  assert.strictEqual(s4.phase, eng.PHASE.CLUE_TURN);
+  assert.strictEqual(s4.cluePass, 1);
+  const lap = s4.order.slice();
+  for (const id of lap) {
+    assert.ok(eng.submitClue(s4, id, "รอบ1").ok);
+  }
+  assert.strictEqual(s4.phase, eng.PHASE.CLUE_TURN);
+  assert.strictEqual(s4.cluePass, 2);
+  assert.strictEqual(s4.clueIndex, 0);
+  assert.strictEqual(s4.clues.length, 4);
+  for (const id of lap) {
+    assert.ok(eng.submitClue(s4, id, "รอบ2").ok);
+  }
+  assert.strictEqual(s4.phase, eng.PHASE.DISCUSSION);
+  assert.strictEqual(s4.clues.length, 8);
+  assert.strictEqual(eng.publicState(s4, lap[0]).clues[4].pass, 2);
+
   assert.strictEqual(eng.normalizeClueRounds(20), 20);
   assert.strictEqual(eng.normalizeClueRounds(999), 99);
   assert.strictEqual(eng.normalizeClueRounds(0), 1);

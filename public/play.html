@@ -25,7 +25,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/style.css?v=chrome3">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp13">
+<link rel="stylesheet" href="/css/imposter.css?v=imp16">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -366,7 +366,7 @@ html,body{background:#070b14}
         <div class="row count-row"><label for="clueRounds">จำนวนรอบคำใบ้</label>
           <input id="clueRounds" type="number" inputmode="numeric" value="5" min="1" max="99" aria-label="จำนวนรอบคำใบ้">
         </div>
-        <p class="hint">1 รอบ = ทุกคนให้คำใบ้ทีละคน 1 ครั้ง แล้วคุย/โหวต — ตั้ง 2 คือวนซ้ำแบบนี้ 2 รอบ ไม่ใช่ใส่คำใบ้ 2 คำในทีเดียว</p>
+        <p class="hint">ตั้ง 5 = ทุกคนใบ้ครบ 5 รอบ วนจากคนแรกถึงคนท้ายแล้วเริ่มใบ้ใหม่ ก่อนคุยและโหวตครั้งเดียว โหวตผิดจะไม่กลับไปใบ้ใหม่</p>
         <div class="row count-row"><label for="clueSec">เวลาเขียนคำใบ้ต่อคน (วินาที)</label>
           <input id="clueSec" type="number" inputmode="numeric" value="45" min="15" max="120">
         </div>
@@ -571,9 +571,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp13");
+    await import("/js/imposter/live-ui.js?v=imp16");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp13";
+    s.src = "/js/game.js?v=imp16";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

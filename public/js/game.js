@@ -3671,6 +3671,7 @@ function applySnap(s){
   hostId=s.hostId||"";
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
+  if(netPhase!=="imposter"&&imposterLive&&typeof imposterLive.halt==="function") imposterLive.halt();
   // Profile card is lobby-only — never stay open during play/pick/wheel/over.
   if(netPhase!=="lobby") closePlayerProfileModal();
   if(netPhase==="lobby"||netPhase==="gate") closeQuitGameModal();

@@ -45,6 +45,8 @@
     let guessPopupOpen = false;
     let clueDismissedKey = "";
     let lastCountdownSec = -1;
+    let clockKey = 0;
+    let localDeadline = 0;
 
     root.innerHTML = `
       <div class="imp-root">
@@ -73,6 +75,7 @@
       overlay.setAttribute("aria-modal", "true");
       overlay.innerHTML = `
         <div class="imp-popup" data-imp-pop="popup">
+          <div class="imp-pop-timer" data-imp-pop="timer">—</div>
           <h2 data-imp-pop="popTitle"></h2>
           <div class="imp-word" data-imp-pop="popWord"></div>
           <p class="imp-hint" data-imp-pop="popHint"></p>
@@ -91,13 +94,14 @@
       clueOverlay.setAttribute("aria-labelledby", "impClueTitle");
       clueOverlay.innerHTML = `
         <div class="imp-popup imp-clue-popup">
+          <div class="imp-pop-timer" data-imp-clue="timer">—</div>
           <h2 id="impClueTitle">ให้คำใบ้</h2>
-          <p class="imp-hint">พิมพ์คำใบ้สั้นๆ โดยไม่พูดคำศัพท์ตรงๆ</p>
+          <p class="imp-hint" data-imp-clue="round">พิมพ์คำใบ้สั้นๆ โดยไม่พูดคำศัพท์ตรงๆ</p>
           <form class="imp-clue-popup-form" data-imp-clue="form" autocomplete="off">
             <input data-imp-clue="input" maxlength="32" placeholder="พิมพ์คำใบ้ 1 คำ/สั้นๆ" aria-label="คำใบ้">
             <div class="imp-clue-popup-actions">
-              <button class="btn ghost" type="button" data-imp-clue="peek">ดูคำใบ้คนอื่น</button>
-              <button class="btn ghost" type="button" data-imp-clue="skip">ข้าม</button>
+              <button class="btn imp-clue-side" type="button" data-imp-clue="peek">ดูคำใบ้คนอื่น</button>
+              <button class="btn imp-clue-side" type="button" data-imp-clue="skip">ข้าม</button>
               <button class="btn" type="submit">ส่งคำใบ้</button>
             </div>
           </form>
@@ -115,6 +119,7 @@
       guessOverlay.setAttribute("aria-labelledby", "impGuessTitle");
       guessOverlay.innerHTML = `
         <div class="imp-popup imp-clue-popup is-imposter">
+          <div class="imp-pop-timer" data-imp-guess="timer">—</div>
           <h2 id="impGuessTitle">ทายคำศัพท์</h2>
           <p class="imp-hint">คุณถูกจับแล้ว — ทายคำให้ถูกเพื่อให้ Imposter ชนะ</p>
           <form class="imp-clue-popup-form" data-imp-guess="form" autocomplete="off">
@@ -145,7 +150,7 @@
 
     function clueTurnKey(state) {
       if (!state) return "";
-      return [state.round || 0, state.clueIndex || 0, state.clueTurnId || ""].join(":");
+      return [state.cluePass || state.round || 0, state.clueIndex || 0, state.clueTurnId || ""].join(":");
     }
 
     function replayPop(el) {
@@ -470,13 +475,25 @@
       }
       if (!state) return;
 
-      $("phaseTitle").textContent =
-        phaseLabel(state.phase) +
-        " · รอบ " +
-        (state.round || 1) +
-        "/" +
-        (state.maxRounds || 1);
-      $("timer").textContent = state.phaseEndsAt ? formatLeft(state.phaseLeft) : "—";
+      const clueLap = state.phase === "CLUE_TURN";
+      $("phaseTitle").textContent = clueLap
+        ? phaseLabel(state.phase) +
+          " · รอบ " +
+          (state.cluePass || 1) +
+          "/" +
+          (state.maxRounds || 1)
+        : phaseLabel(state.phase);
+      renderClock();
+      const clueRound = $c("round");
+      if (clueRound) {
+        clueRound.textContent = clueLap
+          ? "รอบ " +
+            (state.cluePass || 1) +
+            "/" +
+            (state.maxRounds || 1) +
+            " · พิมพ์คำใบ้สั้นๆ โดยไม่พูดคำศัพท์ตรงๆ"
+          : "พิมพ์คำใบ้สั้นๆ โดยไม่พูดคำศัพท์ตรงๆ";
+      }
 
       const turnName =
         state.phase === "CARD_PICK"
@@ -518,11 +535,13 @@
       if (state.phase !== "VOTING") pickedVote = null;
       paintRoster(state);
 
+      const showPass = (state.maxRounds || 1) > 1;
       $("clues").innerHTML = (state.clues || [])
-        .map(
-          (c) =>
-            `<li><span class="who">${esc(c.name)}</span><span class="text">${esc(c.text)}</span></li>`
-        )
+        .map((c) => {
+          const who =
+            (showPass ? "รอบ " + (c.pass || 1) + " · " : "") + (c.name || "");
+          return `<li><span class="who">${esc(who)}</span><span class="text">${esc(c.text)}</span></li>`;
+        })
         .join("");
 
       const clueOn = state.phase === "CLUE_TURN" && state.yourTurn;
@@ -566,16 +585,41 @@
       }
     }
 
-    function tickClock() {
+    function paintTimers(text, urgent) {
+      [$("timer"), $c("timer"), $g("timer"), $p("timer")].forEach((el) => {
+        if (!el) return;
+        el.textContent = text;
+        el.classList.toggle("is-urgent", urgent);
+      });
+    }
+
+    function syncClock(state) {
+      const ends = state && state.phaseEndsAt ? state.phaseEndsAt : 0;
+      if (!ends) {
+        clockKey = 0;
+        localDeadline = 0;
+        return 0;
+      }
+      if (ends !== clockKey) {
+        clockKey = ends;
+        const reported = Number(state.phaseLeft);
+        const remain = Number.isFinite(reported) ? Math.max(0, reported) : 0;
+        localDeadline = Date.now() + remain;
+        lastCountdownSec = -1;
+      }
+      return Math.max(0, localDeadline - Date.now());
+    }
+
+    function renderClock() {
       const timer = $("timer");
       if (!timer) return;
       if (!lastPublic || !lastPublic.phaseEndsAt) {
         lastCountdownSec = -1;
-        timer.classList.remove("is-urgent");
+        paintTimers("—", false);
         return;
       }
-      const left = Math.max(0, lastPublic.phaseEndsAt - Date.now());
-      timer.textContent = formatLeft(left);
+      const left = syncClock(lastPublic);
+      const text = formatLeft(left);
       const sec = left > 0 ? Math.ceil(left / 1000) : 0;
       const phase = lastPublic.phase;
       const countdownPhase =
@@ -586,7 +630,7 @@
         phase === "VOTING" ||
         phase === "GUESS";
       const urgent = countdownPhase && sec > 0 && sec <= 5;
-      timer.classList.toggle("is-urgent", urgent);
+      paintTimers(text, urgent);
       if (!urgent) {
         lastCountdownSec = -1;
         return;
@@ -595,10 +639,27 @@
       lastCountdownSec = sec;
       if (typeof opts.onCountdown === "function") opts.onCountdown(sec);
     }
+    function tickClock() {
+      renderClock();
+    }
     setInterval(tickClock, 250);
+
+    function halt() {
+      lastPublic = null;
+      clockKey = 0;
+      localDeadline = 0;
+      lastCountdownSec = -1;
+      clueDismissedKey = "";
+      hideCluePopup();
+      hideGuessPopup();
+      popupOpen = false;
+      overlay.classList.add("hidden");
+      paintTimers("—", false);
+    }
 
     return {
       paint,
+      halt,
       setYouId(fn) {
         opts.youId = fn;
       }

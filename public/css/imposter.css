@@ -12,22 +12,43 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(8, 12, 22, 0.92);
 }
 .imp-phase-title {
   font-size: 1.15rem;
   font-weight: 700;
   margin: 0;
+  color: #fff;
 }
-.imp-timer {
+.imp-timer,
+.imp-pop-timer {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 800;
   padding: 4px 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  min-width: 3.4rem;
+  text-align: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
-.imp-timer.is-urgent {
-  background: rgba(220, 38, 38, 0.2);
-  color: #fecaca;
+.imp-pop-timer {
+  display: inline-block;
+  margin: 0 auto 8px;
+  font-size: 1.45rem;
+}
+.imp-timer.is-urgent,
+.imp-pop-timer.is-urgent {
+  background: #dc2626;
+  color: #fff;
+  border-color: #fecaca;
   animation: pulseClock 0.7s ease-in-out infinite;
 }
 .imp-clue-board {
@@ -36,6 +57,8 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  max-height: min(42vh, 360px);
+  overflow: auto;
 }
 .imp-clue-board li {
   display: grid;
@@ -76,24 +99,38 @@
 .imp-clue-popup-form input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid #94a3b8;
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 1.05rem;
   font-weight: 700;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.imp-clue-popup-form input::placeholder {
+  color: #64748b;
+  font-weight: 600;
 }
 .imp-clue-popup-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
 }
 .imp-clue-popup-actions .btn {
-  width: auto;
+  width: 100%;
   margin: 0;
 }
 .imp-clue-popup-actions .btn[data-imp-clue="peek"] {
-  margin-right: auto;
+  grid-column: 1 / -1;
+}
+.imp-clue-popup .imp-clue-side {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 1px solid #64748b;
+  font-weight: 800;
+}
+.imp-clue-popup .imp-clue-side:hover {
+  background: #cbd5e1;
 }
 .imp-clue-reopen {
   justify-self: center;
@@ -359,6 +396,7 @@
   padding: 22px 20px 18px;
   background: #fff;
   color: #111;
+  color-scheme: light;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   text-align: center;
   opacity: 1;
@@ -379,6 +417,7 @@
 .imp-popup.is-imposter {
   background: linear-gradient(160deg, #1a1220, #2a1528);
   color: #ffe8f0;
+  color-scheme: dark;
 }
 .imp-popup.is-imposter .btn {
   background: #fff;
