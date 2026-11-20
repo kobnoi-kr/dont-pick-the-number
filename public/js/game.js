@@ -1687,7 +1687,7 @@ function paintLobbyAngel(){
 function helperCanUseInBag(item){
   if(!item||!(Number(item.quantity)>0)||spinning||spectating) return false;
   if(item.id==="item.angel"){
-    return netPhase==="lobby"&&!angelArmed();
+    return netPhase==="lobby"&&gameCat!=="imposter"&&!angelArmed();
   }
   if(item.id==="item.evenodd"){
     const me=playerMeta.find(p=>p&&p.id===myId);
@@ -1787,6 +1787,8 @@ function paintLobbyBagModal(){
   const canUse=helperCanUseInBag(sel);
   const statusNote=armedAngel||armedEven||armedSkip
     ?" · ใช้แล้วในเกมนี้"
+    :sel.id==="item.angel"&&gameCat==="imposter"
+      ?" · ใช้ไม่ได้ใน Imposter"
     :sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake"||netPhase==="wheel")
       ?" · ใช้ระหว่างเกม"
       :sel.id==="item.bomb"&&netPhase==="snake"
@@ -3340,7 +3342,7 @@ const GUIDE={
 <section><h4>ไอเทมในกระเป๋า</h4><ul>
 <li>ซื้อไอเทมได้ที่ <b>Shop</b> ด้วย pts · ดูประวัติได้ที่ <b>ประวัติ pts</b></li>
 <li>ในล็อบบี้กด <b>ไอเทม</b> เพื่อเปิดกระเป๋า</li>
-<li><b>การ์ดนางฟ้า</b> · <b>เลขคู่/คี่</b> ใช้ก่อนเริ่มเกม</li>
+<li><b>การ์ดนางฟ้า</b> · <b>เลขคู่/คี่</b> ใช้ก่อนเริ่มเกม · นางฟ้าใช้ไม่ได้ใน Imposter</li>
 <li><b>Skip Turn</b> · <b>วางบอม</b> ใช้ระหว่างเกม (มีปุ่มกระเป๋าในเกม)</li>
 </ul></section>
 <section><h4>ห้องส่วนตัว</h4><ul>

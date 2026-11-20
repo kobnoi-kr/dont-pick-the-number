@@ -2401,6 +2401,7 @@ async function onUseHelper(ws, msg) {
 
   if (itemId === ANGEL_ITEM_ID) {
     if (ctx.room.phase !== "lobby") return fail(ws, "การ์ดนางฟ้าใช้ได้เฉพาะก่อนเริ่มเกม");
+    if (ctx.room.cat === "imposter") return fail(ws, "การ์ดนางฟ้าใช้ไม่ได้ใน Imposter");
     if (ctx.player.angelCardUsed || ctx.player.angelGuard || (ctx.player.angelSnakeCharges | 0) > 0) {
       return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
     }
