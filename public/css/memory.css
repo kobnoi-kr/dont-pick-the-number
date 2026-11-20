@@ -90,12 +90,33 @@
 .mem-scores b {
   color: #f5f7ff;
 }
+.over-section-label {
+  margin: 16px 0 6px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a7b0c5;
+}
+.over-section-label.hidden { display: none !important; }
 .over-rank {
-  margin-top: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  margin-top: 0;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(53, 201, 145, 0.08);
+  border: 1px solid rgba(53, 201, 145, 0.35);
+}
+.over-rank li {
+  background: rgba(16, 22, 37, 0.72);
+  border: 1px solid transparent;
+}
+.over-rank li.is-first {
+  outline: none;
+  border-color: rgba(53, 201, 145, 0.7);
 }
 .over-rank li b {
-  font-size: 0.85rem;
+  color: #35c991;
+  font-size: 0.82rem;
   font-weight: 700;
 }

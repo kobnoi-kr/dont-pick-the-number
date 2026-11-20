@@ -820,6 +820,10 @@ function paintOverScreen(s){
     shown.classList.toggle("hidden",!!memoryRank.length||!shown.textContent);
   }
   const rankEl=$("overRank");
+  const rankLabel=$("overRankLabel");
+  const pointsLabel=$("overPointsLabel");
+  if(rankLabel) rankLabel.classList.toggle("hidden",!memoryRank.length);
+  if(pointsLabel) pointsLabel.classList.toggle("hidden",!memoryRank.length);
   if(rankEl){
     rankEl.classList.toggle("hidden",!memoryRank.length);
     rankEl.innerHTML=memoryRank.map((row,i)=>{
@@ -828,7 +832,7 @@ function paintOverScreen(s){
       const pairs=Number(row&&row.pairs)||0;
       const combo=Number(row&&row.maxCombo)||0;
       const detail=score+" คะแนน · คู่ "+pairs+(combo?" · คอมโบ "+combo:"");
-      return `<li class="${i===0?"top":""}"><span>${i+1}. ${name}</span><b>${escHtml(detail)}</b></li>`;
+      return `<li class="${i===0?"is-first":""}"><span>${i+1}. ${name}</span><b>${escHtml(detail)}</b></li>`;
     }).join("");
   }
   const guessEl=$("overGuess");

@@ -26,7 +26,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
 <link rel="stylesheet" href="/css/imposter.css?v=imp19">
-<link rel="stylesheet" href="/css/memory.css?v=mem2">
+<link rel="stylesheet" href="/css/memory.css?v=mem3">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -228,8 +228,10 @@ html,body{background:#070b14}
     <div id="secretLabel">เลขลับคือ</div>
     <div class="secret" id="secret"></div>
     <p id="overGuess" class="over-guess hidden"></p>
+    <p id="overRankLabel" class="over-section-label hidden">ผลรอบนี้</p>
     <ol id="overRank" class="scores over-rank hidden"></ol>
     <div class="hist hidden" id="overHistWrap">ผลรอบนี้: <span id="overHist"></span></div>
+    <p id="overPointsLabel" class="over-section-label hidden">แต้มสะสม</p>
     <ol id="finalScores" class="scores"></ol>
     <button class="btn" type="button" id="again">เล่นอีกครั้ง</button>
     <button class="btn ghost" type="button" id="back">เลือกโหมดใหม่</button>
@@ -640,7 +642,7 @@ html,body{background:#070b14}
     await import("/js/imposter/live-ui.js?v=imp19");
     await import("/js/memory/live-ui.js?v=mem1");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=mem2";
+    s.src = "/js/game.js?v=mem3";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();
