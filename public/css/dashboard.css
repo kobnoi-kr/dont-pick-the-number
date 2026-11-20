@@ -489,18 +489,43 @@ textarea:focus {
 .btn.sm { padding: 7px 12px; font-size: 0.86rem; border-radius: 10px; }
 
 .welcome {
+  position: relative;
+  overflow: hidden;
   display: flex;
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
-  padding: 20px;
+  padding: 20px 20px 20px 108px;
   border-radius: 18px;
   background: var(--nv-card);
   border: 1px solid var(--nv-border);
   box-shadow: none;
 }
+.welcome-mark {
+  position: absolute;
+  left: -36px;
+  top: 50%;
+  width: 148px;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.28;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 16px rgba(86, 140, 255, 0.45));
+  -webkit-mask-image: linear-gradient(90deg, #000 42%, transparent 88%);
+  mask-image: linear-gradient(90deg, #000 42%, transparent 88%);
+  animation: welcomeDrift 7.5s ease-in-out infinite;
+}
+.welcome-copy { position: relative; z-index: 1; min-width: 0; }
+@keyframes welcomeDrift {
+  0%, 100% { transform: translateY(-52%) rotate(-8deg); opacity: 0.2; }
+  50% { transform: translateY(-60%) rotate(-1deg); opacity: 0.38; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-mark { animation: none; transform: translateY(-52%) rotate(-8deg); }
+}
 .welcome .big { font-size: 1.45rem; font-weight: 800; margin: 0 0 4px; }
-.welcome .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.welcome .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1; }
 
 .quick-grid {
   display: grid;
@@ -1366,7 +1391,8 @@ body.nav-open .sidebar .nav {
   .sidebar.open { transform: translateX(0); }
   .menu-toggle { display: inline-grid; place-items: center; }
   .quick-grid { grid-template-columns: 1fr; }
-  .welcome { flex-direction: column; align-items: flex-start; }
+  .welcome { flex-direction: column; align-items: flex-start; padding-left: 92px; }
+  .welcome-mark { width: 120px; left: -30px; }
   .welcome .actions { margin-left: 0; width: 100%; }
   .main { padding: 16px 14px 88px; }
   .bottom-nav { display: flex; }

@@ -16,7 +16,8 @@ export async function renderOverview(root, { user, openCreate, openRooms, summar
   const guest = !user || user.accountType === "guest";
   root.innerHTML = `
     <section class="welcome">
-      <div>
+      <img class="welcome-mark" src="/images/n-logo.png" alt="" aria-hidden="true">
+      <div class="welcome-copy">
         <p class="big">${guest ? "ยินดีต้อนรับ!" : "สวัสดี, " + esc(name)}</p>
         <p class="muted">${guest ? "เริ่มเล่นได้เลย หรือผูกบัญชีเพื่อเก็บสถิติ" : "พร้อมท้าเพื่อนอีกเกมไหม?"}</p>
       </div>
