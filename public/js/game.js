@@ -3548,8 +3548,7 @@ function syncSetup(s){
     $("impostorCount").value=Number(s.impostorCount)===2?"2":"1";
   }
   if($("clueRounds")&&document.activeElement!==$("clueRounds")){
-    const rounds=Math.min(5, Math.max(1, Number(s.clueRounds)||5));
-    $("clueRounds").value=String(rounds);
+    $("clueRounds").value=Math.min(99, Math.max(1, Number(s.clueRounds)||5));
   }
   if($("clueSec")&&document.activeElement!==$("clueSec")){
     $("clueSec").value=Number(s.clueSec)||45;
@@ -4127,7 +4126,7 @@ function pushNums(){
   const impCount=parseIntStrict(($("impostorCount")&&$("impostorCount").value)||"1");
   if(impCount!=null) patch.impostorCount=impCount===2?2:1;
   const clueRounds=parseIntStrict(($("clueRounds")&&$("clueRounds").value)||"");
-  if(clueRounds!=null) patch.clueRounds=Math.min(5, Math.max(1, clueRounds));
+  if(clueRounds!=null) patch.clueRounds=Math.min(99, Math.max(1, clueRounds));
   const clue=parseIntStrict(($("clueSec")&&$("clueSec").value)||"");
   if(clue!=null) patch.clueSec=clue;
   const disc=parseIntStrict(($("discussionSec")&&$("discussionSec").value)||"");

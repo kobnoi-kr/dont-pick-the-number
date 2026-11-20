@@ -49,18 +49,16 @@
   font-weight: 700;
   word-break: break-word;
 }
-.imp-guess-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.imp-guess-form input {
-  flex: 1 1 160px;
-  min-width: 0;
-}
 .imp-clue-popup {
   text-align: left;
+}
+.imp-clue-popup.is-imposter .imp-clue-popup-form input {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffe8f0;
+}
+.imp-clue-popup.is-imposter .imp-clue-popup-form input::placeholder {
+  color: rgba(255, 232, 240, 0.55);
 }
 .imp-clue-popup h2 {
   text-align: center;

@@ -22,10 +22,10 @@ html,body{background:#070b14}
 </style>
 <link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="/css/scrollbar.css">
-<link rel="stylesheet" href="/css/style.css?v=chrome2">
+<link rel="stylesheet" href="/css/style.css?v=chrome3">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp8">
+<link rel="stylesheet" href="/css/imposter.css?v=imp11">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -364,13 +364,7 @@ html,body{background:#070b14}
           <button type="button" class="mode" data-impostor-info="category" aria-pressed="false">แค่หมวดหมู่</button>
         </div>
         <div class="row count-row"><label for="clueRounds">จำนวนรอบคำใบ้</label>
-          <select id="clueRounds" class="input" aria-label="จำนวนรอบคำใบ้">
-            <option value="1">1 รอบ</option>
-            <option value="2">2 รอบ</option>
-            <option value="3">3 รอบ</option>
-            <option value="4">4 รอบ</option>
-            <option value="5" selected>5 รอบ</option>
-          </select>
+          <input id="clueRounds" type="number" inputmode="numeric" value="5" min="1" max="99" aria-label="จำนวนรอบคำใบ้">
         </div>
         <p class="hint">1 รอบ = ทุกคนให้คำใบ้ทีละคน 1 ครั้ง แล้วคุย/โหวต — ตั้ง 2 คือวนซ้ำแบบนี้ 2 รอบ ไม่ใช่ใส่คำใบ้ 2 คำในทีเดียว</p>
         <div class="row count-row"><label for="clueSec">เวลาเขียนคำใบ้ต่อคน (วินาที)</label>
@@ -577,9 +571,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp8");
+    await import("/js/imposter/live-ui.js?v=imp11");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp8";
+    s.src = "/js/game.js?v=imp11";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

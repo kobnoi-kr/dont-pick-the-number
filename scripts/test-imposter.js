@@ -103,7 +103,8 @@ function run() {
     rng: () => 0.4
   });
   assert.strictEqual(s4.maxRounds, 2);
-  assert.strictEqual(eng.normalizeClueRounds(99), 5);
+  assert.strictEqual(eng.normalizeClueRounds(20), 20);
+  assert.strictEqual(eng.normalizeClueRounds(999), 99);
   assert.strictEqual(eng.normalizeClueRounds(0), 1);
 
   console.log("imposter engine ok");

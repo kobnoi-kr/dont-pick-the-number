@@ -42,6 +42,7 @@
     let pickedVote = null;
     let popupOpen = false;
     let cluePopupOpen = false;
+    let guessPopupOpen = false;
 
     root.innerHTML = `
       <div class="imp-root">
@@ -56,10 +57,6 @@
         <ul class="imp-clue-board" data-imp="clues"></ul>
         <button class="btn ghost hidden" type="button" data-imp="abstain">งดโหวต</button>
         <ul class="imp-tallies hidden" data-imp="tallies"></ul>
-        <form class="imp-guess-form hidden" data-imp="guessForm" autocomplete="off">
-          <input data-imp="guessInput" maxlength="48" placeholder="ทายคำศัพท์" aria-label="ทายคำ">
-          <button class="btn" type="submit">ทายคำ</button>
-        </form>
       </div>
     `;
 
@@ -104,13 +101,37 @@
       document.body.appendChild(clueOverlay);
     }
 
+    let guessOverlay = document.getElementById("impGuessOverlay");
+    if (!guessOverlay) {
+      guessOverlay = document.createElement("div");
+      guessOverlay.id = "impGuessOverlay";
+      guessOverlay.className = "imp-overlay hidden";
+      guessOverlay.setAttribute("role", "dialog");
+      guessOverlay.setAttribute("aria-modal", "true");
+      guessOverlay.setAttribute("aria-labelledby", "impGuessTitle");
+      guessOverlay.innerHTML = `
+        <div class="imp-popup imp-clue-popup is-imposter">
+          <h2 id="impGuessTitle">ทายคำศัพท์</h2>
+          <p class="imp-hint">คุณถูกจับแล้ว — ทายคำให้ถูกเพื่อให้ Imposter ชนะ</p>
+          <form class="imp-clue-popup-form" data-imp-guess="form" autocomplete="off">
+            <input data-imp-guess="input" maxlength="48" placeholder="ทายคำศัพท์" aria-label="ทายคำ">
+            <div class="imp-clue-popup-actions">
+              <button class="btn" type="submit">ทายคำ</button>
+            </div>
+          </form>
+        </div>`;
+      document.body.appendChild(guessOverlay);
+    }
+
     const $ = (k) => root.querySelector('[data-imp="' + k + '"]');
     const $p = (k) => overlay.querySelector('[data-imp-pop="' + k + '"]');
     const $c = (k) => clueOverlay.querySelector('[data-imp-clue="' + k + '"]');
-    const guessForm = $("guessForm");
+    const $g = (k) => guessOverlay.querySelector('[data-imp-guess="' + k + '"]');
     const popup = $p("popup");
     const clueForm = $c("form");
     const clueInput = $c("input");
+    const guessForm = $g("form");
+    const guessInput = $g("input");
 
     function confirmRole() {
       popupOpen = false;
@@ -135,6 +156,23 @@
       }
     }
 
+    function hideGuessPopup() {
+      guessPopupOpen = false;
+      guessOverlay.classList.add("hidden");
+    }
+
+    function showGuessPopup() {
+      guessOverlay.classList.remove("hidden");
+      if (!guessPopupOpen) {
+        guessPopupOpen = true;
+        setTimeout(() => {
+          try {
+            guessInput.focus();
+          } catch (_) {}
+        }, 40);
+      }
+    }
+
     clueForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = (clueInput.value || "").trim();
@@ -154,9 +192,11 @@
     };
     guessForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const word = ($("guessInput").value || "").trim();
+      const word = (guessInput.value || "").trim();
+      if (!word) return;
       send({ t: "imposter:guess", word });
-      $("guessInput").value = "";
+      guessInput.value = "";
+      hideGuessPopup();
     });
     $p("popOk").onclick = confirmRole;
 
@@ -383,7 +423,10 @@
           ? "กดที่โปรไฟล์ผู้ต้องสงสัยเพื่อโหวต (โหวตตัวเองไม่ได้)"
           : "รอผลโหวตจากผู้เล่นคนอื่น";
       else if (state.phase === "VOTE_RESULT") sub = "สรุปผลโหวต";
-      else if (state.phase === "GUESS") sub = "Imposter ที่ถูกจับทายคำศัพท์";
+      else if (state.phase === "GUESS")
+        sub = state.canGuess
+          ? "ถึงตาคุณทายคำ — กรอกในหน้าต่างกลางจอ"
+          : "รอ Imposter ที่ถูกจับทายคำศัพท์";
       else if (state.phase === "FINISHED") sub = state.winReason || "";
       $("sub").textContent = sub;
 
@@ -418,9 +461,8 @@
       }
 
       const guessOn = state.phase === "GUESS" && state.canGuess;
-      guessForm.classList.toggle("hidden", state.phase !== "GUESS");
-      $("guessInput").disabled = !guessOn;
-      guessForm.querySelector("button[type=submit]").disabled = !guessOn;
+      if (guessOn) showGuessPopup();
+      else hideGuessPopup();
 
       if (
         state.phase === "ROLE_REVEAL" &&

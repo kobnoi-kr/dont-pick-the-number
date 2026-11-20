@@ -760,7 +760,51 @@ main.card.lobby-card{max-width:none;flex:1 1 auto;padding:22px}
 .secret{font-size:4rem;font-weight:700;margin:8px 0}
 .secret.many{font-size:1.45rem;line-height:1.45;font-weight:750}
 .count-row{align-items:center}
-.count-row input{width:96px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;padding:8px 10px;font-size:1rem}
+.count-row input,
+.count-row select,
+select.input{
+  width:96px;
+  border:1px solid var(--line);
+  background:var(--chip);
+  color:var(--text);
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:1rem;
+  box-shadow:none;
+}
+.count-row select,
+select.input{
+  width:auto;
+  min-width:96px;
+  max-width:100%;
+  appearance:none;
+  -webkit-appearance:none;
+  padding-right:28px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%239eb0d0' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  background-color:var(--chip);
+  cursor:pointer;
+}
+.count-row select:focus,
+select.input:focus,
+.count-row input:focus{
+  outline:2px solid rgba(86,119,252,.45);
+  outline-offset:1px;
+  border-color:rgba(86,119,252,.55);
+}
+.count-row select option,
+select.input option{
+  background:#10182a;
+  color:#e8edf8;
+}
+body.room-bg .count-row input,
+body.room-bg .count-row select,
+body.room-bg select.input{
+  background:rgba(18,28,48,.88);
+  border-color:rgba(255,255,255,.14);
+  color:#e8edf8;
+}
 .dial{position:relative;width:min(280px,78vw);aspect-ratio:1;margin:4px auto 8px}
 .numdial{position:relative;width:min(320px,86vw);aspect-ratio:1;margin:0 auto 8px}
 .dial canvas,.numdial canvas{width:100%;height:100%;display:block;border-radius:50%}
@@ -1003,7 +1047,7 @@ body.room-bg .help-slot .helpbtn{
 .room .btn{width:auto;margin:0;padding:8px 14px;font-size:.92rem}
 .setup.locked{opacity:.72}
 .setup.locked,.setup.locked *{pointer-events:none;cursor:not-allowed}
-.setup.locked button,.setup.locked input{opacity:.85}
+.setup.locked button,.setup.locked input,.setup.locked select{opacity:.85}
 .host-only-note{display:none;margin:0 0 10px;color:var(--muted);font-size:.92rem}
 .setup.locked .host-only-note{display:block}
 /* Volume + gate help — top-left (away from in-game chat) */

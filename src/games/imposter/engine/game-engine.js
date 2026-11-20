@@ -9,7 +9,8 @@ const CARD_PICK_MS = 30_000;
 const DEFAULT_CLUE_SEC = 45;
 const DEFAULT_CLUE_ROUNDS = 5;
 const MIN_CLUE_ROUNDS = 1;
-const MAX_CLUE_ROUNDS = 5;
+/** Soft safety cap only — lobby UX is effectively unlimited. */
+const MAX_CLUE_ROUNDS = 99;
 const CLUE_MAX_LEN = 32;
 
 const PHASE = {
