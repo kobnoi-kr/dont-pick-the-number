@@ -22,10 +22,10 @@ html,body{background:#070b14}
 </style>
 <link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="/css/scrollbar.css">
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=chrome1">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp4">
+<link rel="stylesheet" href="/css/imposter.css?v=imp7">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -46,8 +46,13 @@ html,body{background:#070b14}
       <button type="button" id="copyCode" class="textbtn">คัดลอก</button>
     </div>
     <span id="roomCount" class="roomcount"></span>
-    <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
-    <button type="button" id="quitGameBtn" class="quit-power-btn hidden" title="ออกจากเกม" aria-label="ออกจากเกมด่วน">⏻</button>
+    <div class="roombar-end" id="roombarEnd">
+      <button type="button" id="helpBtn" class="helpbtn" aria-label="คู่มือการใช้งาน">
+        <img src="/images/guide-book.png" alt="" width="28" height="28" decoding="async">
+      </button>
+      <button type="button" id="leaveRoom" class="textbtn">ออกจากห้อง</button>
+      <button type="button" id="quitGameBtn" class="quit-power-btn hidden" title="ออกจากเกม" aria-label="ออกจากเกมด่วน">⏻</button>
+    </div>
   </div>
   <p id="roomNote" class="hint hidden"></p>
   <section id="gate">
@@ -358,6 +363,16 @@ html,body{background:#070b14}
           <button type="button" class="mode on" data-impostor-info="none" aria-pressed="true">ไม่เห็นอะไร</button>
           <button type="button" class="mode" data-impostor-info="category" aria-pressed="false">แค่หมวดหมู่</button>
         </div>
+        <div class="row count-row"><label for="clueRounds">จำนวนรอบคำใบ้</label>
+          <select id="clueRounds" class="input" aria-label="จำนวนรอบคำใบ้">
+            <option value="1">1 รอบ</option>
+            <option value="2">2 รอบ</option>
+            <option value="3">3 รอบ</option>
+            <option value="4">4 รอบ</option>
+            <option value="5" selected>5 รอบ</option>
+          </select>
+        </div>
+        <p class="hint">1 รอบ = ทุกคนให้คำใบ้ทีละคน 1 ครั้ง แล้วคุย/โหวต — ตั้ง 2 คือวนซ้ำแบบนี้ 2 รอบ ไม่ใช่ใส่คำใบ้ 2 คำในทีเดียว</p>
         <div class="row count-row"><label for="clueSec">เวลาเขียนคำใบ้ต่อคน (วินาที)</label>
           <input id="clueSec" type="number" inputmode="numeric" value="45" min="15" max="120">
         </div>
@@ -429,9 +444,6 @@ html,body{background:#070b14}
   </div>
 </div>
 
-<button type="button" id="helpBtn" class="helpbtn" aria-label="คู่มือการใช้งาน">
-  <img src="/images/guide-book.png" alt="" width="28" height="28" decoding="async">
-</button>
 <div id="codeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="codeModalTitle">
   <div class="modal-card">
     <h3 id="codeModalTitle">ห้องส่วนตัว</h3>
@@ -515,10 +527,24 @@ html,body{background:#070b14}
     <div id="guideBody" class="guide-body"></div>
   </div>
 </div>
-<div class="volbar" id="volBar" aria-label="ปรับเสียง">
-  <button type="button" id="volDown" class="volbtn" aria-label="ลดเสียง">−</button>
-  <span id="volLabel" class="vollabel">100%</span>
-  <button type="button" id="volUp" class="volbtn" aria-label="เพิ่มเสียง">+</button>
+<div class="top-chrome" id="topChrome">
+  <label class="vol-select-wrap" for="volSelect">
+    <span class="vol-select-ico" aria-hidden="true">🔊</span>
+    <select id="volSelect" aria-label="ระดับเสียง">
+      <option value="0">ปิดเสียง</option>
+      <option value="0.1">10%</option>
+      <option value="0.2">20%</option>
+      <option value="0.3">30%</option>
+      <option value="0.4">40%</option>
+      <option value="0.5">50%</option>
+      <option value="0.6">60%</option>
+      <option value="0.7">70%</option>
+      <option value="0.8">80%</option>
+      <option value="0.9">90%</option>
+      <option value="1">100%</option>
+    </select>
+  </label>
+  <div id="helpSlot" class="help-slot"></div>
 </div>
 <script type="module">
   import {
@@ -547,9 +573,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp4");
+    await import("/js/imposter/live-ui.js?v=imp7");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp4";
+    s.src = "/js/game.js?v=imp7";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

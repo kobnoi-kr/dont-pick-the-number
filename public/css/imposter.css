@@ -129,33 +129,158 @@
   font-size: 1.15rem;
   letter-spacing: 0.04em;
 }
-.imp-role-card {
-  padding: 14px 16px;
-  border-radius: 12px;
+.imp-you-profile {
+  padding: 16px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  text-align: center;
+  display: grid;
+  gap: 14px;
 }
-.imp-role-card.is-imposter {
-  background: rgba(120, 20, 50, 0.35);
+.imp-you-profile.is-imposter {
+  background: linear-gradient(160deg, rgba(90, 18, 42, 0.55), rgba(28, 12, 24, 0.72));
   border-color: rgba(255, 120, 160, 0.35);
 }
-.imp-role-card .imp-role-kicker {
-  margin: 0 0 4px;
-  font-size: 0.8rem;
-  opacity: 0.75;
+.imp-you-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.imp-you-av {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+.imp-you-av.is-ph {
+  color: rgba(255, 255, 255, 0.65);
+}
+.imp-you-id {
+  min-width: 0;
+  flex: 1;
+}
+.imp-you-kicker {
+  margin: 0 0 2px;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  opacity: 0.75;
 }
-.imp-role-card .imp-role-main {
+.imp-you-id h3 {
   margin: 0;
-  font-size: 1.45rem;
-  font-weight: 800;
+  font-size: 1.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.imp-role-card .imp-role-hint {
-  margin: 8px 0 0;
-  font-size: 0.9rem;
-  opacity: 0.85;
+.imp-you-id .sub {
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  opacity: 0.75;
+}
+.imp-you-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+.imp-you-stat {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.imp-you-stat .label {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-weight: 650;
+}
+.imp-you-stat b {
+  font-size: 1.15rem;
+  word-break: break-word;
+}
+.imp-you-stat.is-danger b {
+  color: #ffb3c9;
+}
+.imp-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.imp-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+.imp-seat.is-you {
+  border-color: rgba(120, 170, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(120, 170, 255, 0.12);
+}
+.imp-seat.is-turn {
+  border-color: rgba(120, 220, 160, 0.45);
+}
+.imp-seat.is-out {
+  opacity: 0.5;
+}
+.imp-seat-av {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.imp-seat-av.is-ph {
+  color: rgba(255, 255, 255, 0.65);
+}
+.imp-seat-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.imp-seat-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.imp-seat.is-out .imp-seat-name {
+  text-decoration: line-through;
+}
+.imp-seat-badge {
+  font-size: 0.72rem;
+  opacity: 0.8;
+  width: fit-content;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.imp-seat-badge.is-turn {
+  background: rgba(80, 180, 120, 0.22);
+}
+.imp-seat-badge.is-imp {
+  background: rgba(180, 40, 80, 0.35);
+  color: #ffd0de;
 }
 .imp-overlay {
   position: fixed;
@@ -205,21 +330,6 @@
   font-size: 0.92rem;
   margin: 0 0 14px;
 }
-.imp-alive {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.imp-alive span {
-  font-size: 0.85rem;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
-}
-.imp-alive span.is-out {
-  opacity: 0.45;
-  text-decoration: line-through;
-}
 @keyframes impFadeIn {
   from {
     opacity: 0;
@@ -244,5 +354,13 @@
   }
   .imp-popup {
     padding: 18px 14px 14px;
+  }
+  .imp-card-grid {
+    grid-template-columns: 1fr;
+    max-width: 220px;
+    gap: 12px;
+  }
+  .imp-face-card {
+    min-height: 96px;
   }
 }

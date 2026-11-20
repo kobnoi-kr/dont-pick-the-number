@@ -529,6 +529,7 @@ function blankRoom(code, visibility, host) {
     discussionSec: 60,
     voteSec: 45,
     clueSec: 45,
+    clueRounds: 5,
     imposterTimer: null
   };
 }
@@ -564,6 +565,9 @@ function applyRoomSetup(room, setup) {
   }
   if (Number.isInteger(setup.clueSec)) {
     room.clueSec = Math.min(120, Math.max(15, setup.clueSec));
+  }
+  if (setup.clueRounds != null) {
+    room.clueRounds = imposterBridge.normalizeClueRounds(setup.clueRounds);
   }
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
@@ -636,6 +640,7 @@ function snap(room, player, opts) {
     discussionSec: Number(room.discussionSec) || 60,
     voteSec: Number(room.voteSec) || 45,
     clueSec: Number(room.clueSec) || 45,
+    clueRounds: imposterBridge.normalizeClueRounds(room.clueRounds),
     imposter: imposterBridge.snapImposter(room, spectator ? null : player),
     youImposter: spectator ? null : imposterBridge.privateImposter(room, player),
     players: room.players.map((item) => ({
@@ -1468,6 +1473,9 @@ async function onSetup(ws, msg) {
   }
   if (Number.isInteger(patch.clueSec)) {
     room.clueSec = Math.min(120, Math.max(15, patch.clueSec));
+  }
+  if (patch.clueRounds != null) {
+    room.clueRounds = imposterBridge.normalizeClueRounds(patch.clueRounds);
   }
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
     room.rangeMode = patch.rangeMode;

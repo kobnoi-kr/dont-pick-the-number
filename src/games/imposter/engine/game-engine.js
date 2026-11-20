@@ -7,7 +7,9 @@ const MAX_PLAYERS = 8;
 const ROLE_REVEAL_MS = 20_000;
 const CARD_PICK_MS = 30_000;
 const DEFAULT_CLUE_SEC = 45;
-const MAX_ROUNDS = 5;
+const DEFAULT_CLUE_ROUNDS = 5;
+const MIN_CLUE_ROUNDS = 1;
+const MAX_CLUE_ROUNDS = 5;
 const CLUE_MAX_LEN = 32;
 
 const PHASE = {
@@ -36,6 +38,13 @@ function normalizeImpostorCount(n, playerCount) {
   return c;
 }
 
+/** How many full clue→discuss→vote cycles before imposters win by timeout. */
+function normalizeClueRounds(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return DEFAULT_CLUE_ROUNDS;
+  return clamp(Math.round(v), MIN_CLUE_ROUNDS, MAX_CLUE_ROUNDS);
+}
+
 function shuffle(arr, rng = Math.random) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -57,6 +66,9 @@ function createGame(opts) {
   const discussionSec = clamp(Number(opts.discussionSec) || 60, 30, 180);
   const voteSec = clamp(Number(opts.voteSec) || 45, 20, 120);
   const clueSec = clamp(Number(opts.clueSec) || DEFAULT_CLUE_SEC, 15, 120);
+  const maxRounds = normalizeClueRounds(
+    opts.maxRounds != null ? opts.maxRounds : opts.clueRounds
+  );
   const impostorInfo = normalizeInfo(opts.impostorInfo);
   const impostorCount = normalizeImpostorCount(opts.impostorCount, players.length);
   const picked = pickWord(opts.rng);
@@ -78,7 +90,7 @@ function createGame(opts) {
     status: "playing",
     phase: PHASE.CARD_PICK,
     round: 1,
-    maxRounds: MAX_ROUNDS,
+    maxRounds,
     word: picked.word,
     category: picked.category,
     impostorInfo,
@@ -510,6 +522,9 @@ function tick(state, now = Date.now()) {
 module.exports = {
   MIN_PLAYERS,
   MAX_PLAYERS,
+  DEFAULT_CLUE_ROUNDS,
+  MIN_CLUE_ROUNDS,
+  MAX_CLUE_ROUNDS,
   PHASE,
   CLUE_MAX_LEN,
   createGame,
@@ -526,6 +541,7 @@ module.exports = {
   tick,
   normalizeInfo,
   normalizeImpostorCount,
+  normalizeClueRounds,
   beginDiscussion,
   beginVoting,
   beginClueTurn,

@@ -28,11 +28,17 @@
     return m > 0 ? m + ":" + String(r).padStart(2, "0") : String(s) + "s";
   }
 
+  function initialOf(name) {
+    const t = String(name || "?").trim();
+    return t ? t.slice(0, 1).toUpperCase() : "?";
+  }
+
   function createLiveUi(opts) {
     const root = opts.root;
     const send = opts.send || function () {};
     let lastPrivate = null;
     let lastPublic = null;
+    let lastMeta = { players: [], youId: "" };
     let pickedVote = null;
     let popupOpen = false;
 
@@ -44,13 +50,8 @@
         </div>
         <p class="sub" data-imp="sub"></p>
         <div class="imp-card-grid hidden" data-imp="cardGrid" role="group" aria-label="การ์ดบทบาท"></div>
-        <div class="imp-role-card hidden" data-imp="roleCard">
-          <p class="imp-role-kicker" data-imp="roleKicker"></p>
-          <p class="imp-role-main" data-imp="roleMain"></p>
-          <p class="imp-role-hint" data-imp="roleHint"></p>
-          <button type="button" class="btn sm" data-imp="roleOk" style="margin-top:10px">เข้าใจแล้ว</button>
-        </div>
-        <div class="imp-alive" data-imp="alive"></div>
+        <div class="imp-you-profile hidden" data-imp="youProfile" aria-live="polite"></div>
+        <div class="imp-roster" data-imp="roster" role="list" aria-label="ผู้เล่นในห้อง"></div>
         <ul class="imp-clue-board" data-imp="clues"></ul>
         <form class="imp-clue-form hidden" data-imp="clueForm" autocomplete="off">
           <input data-imp="clueInput" maxlength="32" placeholder="พิมพ์คำใบ้ 1 คำ/สั้นๆ" aria-label="คำใบ้">
@@ -105,7 +106,6 @@
     });
     $("skipClue").onclick = () => send({ t: "imposter:skipClue" });
     $("abstain").onclick = () => send({ t: "imposter:vote", targetId: null });
-    $("roleOk").onclick = confirmRole;
     guessForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const word = ($("guessInput").value || "").trim();
@@ -113,6 +113,19 @@
       $("guessInput").value = "";
     });
     $p("popOk").onclick = confirmRole;
+
+    function playerMeta(id) {
+      const list = lastMeta.players || [];
+      return list.find((p) => p && String(p.id) === String(id)) || null;
+    }
+
+    function avatarHtml(meta, name, cls) {
+      const av = meta && meta.avatarUrl ? String(meta.avatarUrl) : "";
+      if (av) {
+        return `<img class="${cls}" src="${esc(av)}" alt="" loading="lazy">`;
+      }
+      return `<div class="${cls} is-ph" aria-hidden="true">${esc(initialOf(name))}</div>`;
+    }
 
     function fillRoleCopy(priv, titleEl, wordEl, hintEl) {
       const isImp = priv.role === "imposter";
@@ -138,15 +151,98 @@
       popupOpen = true;
     }
 
-    function paintRoleCard(priv, phase) {
-      const card = $("roleCard");
-      if (!card) return;
-      const show = phase === "ROLE_REVEAL" && priv && priv.role;
-      card.classList.toggle("hidden", !show);
-      if (!show) return;
-      const isImp = fillRoleCopy(priv, $("roleKicker"), $("roleMain"), $("roleHint"));
-      card.classList.toggle("is-imposter", isImp);
-      $("roleOk").classList.toggle("hidden", !!priv.confirmed);
+    function paintYouProfile(state, priv) {
+      const box = $("youProfile");
+      if (!box) return;
+      const youId = String((opts.youId && opts.youId()) || lastMeta.youId || "");
+      const show = !!(priv && priv.role && youId);
+      box.classList.toggle("hidden", !show);
+      if (!show) {
+        box.innerHTML = "";
+        return;
+      }
+      const isImp = priv.role === "imposter";
+      const meta = playerMeta(youId);
+      const name = (state.names && state.names[youId]) || (meta && meta.name) || "คุณ";
+      const needConfirm = state.phase === "ROLE_REVEAL" && !priv.confirmed;
+      const secretLabel = isImp ? "บทบาท" : "คำศัพท์";
+      const secretValue = isImp ? "Imposter" : priv.word || "—";
+      const catRow =
+        isImp && priv.category
+          ? `<div class="imp-you-stat"><span class="label">หมวดหมู่</span><b>${esc(priv.category)}</b></div>`
+          : "";
+      box.classList.toggle("is-imposter", isImp);
+      box.innerHTML = `
+        <div class="imp-you-head">
+          ${avatarHtml(meta, name, "imp-you-av")}
+          <div class="imp-you-id">
+            <p class="imp-you-kicker">${isImp ? "คุณคือ Imposter" : "ผู้เล่นปกติ"}</p>
+            <h3>${esc(name)}</h3>
+            <p class="sub">โปรไฟล์ของคุณ · คนอื่นมองไม่เห็นข้อมูลนี้</p>
+          </div>
+        </div>
+        <div class="imp-you-stats">
+          <div class="imp-you-stat${isImp ? " is-danger" : ""}">
+            <span class="label">${secretLabel}</span>
+            <b>${esc(secretValue)}</b>
+          </div>
+          ${catRow}
+        </div>
+        ${
+          needConfirm
+            ? `<button type="button" class="btn sm" data-imp="roleOk">เข้าใจแล้ว</button>`
+            : ""
+        }
+      `;
+      const ok = box.querySelector('[data-imp="roleOk"]');
+      if (ok) ok.onclick = confirmRole;
+    }
+
+    function paintRoster(state) {
+      const roster = $("roster");
+      if (!roster) return;
+      const aliveSet = new Set(state.alive || []);
+      const youId = String((opts.youId && opts.youId()) || lastMeta.youId || "");
+      const turnId =
+        state.phase === "CARD_PICK"
+          ? state.pickTurnId
+          : state.phase === "CLUE_TURN"
+            ? state.clueTurnId
+            : null;
+      roster.innerHTML = (state.order || [])
+        .map((id) => {
+          const sid = String(id);
+          const meta = playerMeta(sid);
+          const name = (state.names && state.names[sid]) || (meta && meta.name) || sid;
+          const out = !aliveSet.has(sid);
+          const mine = youId && sid === youId;
+          const turn = turnId && sid === String(turnId);
+          const cls =
+            "imp-seat" +
+            (out ? " is-out" : "") +
+            (mine ? " is-you" : "") +
+            (turn ? " is-turn" : "");
+          let badge = "";
+          if (state.phase === "FINISHED" && state.roles && state.roles[sid]) {
+            badge =
+              state.roles[sid] === "imposter"
+                ? `<span class="imp-seat-badge is-imp">Imposter</span>`
+                : `<span class="imp-seat-badge">ปกติ</span>`;
+          } else if (out) {
+            badge = `<span class="imp-seat-badge">ตกรอบ</span>`;
+          } else if (turn) {
+            badge = `<span class="imp-seat-badge is-turn">ตานี้</span>`;
+          }
+          return `
+            <div class="${cls}" role="listitem">
+              ${avatarHtml(meta, name, "imp-seat-av")}
+              <div class="imp-seat-meta">
+                <span class="imp-seat-name">${esc(name)}${mine ? " (คุณ)" : ""}</span>
+                ${badge}
+              </div>
+            </div>`;
+        })
+        .join("");
     }
 
     function paintCards(state) {
@@ -178,12 +274,23 @@
       });
     }
 
-    function paint(state, priv) {
+    function paint(state, priv, meta) {
       lastPublic = state || null;
       if (priv) lastPrivate = priv;
+      if (meta) {
+        lastMeta = {
+          players: Array.isArray(meta.players) ? meta.players : lastMeta.players || [],
+          youId: meta.youId != null ? String(meta.youId) : lastMeta.youId || ""
+        };
+      }
       if (!state) return;
 
-      $("phaseTitle").textContent = phaseLabel(state.phase) + " · รอบ " + (state.round || 1);
+      $("phaseTitle").textContent =
+        phaseLabel(state.phase) +
+        " · รอบ " +
+        (state.round || 1) +
+        "/" +
+        (state.maxRounds || 1);
       $("timer").textContent = state.phaseEndsAt ? formatLeft(state.phaseLeft) : "—";
 
       const turnName =
@@ -210,15 +317,8 @@
       $("sub").textContent = sub;
 
       paintCards(state);
-      paintRoleCard(lastPrivate, state.phase);
-
-      const aliveSet = new Set(state.alive || []);
-      $("alive").innerHTML = (state.order || [])
-        .map((id) => {
-          const name = (state.names && state.names[id]) || id;
-          return `<span class="${aliveSet.has(id) ? "" : "is-out"}">${esc(name)}</span>`;
-        })
-        .join("");
+      paintYouProfile(state, lastPrivate);
+      paintRoster(state);
 
       $("clues").innerHTML = (state.clues || [])
         .map(

@@ -19,6 +19,7 @@ function run() {
   });
   assert.strictEqual(state.phase, eng.PHASE.CARD_PICK);
   assert.strictEqual(state.clueSec, 30);
+  assert.strictEqual(state.maxRounds, 5);
   assert.strictEqual(state.order.length, 4);
   assert.strictEqual(state.cards.length, 4);
   assert.strictEqual(state.cards.filter((c) => c.role === "imposter").length, 1);
@@ -95,6 +96,15 @@ function run() {
     rng: () => 0.3
   });
   assert.strictEqual(s3.cards.filter((c) => c.role === "imposter").length, 1);
+
+  const s4 = eng.createGame({
+    players: players(4),
+    clueRounds: 2,
+    rng: () => 0.4
+  });
+  assert.strictEqual(s4.maxRounds, 2);
+  assert.strictEqual(eng.normalizeClueRounds(99), 5);
+  assert.strictEqual(eng.normalizeClueRounds(0), 1);
 
   console.log("imposter engine ok");
 }

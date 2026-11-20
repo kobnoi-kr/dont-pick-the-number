@@ -29,7 +29,10 @@ function updateImposterUi(s){
     note.classList.toggle("hidden",!spectating);
     if(spectating) note.textContent="โหมด Spectator — ดูได้อย่างเดียว ไม่เห็นบทบาท/คำศัพท์ของใคร";
   }
-  ui.paint(s&&s.imposter, s&&s.youImposter);
+  ui.paint(s&&s.imposter, s&&s.youImposter, {
+    players: (s&&s.players)||[],
+    youId: (s&&s.youId)||myId||""
+  });
 }
 function ensureSnakeBoard(){
   if(snakeLive) return snakeLive;
@@ -261,11 +264,11 @@ function applyVolume(){
     stopBackground();
     stopSpinSound();
   }
-  const label=$("volLabel");
-  if(label) label.textContent=Math.round(masterVol*100)+"%";
-  const down=$("volDown"), up=$("volUp");
-  if(down) down.disabled=masterVol<=0;
-  if(up) up.disabled=masterVol>=1;
+  const sel=$("volSelect");
+  if(sel){
+    const v=String(masterVol);
+    if(sel.value!==v) sel.value=v;
+  }
 }
 function setVolume(next, preview){
   masterVol=Math.min(1,Math.max(0,Math.round(next*10)/10));
@@ -275,7 +278,19 @@ function setVolume(next, preview){
   if(masterVol>0) startBackground();
   if(preview&&masterVol>0) playClip(POP_SOUND);
 }
-function nudgeVolume(delta){ setVolume(masterVol+delta, true); }
+function placeHelpBtn(inGame){
+  const btn=$("helpBtn");
+  if(!btn) return;
+  const end=$("roombarEnd");
+  const slot=$("helpSlot");
+  if(inGame&&end){
+    const quit=$("quitGameBtn");
+    if(quit&&quit.parentNode===end) end.insertBefore(btn, quit);
+    else end.appendChild(btn);
+  }else if(slot){
+    slot.appendChild(btn);
+  }
+}
 function stopBackground(){
   try{ bgAudio.pause(); }catch(e){}
 }
@@ -463,6 +478,7 @@ function show(n){
   if($("copyCode")) $("copyCode").classList.toggle("hidden", true);
   if($("leaveRoom")) $("leaveRoom").classList.toggle("hidden", true);
   if($("quitGameBtn")) $("quitGameBtn").classList.toggle("hidden", !inGame);
+  placeHelpBtn(inGame);
   if(!inGame) closeQuitGameModal();
   $("roomNote").classList.toggle("hidden",!inRoom||lobby);
   document.body.classList.toggle("lobby-mode", lobby);
@@ -2433,7 +2449,7 @@ document.addEventListener("keydown",onUserGesture);
 document.addEventListener("click",e=>{
   onUserGesture();
   const btn=e.target.closest("button");
-  if(btn&&!btn.closest("#volBar")&&!btn.closest("#helpBtn")) playClip(POP_SOUND);
+  if(btn&&!btn.closest("#topChrome")&&!btn.closest("#helpBtn")&&!btn.closest("#volSelect")) playClip(POP_SOUND);
 });
 $("restModes").onclick=e=>{
   if(onlineMode&&!isHost()) return;
@@ -3325,7 +3341,7 @@ const GUIDE={
 <li>กด <b>เล่นอัตโนมัติ</b> ให้ระบบเล่นแทนคุณได้</li>
 <li>บันไดงู: AFK เกิน 15 วินาที ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น (หรือตามเวลานับถอยหลังที่โฮสต์ตั้ง)</li>
 <li>โหมดอื่น: ถ้าหมดเวลานับถอยหลัง ระบบจะเปิดออโต้ให้ผู้เล่นคนนั้น</li>
-<li>ปรับเสียงได้ที่ปุ่ม − / + มุมซ้ายบน · คู่มืออยู่ปุ่มมุมขวาบน</li>
+<li>ปรับเสียงได้ที่เมนูมุมซ้ายบน · คู่มืออยู่ปุ่มหนังสือข้างปุ่มออกเกม</li>
 <li>ถ้าหลุดการเชื่อมต่อ ระบบจะพยายามเชื่อมใหม่อัตโนมัติ</li>
 </ul></section>`
 };
@@ -3509,6 +3525,10 @@ function syncSetup(s){
   if($("impostorCount")&&document.activeElement!==$("impostorCount")){
     $("impostorCount").value=Number(s.impostorCount)===2?"2":"1";
   }
+  if($("clueRounds")&&document.activeElement!==$("clueRounds")){
+    const rounds=Math.min(5, Math.max(1, Number(s.clueRounds)||5));
+    $("clueRounds").value=String(rounds);
+  }
   if($("clueSec")&&document.activeElement!==$("clueSec")){
     $("clueSec").value=Number(s.clueSec)||45;
   }
@@ -3522,7 +3542,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueSec","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
       const wrap=$(id);
       if(!wrap) return;
@@ -3535,7 +3555,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueSec","discussionSec","voteSec"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -4084,6 +4104,8 @@ function pushNums(){
   if(infoBtn) patch.impostorInfo=infoBtn.getAttribute("data-impostor-info")==="category"?"category":"none";
   const impCount=parseIntStrict(($("impostorCount")&&$("impostorCount").value)||"1");
   if(impCount!=null) patch.impostorCount=impCount===2?2:1;
+  const clueRounds=parseIntStrict(($("clueRounds")&&$("clueRounds").value)||"");
+  if(clueRounds!=null) patch.clueRounds=Math.min(5, Math.max(1, clueRounds));
   const clue=parseIntStrict(($("clueSec")&&$("clueSec").value)||"");
   if(clue!=null) patch.clueSec=clue;
   const disc=parseIntStrict(($("discussionSec")&&$("discussionSec").value)||"");
@@ -4591,22 +4613,15 @@ async function bootOnline(){
     if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
     hideRoomInvite();
   };
-  const bindVol=(id, delta)=>{
-    const el=$(id);
-    let armed=false;
-    const go=e=>{
-      if(armed) return;
-      armed=true;
-      setTimeout(()=>{ armed=false; }, 250);
-      if(e&&e.cancelable) e.preventDefault();
+  const volSel=$("volSelect");
+  if(volSel){
+    volSel.addEventListener("change",()=>{
       unlockAudio();
-      nudgeVolume(delta);
-    };
-    el.addEventListener("pointerdown",go);
-    el.addEventListener("click",go);
-  };
-  bindVol("volDown", -0.1);
-  bindVol("volUp", 0.1);
+      const n=Number(volSel.value);
+      setVolume(Number.isFinite(n)?n:masterVol, true);
+    });
+  }
+  placeHelpBtn(false);
   applyVolume();
   show("gate");
   connect();
