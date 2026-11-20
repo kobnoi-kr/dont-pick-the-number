@@ -135,14 +135,13 @@ function finishIfDone(room, setOver) {
     wrongs: state.wrongs[id] || 0,
     maxCombo: state.maxCombo[id] || 0
   }));
-  const lines = ranking.map((row, i) => (i + 1) + ". " + row.name + " " + row.score);
   if (typeof setOver === "function") {
     setOver(room, {
       title: names.length ? names.join(" กับ ") + " ชนะ!" : "จบเกม",
       note: state.winReason || "",
       mode: "cardmemory",
-      secretLabel: "อันดับ",
-      secretText: lines.join(" · "),
+      secretLabel: "",
+      secretText: "",
       many: false,
       hist: null,
       again: "เล่นอีกครั้ง",

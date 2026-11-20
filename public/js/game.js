@@ -807,11 +807,29 @@ function paintOverScreen(s){
   }
   $("overNote").textContent=note;
   setOverOutOrder(s.over.outOrder||[]);
-  $("secretLabel").textContent=s.over.secretLabel||"";
+  const memoryRank=s.over.mode==="cardmemory"&&Array.isArray(s.over.ranking)?s.over.ranking:[];
+  const secretLabel=$("secretLabel");
+  if(secretLabel){
+    secretLabel.textContent=memoryRank.length?"":(s.over.secretLabel||"");
+    secretLabel.classList.toggle("hidden",!!memoryRank.length||!secretLabel.textContent);
+  }
   const shown=$("secret");
   if(shown){
-    shown.textContent=s.over.secretText||"";
+    shown.textContent=memoryRank.length?"":(s.over.secretText||"");
     shown.classList.toggle("many",!!s.over.many);
+    shown.classList.toggle("hidden",!!memoryRank.length||!shown.textContent);
+  }
+  const rankEl=$("overRank");
+  if(rankEl){
+    rankEl.classList.toggle("hidden",!memoryRank.length);
+    rankEl.innerHTML=memoryRank.map((row,i)=>{
+      const name=escHtml(row&&row.name||"ผู้เล่น");
+      const score=Number(row&&row.score)||0;
+      const pairs=Number(row&&row.pairs)||0;
+      const combo=Number(row&&row.maxCombo)||0;
+      const detail=score+" คะแนน · คู่ "+pairs+(combo?" · คอมโบ "+combo:"");
+      return `<li class="${i===0?"top":""}"><span>${i+1}. ${name}</span><b>${escHtml(detail)}</b></li>`;
+    }).join("");
   }
   const guessEl=$("overGuess");
   if(guessEl){
