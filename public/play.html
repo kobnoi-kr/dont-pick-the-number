@@ -22,10 +22,10 @@ html,body{background:#070b14}
 </style>
 <link rel="stylesheet" href="/css/boot-splash.css">
 <link rel="stylesheet" href="/css/scrollbar.css">
-<link rel="stylesheet" href="/css/style.css?v=chrome1">
+<link rel="stylesheet" href="/css/style.css?v=chrome2">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp7">
+<link rel="stylesheet" href="/css/imposter.css?v=imp8">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -528,22 +528,26 @@ html,body{background:#070b14}
   </div>
 </div>
 <div class="top-chrome" id="topChrome">
-  <label class="vol-select-wrap" for="volSelect">
-    <span class="vol-select-ico" aria-hidden="true">🔊</span>
-    <select id="volSelect" aria-label="ระดับเสียง">
-      <option value="0">ปิดเสียง</option>
-      <option value="0.1">10%</option>
-      <option value="0.2">20%</option>
-      <option value="0.3">30%</option>
-      <option value="0.4">40%</option>
-      <option value="0.5">50%</option>
-      <option value="0.6">60%</option>
-      <option value="0.7">70%</option>
-      <option value="0.8">80%</option>
-      <option value="0.9">90%</option>
-      <option value="1">100%</option>
-    </select>
-  </label>
+  <div class="vol-menu" id="volMenu">
+    <button type="button" class="vol-menu-btn" id="volMenuBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="volMenuList" aria-label="ระดับเสียง">
+      <span class="vol-select-ico" aria-hidden="true">🔊</span>
+      <span id="volMenuLabel">40%</span>
+      <span class="vol-menu-caret" aria-hidden="true"></span>
+    </button>
+    <div class="vol-menu-panel hidden" id="volMenuList" role="listbox" aria-label="เลือกระดับเสียง">
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0">ปิดเสียง</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.1">10%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.2">20%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.3">30%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.4">40%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.5">50%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.6">60%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.7">70%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.8">80%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="0.9">90%</button>
+      <button type="button" class="vol-menu-opt" role="option" data-vol="1">100%</button>
+    </div>
+  </div>
   <div id="helpSlot" class="help-slot"></div>
 </div>
 <script type="module">
@@ -573,9 +577,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp7");
+    await import("/js/imposter/live-ui.js?v=imp8");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp7";
+    s.src = "/js/game.js?v=imp8";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

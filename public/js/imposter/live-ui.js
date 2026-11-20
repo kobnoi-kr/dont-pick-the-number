@@ -41,6 +41,7 @@
     let lastMeta = { players: [], youId: "" };
     let pickedVote = null;
     let popupOpen = false;
+    let cluePopupOpen = false;
 
     root.innerHTML = `
       <div class="imp-root">
@@ -53,12 +54,6 @@
         <div class="imp-you-profile hidden" data-imp="youProfile" aria-live="polite"></div>
         <div class="imp-roster" data-imp="roster" role="list" aria-label="ผู้เล่นในห้อง"></div>
         <ul class="imp-clue-board" data-imp="clues"></ul>
-        <form class="imp-clue-form hidden" data-imp="clueForm" autocomplete="off">
-          <input data-imp="clueInput" maxlength="32" placeholder="พิมพ์คำใบ้ 1 คำ/สั้นๆ" aria-label="คำใบ้">
-          <button class="btn" type="submit">ส่งคำใบ้</button>
-          <button class="btn ghost" type="button" data-imp="skipClue">ข้าม</button>
-        </form>
-        <div class="imp-vote-grid hidden" data-imp="votes"></div>
         <button class="btn ghost hidden" type="button" data-imp="abstain">งดโหวต</button>
         <ul class="imp-tallies hidden" data-imp="tallies"></ul>
         <form class="imp-guess-form hidden" data-imp="guessForm" autocomplete="off">
@@ -68,7 +63,7 @@
       </div>
     `;
 
-    // Mount overlay on body so it is never clipped by stage/layout.
+    // Mount overlays on body so they are never clipped by stage/layout.
     let overlay = document.getElementById("impRoleOverlay");
     if (!overlay) {
       overlay = document.createElement("div");
@@ -86,11 +81,36 @@
       document.body.appendChild(overlay);
     }
 
+    let clueOverlay = document.getElementById("impClueOverlay");
+    if (!clueOverlay) {
+      clueOverlay = document.createElement("div");
+      clueOverlay.id = "impClueOverlay";
+      clueOverlay.className = "imp-overlay hidden";
+      clueOverlay.setAttribute("role", "dialog");
+      clueOverlay.setAttribute("aria-modal", "true");
+      clueOverlay.setAttribute("aria-labelledby", "impClueTitle");
+      clueOverlay.innerHTML = `
+        <div class="imp-popup imp-clue-popup">
+          <h2 id="impClueTitle">ให้คำใบ้</h2>
+          <p class="imp-hint">พิมพ์คำใบ้สั้นๆ โดยไม่พูดคำศัพท์ตรงๆ</p>
+          <form class="imp-clue-popup-form" data-imp-clue="form" autocomplete="off">
+            <input data-imp-clue="input" maxlength="32" placeholder="พิมพ์คำใบ้ 1 คำ/สั้นๆ" aria-label="คำใบ้">
+            <div class="imp-clue-popup-actions">
+              <button class="btn ghost" type="button" data-imp-clue="skip">ข้าม</button>
+              <button class="btn" type="submit">ส่งคำใบ้</button>
+            </div>
+          </form>
+        </div>`;
+      document.body.appendChild(clueOverlay);
+    }
+
     const $ = (k) => root.querySelector('[data-imp="' + k + '"]');
     const $p = (k) => overlay.querySelector('[data-imp-pop="' + k + '"]');
-    const clueForm = $("clueForm");
+    const $c = (k) => clueOverlay.querySelector('[data-imp-clue="' + k + '"]');
     const guessForm = $("guessForm");
     const popup = $p("popup");
+    const clueForm = $c("form");
+    const clueInput = $c("input");
 
     function confirmRole() {
       popupOpen = false;
@@ -98,14 +118,40 @@
       send({ t: "imposter:confirm" });
     }
 
+    function hideCluePopup() {
+      cluePopupOpen = false;
+      clueOverlay.classList.add("hidden");
+    }
+
+    function showCluePopup() {
+      clueOverlay.classList.remove("hidden");
+      if (!cluePopupOpen) {
+        cluePopupOpen = true;
+        setTimeout(() => {
+          try {
+            clueInput.focus();
+          } catch (_) {}
+        }, 40);
+      }
+    }
+
     clueForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const text = ($("clueInput").value || "").trim();
+      const text = (clueInput.value || "").trim();
+      if (!text) return;
       send({ t: "imposter:clue", text });
-      $("clueInput").value = "";
+      clueInput.value = "";
+      hideCluePopup();
     });
-    $("skipClue").onclick = () => send({ t: "imposter:skipClue" });
-    $("abstain").onclick = () => send({ t: "imposter:vote", targetId: null });
+    $c("skip").onclick = () => {
+      send({ t: "imposter:skipClue" });
+      clueInput.value = "";
+      hideCluePopup();
+    };
+    $("abstain").onclick = () => {
+      pickedVote = null;
+      send({ t: "imposter:vote", targetId: null });
+    };
     guessForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const word = ($("guessInput").value || "").trim();
@@ -209,6 +255,8 @@
           : state.phase === "CLUE_TURN"
             ? state.clueTurnId
             : null;
+      const voteOn = state.phase === "VOTING" && state.canVote;
+      roster.classList.toggle("is-voting", state.phase === "VOTING");
       roster.innerHTML = (state.order || [])
         .map((id) => {
           const sid = String(id);
@@ -217,32 +265,52 @@
           const out = !aliveSet.has(sid);
           const mine = youId && sid === youId;
           const turn = turnId && sid === String(turnId);
+          const canVoteTarget = voteOn && !mine && !out;
+          const picked = pickedVote === sid;
+          const tag = canVoteTarget ? "button" : "div";
           const cls =
             "imp-seat" +
             (out ? " is-out" : "") +
             (mine ? " is-you" : "") +
-            (turn ? " is-turn" : "");
+            (turn ? " is-turn" : "") +
+            (canVoteTarget ? " is-voteable" : "") +
+            (picked ? " is-picked" : "");
           let badge = "";
           if (state.phase === "FINISHED" && state.roles && state.roles[sid]) {
             badge =
               state.roles[sid] === "imposter"
                 ? `<span class="imp-seat-badge is-imp">Imposter</span>`
                 : `<span class="imp-seat-badge">ปกติ</span>`;
+          } else if (picked) {
+            badge = `<span class="imp-seat-badge is-picked">โหวตแล้ว</span>`;
           } else if (out) {
             badge = `<span class="imp-seat-badge">ตกรอบ</span>`;
+          } else if (canVoteTarget) {
+            badge = `<span class="imp-seat-badge is-vote">กดเพื่อโหวต</span>`;
           } else if (turn) {
             badge = `<span class="imp-seat-badge is-turn">ตานี้</span>`;
           }
+          const voteAttr = canVoteTarget ? ` type="button" data-vote="${esc(sid)}"` : "";
           return `
-            <div class="${cls}" role="listitem">
+            <${tag} class="${cls}" role="listitem"${voteAttr}>
               ${avatarHtml(meta, name, "imp-seat-av")}
               <div class="imp-seat-meta">
                 <span class="imp-seat-name">${esc(name)}${mine ? " (คุณ)" : ""}</span>
                 ${badge}
               </div>
-            </div>`;
+            </${tag}>`;
         })
         .join("");
+
+      if (voteOn) {
+        roster.querySelectorAll("[data-vote]").forEach((btn) => {
+          btn.onclick = () => {
+            pickedVote = btn.getAttribute("data-vote");
+            send({ t: "imposter:vote", targetId: pickedVote });
+            paintRoster(state);
+          };
+        });
+      }
     }
 
     function paintCards(state) {
@@ -308,9 +376,12 @@
           : "รอ " + turnName + " จั่วการ์ด";
       else if (state.phase === "ROLE_REVEAL") sub = "ดูบทบาทของคุณด้านล่าง / หน้าต่างกลางจอ";
       else if (state.phase === "CLUE_TURN")
-        sub = state.yourTurn ? "ถึงตาคุณให้คำใบ้" : "รอ " + turnName + " ให้คำใบ้";
+        sub = state.yourTurn ? "ถึงตาคุณให้คำใบ้ — กรอกในหน้าต่างกลางจอ" : "รอ " + turnName + " ให้คำใบ้";
       else if (state.phase === "DISCUSSION") sub = "คุยกันผ่านแชทในห้อง";
-      else if (state.phase === "VOTING") sub = "เลือกผู้ต้องสงสัย (โหวตตัวเองไม่ได้)";
+      else if (state.phase === "VOTING")
+        sub = state.canVote
+          ? "กดที่โปรไฟล์ผู้ต้องสงสัยเพื่อโหวต (โหวตตัวเองไม่ได้)"
+          : "รอผลโหวตจากผู้เล่นคนอื่น";
       else if (state.phase === "VOTE_RESULT") sub = "สรุปผลโหวต";
       else if (state.phase === "GUESS") sub = "Imposter ที่ถูกจับทายคำศัพท์";
       else if (state.phase === "FINISHED") sub = state.winReason || "";
@@ -318,6 +389,7 @@
 
       paintCards(state);
       paintYouProfile(state, lastPrivate);
+      if (state.phase !== "VOTING") pickedVote = null;
       paintRoster(state);
 
       $("clues").innerHTML = (state.clues || [])
@@ -328,33 +400,11 @@
         .join("");
 
       const clueOn = state.phase === "CLUE_TURN" && state.yourTurn;
-      clueForm.classList.toggle("hidden", !clueOn);
+      if (clueOn) showCluePopup();
+      else hideCluePopup();
 
       const voteOn = state.phase === "VOTING" && state.canVote;
-      $("votes").classList.toggle("hidden", state.phase !== "VOTING");
       $("abstain").classList.toggle("hidden", !voteOn);
-      if (state.phase === "VOTING") {
-        $("votes").innerHTML = (state.alive || [])
-          .filter((id) => id !== (opts.youId && opts.youId()))
-          .map((id) => {
-            const name = (state.names && state.names[id]) || id;
-            const on = pickedVote === id ? " is-picked" : "";
-            const disabled = voteOn ? "" : " disabled";
-            return `<button type="button" class="btn ghost${on}" data-vote="${esc(id)}"${disabled}>${esc(
-              name
-            )}</button>`;
-          })
-          .join("");
-        $("votes").querySelectorAll("[data-vote]").forEach((btn) => {
-          btn.onclick = () => {
-            if (!voteOn) return;
-            pickedVote = btn.getAttribute("data-vote");
-            send({ t: "imposter:vote", targetId: pickedVote });
-          };
-        });
-      } else {
-        pickedVote = null;
-      }
 
       const tallies = state.voteTallies && state.voteTallies.entries;
       $("tallies").classList.toggle(

@@ -1019,43 +1019,74 @@ body.room-bg .help-slot .helpbtn{
   -webkit-user-select:none;
   user-select:none;
 }
-.vol-select-wrap{
+.vol-menu{position:relative}
+.vol-menu-btn{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  padding:4px 8px 4px 10px;
+  padding:6px 12px;
   border:1px solid var(--line);
   border-radius:999px;
   background:var(--card);
+  color:var(--text);
   box-shadow:0 4px 14px rgba(30,50,100,.12);
   cursor:pointer;
-}
-.vol-select-ico{font-size:.9rem;line-height:1;opacity:.85}
-.vol-select-wrap select{
-  appearance:none;
-  -webkit-appearance:none;
-  border:0;
-  background:transparent;
-  color:var(--text);
   font-size:.82rem;
   font-weight:700;
-  padding:4px 18px 4px 0;
-  margin:0;
-  min-width:4.8em;
-  cursor:pointer;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2394a3b8' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;
-  background-position:right 2px center;
+  line-height:1;
 }
-.vol-select-wrap select:focus{outline:none}
-.vol-select-wrap select option{color:#111;background:#fff}
-body.room-bg .vol-select-wrap{
+.vol-select-ico{font-size:.9rem;line-height:1;opacity:.85}
+.vol-menu-caret{
+  width:0;height:0;
+  border-left:4px solid transparent;
+  border-right:4px solid transparent;
+  border-top:5px solid currentColor;
+  opacity:.65;
+  margin-left:2px;
+}
+.vol-menu.is-open .vol-menu-caret{transform:rotate(180deg)}
+.vol-menu-panel{
+  position:absolute;
+  top:calc(100% + 6px);
+  left:0;
+  min-width:132px;
+  max-height:min(52vh,320px);
+  overflow:auto;
+  padding:6px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  background:rgba(12,16,28,.96);
+  box-shadow:0 12px 28px rgba(0,0,0,.4);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  z-index:50;
+}
+.vol-menu-panel.hidden{display:none !important}
+.vol-menu-opt{
+  display:block;
+  width:100%;
+  text-align:left;
+  border:0;
+  background:transparent;
+  color:#e8edf8;
+  border-radius:10px;
+  padding:9px 11px;
+  font-size:.88rem;
+  font-weight:650;
+  cursor:pointer;
+}
+.vol-menu-opt:hover,
+.vol-menu-opt.is-on{
+  background:rgba(86,119,252,.28);
+}
+.vol-menu-opt.is-on{font-weight:800}
+body.room-bg .vol-menu-btn{
   background:rgba(12,16,28,.92);
   border-color:rgba(255,255,255,.12);
+  color:#e8edf8;
   box-shadow:0 8px 24px rgba(0,0,0,.35);
   backdrop-filter:blur(10px);
 }
-body.room-bg .vol-select-wrap select{color:#e8edf8}
 body.in-game .help-slot{display:none}
 .auth-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip)}
 .auth-bar.profile{justify-content:flex-start;gap:12px}

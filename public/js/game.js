@@ -264,11 +264,33 @@ function applyVolume(){
     stopBackground();
     stopSpinSound();
   }
-  const sel=$("volSelect");
-  if(sel){
-    const v=String(masterVol);
-    if(sel.value!==v) sel.value=v;
-  }
+  const label=$("volMenuLabel");
+  if(label) label.textContent=masterVol<=0?"ปิดเสียง":(Math.round(masterVol*100)+"%");
+  const ico=document.querySelector("#volMenuBtn .vol-select-ico");
+  if(ico) ico.textContent=masterVol<=0?"🔇":"🔊";
+  document.querySelectorAll("#volMenuList [data-vol]").forEach((btn)=>{
+    const on=Number(btn.getAttribute("data-vol"))===masterVol;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-selected", on?"true":"false");
+  });
+}
+function closeVolMenu(){
+  const menu=$("volMenu");
+  const list=$("volMenuList");
+  const btn=$("volMenuBtn");
+  if(menu) menu.classList.remove("is-open");
+  if(list) list.classList.add("hidden");
+  if(btn) btn.setAttribute("aria-expanded","false");
+}
+function toggleVolMenu(force){
+  const menu=$("volMenu");
+  const list=$("volMenuList");
+  const btn=$("volMenuBtn");
+  if(!menu||!list||!btn) return;
+  const open=force==null?!menu.classList.contains("is-open"):!!force;
+  menu.classList.toggle("is-open", open);
+  list.classList.toggle("hidden", !open);
+  btn.setAttribute("aria-expanded", open?"true":"false");
 }
 function setVolume(next, preview){
   masterVol=Math.min(1,Math.max(0,Math.round(next*10)/10));
@@ -2449,7 +2471,7 @@ document.addEventListener("keydown",onUserGesture);
 document.addEventListener("click",e=>{
   onUserGesture();
   const btn=e.target.closest("button");
-  if(btn&&!btn.closest("#topChrome")&&!btn.closest("#helpBtn")&&!btn.closest("#volSelect")) playClip(POP_SOUND);
+  if(btn&&!btn.closest("#topChrome")&&!btn.closest("#helpBtn")&&!btn.closest("#volMenu")) playClip(POP_SOUND);
 });
 $("restModes").onclick=e=>{
   if(onlineMode&&!isHost()) return;
@@ -4613,14 +4635,30 @@ async function bootOnline(){
     if(pendingRoomInvite) send({t:"declineInvite",inviteId:pendingRoomInvite.inviteId});
     hideRoomInvite();
   };
-  const volSel=$("volSelect");
-  if(volSel){
-    volSel.addEventListener("change",()=>{
+  const volBtn=$("volMenuBtn");
+  const volList=$("volMenuList");
+  if(volBtn){
+    volBtn.onclick=(e)=>{
+      e.stopPropagation();
       unlockAudio();
-      const n=Number(volSel.value);
-      setVolume(Number.isFinite(n)?n:masterVol, true);
-    });
+      toggleVolMenu();
+    };
   }
+  if(volList){
+    volList.onclick=(e)=>{
+      const opt=e.target.closest("[data-vol]");
+      if(!opt) return;
+      e.stopPropagation();
+      unlockAudio();
+      const n=Number(opt.getAttribute("data-vol"));
+      setVolume(Number.isFinite(n)?n:masterVol, true);
+      closeVolMenu();
+    };
+  }
+  document.addEventListener("click",(e)=>{
+    if(e.target.closest&&e.target.closest("#volMenu")) return;
+    closeVolMenu();
+  });
   placeHelpBtn(false);
   applyVolume();
   show("gate");

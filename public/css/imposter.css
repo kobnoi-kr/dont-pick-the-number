@@ -49,30 +49,44 @@
   font-weight: 700;
   word-break: break-word;
 }
-.imp-clue-form,
 .imp-guess-form {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
-.imp-clue-form input,
 .imp-guess-form input {
   flex: 1 1 160px;
   min-width: 0;
 }
-.imp-vote-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
-}
-.imp-vote-grid button {
+.imp-clue-popup {
   text-align: left;
-  padding: 12px;
-  border-radius: 10px;
 }
-.imp-vote-grid button.is-picked {
-  outline: 2px solid currentColor;
+.imp-clue-popup h2 {
+  text-align: center;
+}
+.imp-clue-popup-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+.imp-clue-popup-form input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.imp-clue-popup-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.imp-clue-popup-actions .btn {
+  width: auto;
+  margin: 0;
 }
 .imp-tallies {
   display: grid;
@@ -236,6 +250,28 @@
 .imp-seat.is-out {
   opacity: 0.5;
 }
+.imp-seat.is-voteable {
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.imp-seat.is-voteable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(250, 204, 21, 0.55);
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.2);
+}
+.imp-seat.is-picked {
+  border-color: rgba(250, 204, 21, 0.75);
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.28);
+  background: rgba(250, 204, 21, 0.08);
+}
+.imp-roster.is-voting .imp-seat.is-you {
+  opacity: 0.72;
+}
 .imp-seat-av {
   width: 40px;
   height: 40px;
@@ -277,6 +313,14 @@
 }
 .imp-seat-badge.is-turn {
   background: rgba(80, 180, 120, 0.22);
+}
+.imp-seat-badge.is-vote {
+  background: rgba(250, 204, 21, 0.18);
+  color: #fde68a;
+}
+.imp-seat-badge.is-picked {
+  background: rgba(250, 204, 21, 0.28);
+  color: #fef3c7;
 }
 .imp-seat-badge.is-imp {
   background: rgba(180, 40, 80, 0.35);
