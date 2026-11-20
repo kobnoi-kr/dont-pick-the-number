@@ -10,6 +10,24 @@ let wheelAlive=[], wheelLog=[], wheelGone=[], wheelRot=0, wheelSpinning=false, w
 let snakeLive=null;
 let snakeSnapSeq=0;
 let imposterLive=null;
+let memoryLive=null;
+function ensureMemoryUi(){
+  if(memoryLive) return memoryLive;
+  const root=$("memoryRoot");
+  if(!root||!window.NVMemory||typeof window.NVMemory.createLiveUi!=="function") return null;
+  memoryLive=window.NVMemory.createLiveUi({
+    root,
+    onFlip:(cardId)=>{ if(onlineMode&&!spectating) send({t:"memory:flip",cardId}); }
+  });
+  return memoryLive;
+}
+function updateMemoryUi(s){
+  const ui=ensureMemoryUi();
+  if(!ui) return;
+  const note=$("memorySpectateNote");
+  if(note) note.classList.toggle("hidden",!spectating);
+  ui.paint(s&&s.memory);
+}
 function ensureImposterUi(){
   if(imposterLive) return imposterLive;
   const root=$("imposterRoot");
@@ -471,19 +489,21 @@ function applySpectatorUi(){
   document.body.classList.add("spectating");
   const note=$("roomNote");
   if(note){ note.classList.remove("hidden"); note.textContent="โหมด Spectator — ดูได้อย่างเดียว"; }
-  ["spin","clearScores","addBot","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave","imposterLeave"].forEach(id=>{
+  ["spin","clearScores","addBot","again","pickGo","doSpin","wheelRepick","autoPlay","autoPick","autoSnake","renameRoomBtn","snakeLeave","imposterLeave","memoryLeave"].forEach(id=>{
     const el=$(id); if(el){ el.disabled=true; el.classList.add("hidden"); }
   });
 }
 function show(n){
-  ["gate","start","play","pick","wheelGame","snakeGame","imposterGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
+  ["gate","start","play","pick","wheelGame","snakeGame","imposterGame","memoryGame","over"].forEach(s=>{ const el=$(s); if(el) el.classList.toggle("hidden",s!==n); });
   const inRoom=n!=="gate";
   const lobby=n==="start";
   const snakePlay=n==="snakeGame";
   const imposterPlay=n==="imposterGame";
+  const memoryPlay=n==="memoryGame";
   const inGame=inRoom&&!lobby;
   document.body.classList.toggle("snake-play", snakePlay);
   document.body.classList.toggle("imposter-play", imposterPlay);
+  document.body.classList.toggle("memory-play", memoryPlay);
   document.body.classList.toggle("in-game", inGame);
   if(!snakePlay){
     try{ delete document.body.dataset.snakeMap; }catch(e){}
@@ -1687,7 +1707,7 @@ function paintLobbyAngel(){
 function helperCanUseInBag(item){
   if(!item||!(Number(item.quantity)>0)||spinning||spectating) return false;
   if(item.id==="item.angel"){
-    return netPhase==="lobby"&&gameCat!=="imposter"&&!angelArmed();
+    return netPhase==="lobby"&&gameCat!=="imposter"&&gameCat!=="cardmemory"&&!angelArmed();
   }
   if(item.id==="item.evenodd"){
     const me=playerMeta.find(p=>p&&p.id===myId);
@@ -1787,8 +1807,8 @@ function paintLobbyBagModal(){
   const canUse=helperCanUseInBag(sel);
   const statusNote=armedAngel||armedEven||armedSkip
     ?" · ใช้แล้วในเกมนี้"
-    :sel.id==="item.angel"&&gameCat==="imposter"
-      ?" · ใช้ไม่ได้ใน Imposter"
+    :sel.id==="item.angel"&&(gameCat==="imposter"||gameCat==="cardmemory")
+      ?" · ใช้ไม่ได้ในเกมนี้"
     :sel.id==="item.skip"&&(netPhase==="play"||netPhase==="snake"||netPhase==="wheel")
       ?" · ใช้ระหว่างเกม"
       :sel.id==="item.bomb"&&netPhase==="snake"
@@ -2430,12 +2450,12 @@ function paintGameModeBadge(cat){
   const ico=$("gameModeIco");
   const name=$("gameModeName");
   const hint=$("gameModeHint");
-  if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":cat==="imposter"?"🕵️":"🔢";
-  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"บันไดงู":cat==="imposter"?"Imposter":"หาเลข";
-  if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":cat==="imposter"?"หา Imposter ด้วยคำใบ้":"ห้ามโดนเลขลับ";
+  if(ico) ico.textContent=cat==="wheel"?"🎡":cat==="snake"?"🐍":cat==="imposter"?"🕵️":cat==="cardmemory"?"🃏":"🔢";
+  if(name) name.textContent=cat==="wheel"?"วงล้อ":cat==="snake"?"บันไดงู":cat==="imposter"?"Imposter":cat==="cardmemory"?"Memory Card":"หาเลข";
+  if(hint) hint.textContent=cat==="wheel"?"วงล้อสุ่มเลข":cat==="snake"?"ทอยลูกเต๋าถึง 100":cat==="imposter"?"หา Imposter ด้วยคำใบ้":cat==="cardmemory"?"จับคู่การ์ด":"ห้ามโดนเลขลับ";
 }
 function normalizeCat(next){
-  if(next==="wheel"||next==="snake"||next==="secret"||next==="imposter") return next;
+  if(next==="wheel"||next==="snake"||next==="secret"||next==="imposter"||next==="cardmemory") return next;
   return "secret";
 }
 function applyCat(next){
@@ -2449,11 +2469,13 @@ function applyCat(next){
   const wheel=cat==="wheel";
   const snake=cat==="snake";
   const imposter=cat==="imposter";
-  if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake||imposter);
+  const memory=cat==="cardmemory";
+  if($("secretOnly")) $("secretOnly").classList.toggle("hidden", wheel||snake||imposter||memory);
   if($("wheelOnly")) $("wheelOnly").classList.toggle("hidden", !wheel);
   if($("snakeOnly")) $("snakeOnly").classList.toggle("hidden", !snake);
   if($("imposterOnly")) $("imposterOnly").classList.toggle("hidden", !imposter);
-  if($("numberSetup")) $("numberSetup").classList.toggle("hidden", snake||imposter);
+  if($("memoryOnly")) $("memoryOnly").classList.toggle("hidden", !memory);
+  if($("numberSetup")) $("numberSetup").classList.toggle("hidden", snake||imposter||memory);
   const cats=$("cats");
   if(cats){
     for(const x of cats.querySelectorAll("[data-cat]")){
@@ -2470,7 +2492,9 @@ function applyCat(next){
         ?"ทอยลูกเต๋า ปีนบันได เลี่ยงงู — ถึงช่อง 100 ชนะ"
         :imposter
           ?"ให้คำใบ้ คุยในแชท โหวตหา Imposter"
-          :"ทายเลข… แต่ห้ามโดนเลขนั้น!";
+          :memory
+            ?"เปิดการ์ดทีละ 2 ใบ จำตำแหน่ง แล้วจับคู่"
+            :"ทายเลข… แต่ห้ามโดนเลขนั้น!";
   }
   if(changed){
     loadScores();
@@ -3392,16 +3416,25 @@ const GUIDE_GAMES={
 <li>จับ Imposter ได้แต่ยังเหลืออีกคน จะเริ่มให้คำใบ้รอบใหม่</li>
 <li>จับ Imposter คนสุดท้ายได้ ต้องทายคำใน 30 วินาที ทายถูก Imposter ชนะ ทายผิดหรือหมดเวลาทีมปกติชนะ</li>
 <li>การ์ดนางฟ้าใช้ในเกมนี้ไม่ได้</li>
+</ul></section>`,
+  cardmemory:`<section><h4>Memory Card</h4><ul>
+<li>ผู้เล่น 2–8 คน เปิดการ์ดทีละ 2 ใบ จำตำแหน่งแล้วจับคู่ภาพที่เหมือนกัน</li>
+<li>จับคู่ถูกได้คะแนน และเล่นต่อ หรือเปลี่ยนคน ตามที่โฮสต์ตั้ง</li>
+<li>จับคู่ผิดการ์ดจะคว่ำกลับ แล้วเปลี่ยนเทิร์น หรือให้ลองอีกครั้งเดียว</li>
+<li>คอมโบเพิ่มเมื่อจับคู่ติดกัน เปิดผิดแล้วคอมโบกลับเป็น 0</li>
+<li>จับคู่ครบคนคะแนนสูงสุดชนะ ถ้าคะแนนเท่ากันดูจำนวนคู่ แล้วดูว่าใครทำคะแนนได้ก่อน</li>
+<li>เซิร์ฟเวอร์เป็นคนสุ่มการ์ดและตัดสินผล การ์ดที่ยังคว่ำอยู่จะไม่ส่งภาพให้เครื่องผู้เล่น</li>
 </ul></section>`
 };
 const GUIDE_TITLES={
   secret:"คู่มือหาเลข",
   wheel:"คู่มือวงล้อ",
   snake:"คู่มือบันไดงู",
-  imposter:"คู่มือ Imposter"
+  imposter:"คู่มือ Imposter",
+  cardmemory:"คู่มือ Memory Card"
 };
 function guideGameId(){
-  if(gameCat==="wheel"||gameCat==="snake"||gameCat==="imposter"||gameCat==="secret") return gameCat;
+  if(gameCat==="wheel"||gameCat==="snake"||gameCat==="imposter"||gameCat==="cardmemory"||gameCat==="secret") return gameCat;
   return "secret";
 }
 function renderGuide(cat){
@@ -3420,7 +3453,7 @@ function renderGuide(cat){
   }
 }
 function openGuide(cat){
-  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="cardmemory"||netPhase==="over";
   renderGuide(cat||(inGame?"play":"room"));
   $("guideModal").classList.remove("hidden");
 }
@@ -3470,7 +3503,7 @@ function leaveCurrentRoom(){
   send({t:"leave"});
 }
 function openQuitGameModal(){
-  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
+  const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="cardmemory"||netPhase==="over";
   if(!onlineMode||!inGame) return;
   const modal=$("quitGameModal");
   if(modal) modal.classList.remove("hidden");
@@ -3603,11 +3636,18 @@ function syncSetup(s){
   if($("voteSec")&&document.activeElement!==$("voteSec")){
     $("voteSec").value=Number(s.voteSec)||45;
   }
+  if($("memoryBoard")&&document.activeElement!==$("memoryBoard")) $("memoryBoard").value=s.memoryBoard||"4x4";
+  if($("memoryTurnSec")&&document.activeElement!==$("memoryTurnSec")) $("memoryTurnSec").value=String(s.memoryTurnSec==null?20:s.memoryTurnSec);
+  if($("memoryRevealMs")&&document.activeElement!==$("memoryRevealMs")) $("memoryRevealMs").value=String(s.memoryRevealMs||1500);
+  if($("memoryPoints")&&document.activeElement!==$("memoryPoints")) $("memoryPoints").value=String(s.memoryPoints||100);
+  if($("memoryOnMatch")&&document.activeElement!==$("memoryOnMatch")) $("memoryOnMatch").value=s.memoryOnMatch==="next"?"next":"continue";
+  if($("memoryOnWrong")&&document.activeElement!==$("memoryOnWrong")) $("memoryOnWrong").value=s.memoryOnWrong==="retry"?"retry":"next";
+  if($("memoryCombo")&&document.activeElement!==$("memoryCombo")) $("memoryCombo").value=s.memoryCombo===false?"0":"1";
 }
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
       const wrap=$(id);
       if(!wrap) return;
@@ -3620,7 +3660,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -3634,7 +3674,7 @@ function hostLocks(){
     setupSubmit.disabled=!canSetup;
     setupSubmit.textContent="บันทึกการตั้งค่า";
   }
-  ["leave","back","wheelLeave","pickLeave","snakeLeave","imposterLeave"].forEach(id=>{
+  ["leave","back","wheelLeave","pickLeave","snakeLeave","imposterLeave","memoryLeave"].forEach(id=>{
     const el=$(id);
     if(!el) return;
     // Spectators use quit (unwatch); hide host abort buttons.
@@ -3643,7 +3683,7 @@ function hostLocks(){
     el.textContent=id==="imposterLeave"&&netPhase==="imposter"?"ตัดจบเกม · กลับห้อง":"กลับห้อง";
   });
   if($("quitGameBtn")){
-    const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="over";
+    const inGame=netPhase==="play"||netPhase==="pick"||netPhase==="wheel"||netPhase==="snake"||netPhase==="imposter"||netPhase==="cardmemory"||netPhase==="over";
     $("quitGameBtn").classList.toggle("hidden",!(onlineMode&&inGame));
   }
   const canRenameRoom=host&&lobby&&!spectating;
@@ -3715,6 +3755,7 @@ function applySnap(s){
   roomCode=s.code||"";
   netPhase=s.phase||"lobby";
   if(netPhase!=="imposter"&&imposterLive&&typeof imposterLive.halt==="function") imposterLive.halt();
+  if(netPhase!=="cardmemory"&&memoryLive&&typeof memoryLive.halt==="function") memoryLive.halt();
   // Profile card is lobby-only — never stay open during play/pick/wheel/over.
   if(netPhase!=="lobby") closePlayerProfileModal();
   if(netPhase==="lobby"||netPhase==="gate") closeQuitGameModal();
@@ -3814,6 +3855,17 @@ function applySnap(s){
         :"ให้คำใบ้ · คุย · โหวต · ผู้เล่น 4–"+(s.maxPlayers||8);
     }
     updateImposterUi(s);
+    if(spectating) applySpectatorUi();
+    renderPlayers();
+  }else if(s.phase==="cardmemory"){
+    show("memoryGame");
+    if($("memoryMode")){
+      const board=s.memoryBoard||"4x4";
+      $("memoryMode").textContent=spectating
+        ?"กำลังชม · Memory Card · "+board
+        :"จับคู่การ์ด · "+board+" · ผู้เล่น 2–"+(s.maxPlayers||8);
+    }
+    updateMemoryUi(s);
     if(spectating) applySpectatorUi();
     renderPlayers();
   }else if(s.phase==="wheel"){
@@ -4089,7 +4141,7 @@ function renderLobby(msg){
       title.append(lock, document.createTextNode(label));
     }else title.textContent=label;
     const sub=document.createElement("small");
-    const cat=room.cat==="wheel"?"วงล้อสุ่มเลข":"ห้ามโดนเลขลับ";
+    const cat=room.cat==="wheel"?"วงล้อสุ่มเลข":room.cat==="snake"?"บันไดงู":room.cat==="imposter"?"Imposter":room.cat==="cardmemory"?"Memory Card":"ห้ามโดนเลขลับ";
     const state=room.phase==="lobby"?"รอผู้เล่น":"กำลังเล่น";
     const vis=priv?"ส่วนตัว":"สาธารณะ";
     sub.textContent=priv
@@ -4190,6 +4242,25 @@ function pushSnakeMap(){
   const hint=$("snakeMapHint");
   if(hint&&picked&&picked.blurb) hint.textContent=picked.blurb;
   send({t:"setup",patch:{snakeMapId:id}});
+}
+function pushMemory(){
+  if(applying||!isHost()||netPhase!=="lobby") return;
+  const patch={};
+  const board=$("memoryBoard");
+  const turn=$("memoryTurnSec");
+  const reveal=$("memoryRevealMs");
+  const points=$("memoryPoints");
+  const onMatch=$("memoryOnMatch");
+  const onWrong=$("memoryOnWrong");
+  const combo=$("memoryCombo");
+  if(board) patch.memoryBoard=board.value;
+  if(turn) patch.memoryTurnSec=Number(turn.value);
+  if(reveal) patch.memoryRevealMs=Number(reveal.value);
+  if(points) patch.memoryPoints=Number(points.value);
+  if(onMatch) patch.memoryOnMatch=onMatch.value;
+  if(onWrong) patch.memoryOnWrong=onWrong.value;
+  if(combo) patch.memoryCombo=combo.value!=="0";
+  send({t:"setup",patch});
 }
 function connect(){
   if(sock&&(sock.readyState===0||sock.readyState===1)) return;
@@ -4362,6 +4433,10 @@ async function bootOnline(){
   if($("myName")) $("myName").addEventListener("change",typedName);
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   if($("snakeMap")) $("snakeMap").addEventListener("change",pushSnakeMap);
+  ["memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
+    const el=$(id);
+    if(el) el.addEventListener("change",pushMemory);
+  });
   setInterval(paintTurnClock, 250);
   function toggleAuto(){
     if(!onlineMode||spectating) return;
@@ -4482,6 +4557,7 @@ async function bootOnline(){
   });
   ["leave","back","wheelLeave","pickLeave","snakeLeave"].forEach(id=>{ const el=$(id); if(el) el.onclick=()=>{ if(isHost()) send({t:"abort"}); }; });
   if($("imposterLeave")) $("imposterLeave").onclick=()=>{ if(isHost()) send({t:"abort"}); };
+  if($("memoryLeave")) $("memoryLeave").onclick=()=>{ if(isHost()) send({t:"abort"}); };
   $("pickGo").onclick=()=>{ if(isHost()) send({t:"openWheel"}); };
   $("pickUndo").onclick=()=>send({t:"undo"});
   $("doSpin").onclick=()=>{ if(isHost()) send({t:"spinNum"}); };

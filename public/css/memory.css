@@ -1,0 +1,92 @@
+.mem-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mem-turn {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #f5f7ff;
+}
+.mem-sub {
+  margin: 4px 0 0;
+  color: #a7b0c5;
+}
+.mem-timer {
+  min-width: 3.2rem;
+  padding: 6px 10px;
+  border-radius: 10px;
+  text-align: center;
+  background: #151c2b;
+  border: 1px solid #273149;
+  color: #f5f7ff;
+}
+.mem-timer.is-urgent {
+  background: #f05c72;
+  color: #fff;
+  border-color: #f05c72;
+}
+.mem-board {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+}
+.mem-card {
+  aspect-ratio: 1;
+  border: 1px solid #273149;
+  border-radius: 12px;
+  background: #151c2b;
+  color: #f5f7ff;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  cursor: pointer;
+  padding: 0;
+}
+.mem-card:hover:not(:disabled) {
+  background: #1b2436;
+}
+.mem-card:disabled {
+  cursor: default;
+}
+.mem-card.is-revealed,
+.mem-card.is-matched {
+  background: #101625;
+  border-color: #5677fc;
+}
+.mem-card.is-matched {
+  border-color: #35c991;
+  box-shadow: 0 0 0 1px rgba(53, 201, 145, 0.45);
+}
+.mem-card.is-shake {
+  animation: memShake 0.35s linear;
+}
+@keyframes memShake {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.mem-scores {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.mem-scores li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(16, 22, 37, 0.8);
+  border: 1px solid #273149;
+  color: #a7b0c5;
+}
+.mem-scores li.is-turn {
+  border-color: #5677fc;
+  color: #f5f7ff;
+}
+.mem-scores b {
+  color: #f5f7ff;
+}

@@ -2,7 +2,7 @@ import { ensureGuest, api, playUrl } from "./api.js";
 import { paintUser, wireShell, logout } from "./shell.js";
 import { connectDashboardWs, onDashboardMessage, disconnectDashboardWs } from "./ws.js";
 import { renderOverview } from "./overview.js";
-import { renderLibrary } from "./library.js?v=howto1";
+import { renderLibrary } from "./library.js?v=mem1";
 import { renderRooms } from "./rooms.js";
 import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";
@@ -32,7 +32,7 @@ const state = {
 
 function setCreateCat(cat) {
   const next =
-    cat === "wheel" ? "wheel" : cat === "snake" ? "snake" : cat === "imposter" ? "imposter" : "secret";
+    cat === "wheel" ? "wheel" : cat === "snake" ? "snake" : cat === "imposter" ? "imposter" : cat === "cardmemory" ? "cardmemory" : "secret";
   state.pendingCat = next;
   const hidden = document.getElementById("crCat");
   if (hidden) hidden.value = next;
@@ -136,7 +136,7 @@ async function createRoomFromModal() {
   const catEl = document.getElementById("crCat");
   const raw = (catEl && catEl.value) || state.pendingCat || "secret";
   const cat =
-    raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : raw === "imposter" ? "imposter" : "secret";
+    raw === "wheel" ? "wheel" : raw === "snake" ? "snake" : raw === "imposter" ? "imposter" : raw === "cardmemory" ? "cardmemory" : "secret";
   state.pendingCat = cat;
   writeCreateCat(cat);
   const body = {

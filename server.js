@@ -31,6 +31,7 @@ const {
 } = require("./src/system/public-settings");
 const snakeBridge = require("./src/games/snake-ladders/room-bridge");
 const imposterBridge = require("./src/games/imposter/room-bridge");
+const memoryBridge = require("./src/games/memory/room-bridge");
 
 const PORT = Number(process.env.PORT) || 8787;
 /** Bind host: 0.0.0.0 = ทุก interface (LAN/สาธารณะ), 127.0.0.1 = เฉพาะเครื่องนี้ */
@@ -53,10 +54,11 @@ const MAX_PLAYERS = 12;
 const MAX_ROOMS = 200;
 function roomMaxPlayers(room) {
   if (room && room.cat === "imposter") return imposterBridge.MAX_PLAYERS;
+  if (room && room.cat === "cardmemory") return memoryBridge.MAX_PLAYERS;
   return snakeBridge.roomCap(room, MAX_PLAYERS);
 }
 function normalizeGameCat(cat) {
-  return imposterBridge.normalizeCat(cat) || snakeBridge.normalizeCat(cat);
+  return memoryBridge.normalizeCat(cat) || imposterBridge.normalizeCat(cat) || snakeBridge.normalizeCat(cat);
 }
 const SEAT_MS = 45000;
 const ROOM_MS = 60000;
@@ -530,7 +532,16 @@ function blankRoom(code, visibility, host) {
     voteSec: 45,
     clueSec: 45,
     clueRounds: 5,
-    imposterTimer: null
+    imposterTimer: null,
+    memory: null,
+    memoryBoard: "4x4",
+    memoryTurnSec: 20,
+    memoryRevealMs: 1500,
+    memoryPoints: 100,
+    memoryCombo: true,
+    memoryOnMatch: "continue",
+    memoryOnWrong: "next",
+    memoryTimer: null
   };
 }
 function applyRoomSetup(room, setup) {
@@ -540,6 +551,8 @@ function applyRoomSetup(room, setup) {
     if (nextCat === "snake" && room.players.length > snakeBridge.MAX_PLAYERS) {
       /* keep previous cat — too many seated for snake */
     } else if (nextCat === "imposter" && room.players.length > imposterBridge.MAX_PLAYERS) {
+      /* keep previous cat */
+    } else if (nextCat === "cardmemory" && room.players.length > memoryBridge.MAX_PLAYERS) {
       /* keep previous cat */
     } else {
       room.cat = nextCat;
@@ -569,6 +582,13 @@ function applyRoomSetup(room, setup) {
   if (setup.clueRounds != null) {
     room.clueRounds = imposterBridge.normalizeClueRounds(setup.clueRounds);
   }
+  if (setup.memoryBoard != null) room.memoryBoard = memoryBridge.normalizeBoard(setup.memoryBoard);
+  if (setup.memoryTurnSec != null) room.memoryTurnSec = memoryBridge.normalizeTurnSec(setup.memoryTurnSec);
+  if (setup.memoryRevealMs != null) room.memoryRevealMs = memoryBridge.normalizeRevealMs(setup.memoryRevealMs);
+  if (setup.memoryPoints != null) room.memoryPoints = memoryBridge.normalizePoints(setup.memoryPoints);
+  if (setup.memoryCombo != null) room.memoryCombo = !!setup.memoryCombo;
+  if (setup.memoryOnMatch != null) room.memoryOnMatch = memoryBridge.normalizeOnMatch(setup.memoryOnMatch);
+  if (setup.memoryOnWrong != null) room.memoryOnWrong = memoryBridge.normalizeOnWrong(setup.memoryOnWrong);
   if (setup.rangeMode === "99" || setup.rangeMode === "999" || setup.rangeMode === "9999") {
     room.rangeMode = setup.rangeMode;
     room.min = 1;
@@ -643,6 +663,14 @@ function snap(room, player, opts) {
     clueRounds: imposterBridge.normalizeClueRounds(room.clueRounds),
     imposter: imposterBridge.snapImposter(room, spectator ? null : player),
     youImposter: spectator ? null : imposterBridge.privateImposter(room, player),
+    memoryBoard: memoryBridge.normalizeBoard(room.memoryBoard),
+    memoryTurnSec: memoryBridge.normalizeTurnSec(room.memoryTurnSec),
+    memoryRevealMs: memoryBridge.normalizeRevealMs(room.memoryRevealMs),
+    memoryPoints: memoryBridge.normalizePoints(room.memoryPoints),
+    memoryCombo: room.memoryCombo !== false,
+    memoryOnMatch: memoryBridge.normalizeOnMatch(room.memoryOnMatch),
+    memoryOnWrong: memoryBridge.normalizeOnWrong(room.memoryOnWrong),
+    memory: memoryBridge.snapMemory(room, spectator ? null : player),
     players: room.players.map((item) => ({
       id: item.id,
       name: item.name,
@@ -1356,6 +1384,10 @@ function dropFromRound(room, name) {
       room.phase = "lobby";
       clearAngelGuards(room);
     }
+  } else if (room.phase === "cardmemory") {
+    memoryBridge.dropPlayerByName(room, name);
+    if (memoryBridge.finishIfDone(room, applyMemoryOver)) clearMemoryTimer(room);
+    else armMemoryTimer(room);
   } else if (room.phase === "wheel") {
     cancelSpin(room);
     room.wheelAlive = room.wheelAlive.filter((item) => item !== name);
@@ -1453,6 +1485,9 @@ async function onSetup(ws, msg) {
     if (nextCat === "imposter" && room.players.length > imposterBridge.MAX_PLAYERS) {
       return fail(ws, "Imposter รองรับได้สูงสุด " + imposterBridge.MAX_PLAYERS + " คน");
     }
+    if (nextCat === "cardmemory" && room.players.length > memoryBridge.MAX_PLAYERS) {
+      return fail(ws, "Memory Card รองรับได้สูงสุด " + memoryBridge.MAX_PLAYERS + " คน");
+    }
     if (!(await assertComingSoonPlayable(ws, ctx.player, nextCat))) return;
     room.cat = nextCat;
   }
@@ -1477,6 +1512,13 @@ async function onSetup(ws, msg) {
   if (patch.clueRounds != null) {
     room.clueRounds = imposterBridge.normalizeClueRounds(patch.clueRounds);
   }
+  if (patch.memoryBoard != null) room.memoryBoard = memoryBridge.normalizeBoard(patch.memoryBoard);
+  if (patch.memoryTurnSec != null) room.memoryTurnSec = memoryBridge.normalizeTurnSec(patch.memoryTurnSec);
+  if (patch.memoryRevealMs != null) room.memoryRevealMs = memoryBridge.normalizeRevealMs(patch.memoryRevealMs);
+  if (patch.memoryPoints != null) room.memoryPoints = memoryBridge.normalizePoints(patch.memoryPoints);
+  if (patch.memoryCombo != null) room.memoryCombo = !!patch.memoryCombo;
+  if (patch.memoryOnMatch != null) room.memoryOnMatch = memoryBridge.normalizeOnMatch(patch.memoryOnMatch);
+  if (patch.memoryOnWrong != null) room.memoryOnWrong = memoryBridge.normalizeOnWrong(patch.memoryOnWrong);
   if (patch.rangeMode === "99" || patch.rangeMode === "999" || patch.rangeMode === "9999" || patch.rangeMode === "custom") {
     room.rangeMode = patch.rangeMode;
     if (patch.rangeMode === "99") { room.min = 1; room.max = 99; }
@@ -1581,6 +1623,72 @@ function onImposterTick(room) {
   armImposterTimer(room);
   broadcast(room);
 }
+function applyMemoryOver(room, over) {
+  clearTurnTimer(room);
+  clearMemoryTimer(room);
+  room.phase = "over";
+  room.activeSpin = null;
+  const winners = Array.isArray(over.winners) ? over.winners : [];
+  for (const name of winners) addPoint(room, name);
+  if (winners.length) setChampions(room, winners);
+  room.over = Object.assign(
+    {
+      outOrder: [],
+      many: false,
+      hist: null,
+      again: "เล่นอีกครั้ง",
+      reset: true,
+      winTarget: 1,
+      at: Date.now()
+    },
+    over
+  );
+}
+function clearMemoryTimer(room) {
+  if (room && room.memoryTimer) clearTimeout(room.memoryTimer);
+  if (room) room.memoryTimer = null;
+}
+function armMemoryTimer(room) {
+  clearMemoryTimer(room);
+  if (!room || room.phase !== "cardmemory" || !room.memory) return;
+  const ends = room.memory.phaseEndsAt;
+  if (!ends) return;
+  const delay = Math.max(50, ends - Date.now() + 20);
+  room.memoryTimer = setTimeout(() => onMemoryTick(room), delay);
+}
+function onMemoryTick(room) {
+  if (!room || room.phase !== "cardmemory" || !room.memory) return;
+  memoryBridge.tickMemory(room);
+  if (memoryBridge.finishIfDone(room, applyMemoryOver)) {
+    clearMemoryTimer(room);
+    broadcast(room);
+    return;
+  }
+  armMemoryTimer(room);
+  broadcast(room);
+}
+function onMemoryFlip(ws, msg) {
+  const ctx = seat(ws);
+  if (!ctx || ctx.room.phase !== "cardmemory" || !ctx.room.memory) return;
+  const res = memoryBridge.flipMemory(ctx.room, ctx.player.id, msg && msg.cardId);
+  if (!res.ok) {
+    const map = {
+      not_your_turn: "ยังไม่ถึงตาคุณ",
+      taken: "การ์ดใบนี้เปิดอยู่แล้ว",
+      bad_card: "เลือกการ์ดไม่ได้",
+      wrong_phase: "รอการ์ดคว่ำก่อน",
+      finished: "เกมจบแล้ว"
+    };
+    return fail(ws, map[res.error] || "เปิดการ์ดไม่สำเร็จ");
+  }
+  if (memoryBridge.finishIfDone(ctx.room, applyMemoryOver)) {
+    clearMemoryTimer(ctx.room);
+    broadcast(ctx.room);
+    return;
+  }
+  armMemoryTimer(ctx.room);
+  broadcast(ctx.room);
+}
 function afterImposterAction(room) {
   if (imposterBridge.finishIfDone(room, applyImposterOver)) {
     clearImposterTimer(room);
@@ -1633,6 +1741,23 @@ function onStart(ws) {
       );
     }
     armImposterTimer(room);
+    broadcast(room);
+    return;
+  }
+  if (room.cat === "cardmemory") {
+    if (room.players.length > memoryBridge.MAX_PLAYERS) {
+      return fail(ws, "Memory Card รองรับได้สูงสุด " + memoryBridge.MAX_PLAYERS + " คน");
+    }
+    if (room.players.length < memoryBridge.MIN_PLAYERS) {
+      return fail(ws, "ต้องมีผู้เล่นอย่างน้อย " + memoryBridge.MIN_PLAYERS + " คน");
+    }
+    try {
+      clearChampions(room);
+      memoryBridge.startMemory(room);
+    } catch (err) {
+      return fail(ws, err && err.code === "invalid_player_count" ? "จำนวนผู้เล่นไม่ถูกต้อง" : "เริ่ม Memory Card ไม่สำเร็จ");
+    }
+    armMemoryTimer(room);
     broadcast(room);
     return;
   }
@@ -1810,6 +1935,17 @@ function onAgain(ws) {
       imposterBridge.clearImposter(room);
       return fail(ws, "เริ่ม Imposter รอบใหม่ไม่สำเร็จ");
     }
+  } else if (room.over.mode === "cardmemory" || room.cat === "cardmemory") {
+    try {
+      clearChampions(room);
+      memoryBridge.startMemory(room);
+      armMemoryTimer(room);
+    } catch (err) {
+      room.phase = "lobby";
+      room.over = null;
+      memoryBridge.clearMemory(room);
+      return fail(ws, "เริ่ม Memory Card รอบใหม่ไม่สำเร็จ");
+    }
   } else begin(room);
   broadcast(room);
 }
@@ -1838,6 +1974,8 @@ function onAbort(ws) {
   snakeBridge.clearSnake(room);
   clearImposterTimer(room);
   imposterBridge.clearImposter(room);
+  clearMemoryTimer(room);
+  memoryBridge.clearMemory(room);
   clearAngelGuards(room);
   room.players.forEach((player) => {
     if (!isBot(player)) player.auto = false;
@@ -1854,7 +1992,8 @@ function onClear(ws) {
     room.phase === "pick" ||
     room.phase === "wheel" ||
     room.phase === "snake" ||
-    room.phase === "imposter"
+    room.phase === "imposter" ||
+    room.phase === "cardmemory"
   ) {
     return;
   }
@@ -2362,6 +2501,7 @@ function onMessage(ws, raw) {
   if (msg.t === "imposter:skipClue") return onImposterSkipClue(ws);
   if (msg.t === "imposter:vote") return onImposterVote(ws, msg);
   if (msg.t === "imposter:guess") return onImposterGuess(ws, msg);
+  if (msg.t === "memory:flip") return onMemoryFlip(ws, msg);
   if (msg.t === "pick") return onPick(ws, msg);
   if (msg.t === "pickNum") return onPickNum(ws, msg);
   if (msg.t === "undo") return onUndo(ws);
@@ -2402,6 +2542,7 @@ async function onUseHelper(ws, msg) {
   if (itemId === ANGEL_ITEM_ID) {
     if (ctx.room.phase !== "lobby") return fail(ws, "การ์ดนางฟ้าใช้ได้เฉพาะก่อนเริ่มเกม");
     if (ctx.room.cat === "imposter") return fail(ws, "การ์ดนางฟ้าใช้ไม่ได้ใน Imposter");
+    if (ctx.room.cat === "cardmemory") return fail(ws, "การ์ดนางฟ้าใช้ไม่ได้ใน Memory Card");
     if (ctx.player.angelCardUsed || ctx.player.angelGuard || (ctx.player.angelSnakeCharges | 0) > 0) {
       return fail(ws, "ใช้การ์ดนางฟ้าไปแล้วในเกมนี้");
     }

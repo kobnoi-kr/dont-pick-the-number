@@ -54,7 +54,9 @@ async function persistFinishedGame(room, scoreOf) {
               ? "snake"
               : room.cat === "imposter"
                 ? "imposter"
-                : "secret",
+                : room.cat === "cardmemory"
+                  ? "cardmemory"
+                  : "secret",
         visibility: room.visibility === "private" ? "private" : "public",
         status: "finished",
         playerCount: players.length,
@@ -110,7 +112,9 @@ async function persistFinishedGame(room, scoreOf) {
                 ? "snake"
                 : room.cat === "imposter"
                   ? "imposter"
-                  : "secret"
+                  : room.cat === "cardmemory"
+                    ? "cardmemory"
+                    : "secret"
         },
         update: {
           totalGames,
@@ -128,7 +132,9 @@ async function persistFinishedGame(room, scoreOf) {
                 ? "snake"
                 : room.cat === "imposter"
                   ? "imposter"
-                  : "secret"
+                  : room.cat === "cardmemory"
+                    ? "cardmemory"
+                    : "secret"
         }
       });
 

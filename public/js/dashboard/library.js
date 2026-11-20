@@ -72,7 +72,8 @@ const FALLBACK = [
     categoryLabel: "ความจำ",
     maxPlayers: 8,
     description: "พลิกไพ่จับคู่ — จำตำแหน่งให้แม่น ใครจับคู่ได้มากสุดชนะ",
-    howTo: "รายละเอียดกติกาจะเปิดพร้อมตัวเกม",
+    howTo:
+      "ผู้เล่น 2–8 คน เปิดการ์ดทีละ 2 ใบ จำตำแหน่งแล้วจับคู่ภาพที่เหมือนกัน\nจับคู่ถูกได้คะแนน จับคู่ผิดการ์ดจะคว่ำกลับแล้วเปลี่ยนเทิร์น\nโฮสต์เลือกขนาดกระดาน เวลาต่อเทิร์น คะแนนต่อคู่ และกติกาเปลี่ยนเทิร์นได้\nจับคู่ครบแล้วคนคะแนนสูงสุดชนะ",
     popular: false,
     comingSoon: true
   }
@@ -94,9 +95,11 @@ function rememberCreateCat(id) {
       ? "wheel"
       : id === "snake"
         ? "snake"
-        : id === "imposter"
-          ? "imposter"
-          : id === "secret"
+          : id === "imposter"
+            ? "imposter"
+            : id === "cardmemory"
+              ? "cardmemory"
+              : id === "secret"
             ? "secret"
             : "";
   if (!mode) return;
@@ -128,7 +131,8 @@ export async function renderLibrary(root, { openCreate, lastPlayedMode, user } =
       ? lastPlayedMode === "wheel" ||
         lastPlayedMode === "snake" ||
         lastPlayedMode === "secret" ||
-        lastPlayedMode === "imposter"
+        lastPlayedMode === "imposter" ||
+        lastPlayedMode === "cardmemory"
         ? lastPlayedMode
         : ""
       : "";
