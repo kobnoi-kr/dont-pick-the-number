@@ -793,6 +793,13 @@ function paintOverScreen(s){
     shown.textContent=s.over.secretText||"";
     shown.classList.toggle("many",!!s.over.many);
   }
+  const guessEl=$("overGuess");
+  if(guessEl){
+    const typed=s.over.mode==="imposter"?String(s.over.guessText||"").trim():"";
+    const who=s.over.guessName?s.over.guessName:"Imposter";
+    guessEl.textContent=typed?who+" พิมพ์ตอบ: "+typed:"";
+    guessEl.classList.toggle("hidden",!typed);
+  }
   renderOverHist(s.over.hist);
   $("again").textContent=s.over.again||"เล่นอีกครั้ง";
   $("again").dataset.reset=s.over.reset?"1":"";
@@ -814,6 +821,13 @@ function shouldCelebrateOver(s){
   if(s.over.mode==="imposter"||s.cat==="imposter") return true;
   return !!s.over.reset;
 }
+function overCelebrateNote(s){
+  const base=(s&&s.over&&s.over.note)||"";
+  const typed=s&&s.over&&s.over.mode==="imposter"?String(s.over.guessText||"").trim():"";
+  if(!typed) return base;
+  const extra="พิมพ์ตอบ: "+typed;
+  return base?base+" · "+extra:extra;
+}
 function celebrateOverSnap(s){
   if(!shouldCelebrateOver(s)){
     closeWinnerModal();
@@ -825,14 +839,14 @@ function celebrateOverSnap(s){
     const titled=String((s.over&&s.over.title)||"").replace(/\s*ชนะ!?\s*$/,"").trim();
     if(titled) celebrateMatchWin([titled],{
       winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
-      note:s.over.note||"",
+      note:overCelebrateNote(s),
       matchKey:String((s.snake&&s.snake.sessionId)||s.over.at||"")
     });
     return;
   }
   celebrateMatchWin(winners,{
     winTarget:s.over.winTarget!=null?s.over.winTarget:winTarget,
-    note:s.over.note||"",
+    note:overCelebrateNote(s),
     matchKey:String((s.snake&&s.snake.sessionId)||s.over.at||"")
   });
 }

@@ -135,6 +135,13 @@
 .imp-clue-reopen {
   justify-self: center;
 }
+.over-guess {
+  margin: 0 0 16px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #fecaca;
+}
 .imp-tallies {
   display: grid;
   gap: 6px;

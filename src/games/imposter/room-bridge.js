@@ -194,7 +194,9 @@ function finishIfDone(room, setOver) {
         : imposters,
       imposters,
       word: st.word,
-      category: st.category
+      category: st.category,
+      guessText: st.lastGuess || "",
+      guessName: st.lastGuessName || ""
     });
   }
   return true;

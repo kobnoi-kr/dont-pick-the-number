@@ -79,6 +79,7 @@ function run() {
   assert.ok(bad.ok);
   assert.strictEqual(state.phase, eng.PHASE.FINISHED);
   assert.strictEqual(state.winner, "villagers");
+  assert.strictEqual(state.lastGuess, "คำผิดๆ");
 
   const finishedPub = eng.publicState(state, state.order[0]);
   assert.ok(finishedPub.word);

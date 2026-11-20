@@ -115,6 +115,8 @@ function createGame(opts) {
     winner: null,
     winReason: "",
     guessPlayerId: null,
+    lastGuess: "",
+    lastGuessName: "",
     lastVoteTarget: null
   };
 }
@@ -488,6 +490,8 @@ function submitGuess(state, playerId, guess) {
     .trim()
     .replace(/\s+/g, " ");
   if (!g) return { ok: false, error: "empty" };
+  state.lastGuess = g;
+  state.lastGuessName = state.names[String(playerId)] || "Imposter";
   if (g.toLowerCase() === String(state.word).toLowerCase()) {
     finish(state, "imposters", "Imposter ทายคำถูก");
   } else {

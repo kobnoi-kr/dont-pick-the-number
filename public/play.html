@@ -25,7 +25,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/style.css?v=chrome3">
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
-<link rel="stylesheet" href="/css/imposter.css?v=imp16">
+<link rel="stylesheet" href="/css/imposter.css?v=imp17">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -218,6 +218,7 @@ html,body{background:#070b14}
     <p id="overNote" class="sub"></p>
     <div id="secretLabel">เลขลับคือ</div>
     <div class="secret" id="secret"></div>
+    <p id="overGuess" class="over-guess hidden"></p>
     <div class="hist hidden" id="overHistWrap">ผลรอบนี้: <span id="overHist"></span></div>
     <ol id="finalScores" class="scores"></ol>
     <button class="btn" type="button" id="again">เล่นอีกครั้ง</button>
@@ -571,9 +572,9 @@ html,body{background:#070b14}
     const { createLiveBoard } = await import("/js/snake-ladders/live-board.js?v=bomb2");
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
-    await import("/js/imposter/live-ui.js?v=imp16");
+    await import("/js/imposter/live-ui.js?v=imp17");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=imp16";
+    s.src = "/js/game.js?v=imp17";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();
