@@ -29,20 +29,36 @@
   color: #fff;
   border-color: #f05c72;
 }
+.memory-root {
+  width: 100%;
+}
 .mem-board {
   display: grid;
   gap: 8px;
-  max-width: 640px;
+  width: 100%;
+}
+.mem-board[data-cols="10"],
+.mem-board[data-cols="12"] {
+  gap: 4px;
 }
 .mem-card {
   aspect-ratio: 1;
+  min-width: 0;
+  container-type: inline-size;
   border: 1px solid #273149;
   border-radius: 12px;
   background: #151c2b;
   color: #f5f7ff;
-  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-size: clamp(0.85rem, 46cqi, 1.7rem);
+  line-height: 1;
   cursor: pointer;
   padding: 0;
+}
+body.memory-play .stage {
+  width: min(100vw - 16px, 1080px);
+}
+body.memory-play main.card {
+  max-width: none;
 }
 .mem-card:hover:not(:disabled) {
   background: #1b2436;

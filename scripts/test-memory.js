@@ -72,7 +72,12 @@ function run() {
     eng.flipCard(closer, id, mate.id);
     guard += 1;
   }
-  for (const board of ["4x4", "6x4", "6x6", "8x6"]) {
+  const biggest = Object.keys(eng.BOARDS).reduce((max, id) => {
+    const spec = eng.BOARDS[id];
+    return Math.max(max, (spec.cols * spec.rows) / 2);
+  }, 0);
+  assert.ok(eng.FACES.length >= biggest);
+  for (const board of Object.keys(eng.BOARDS)) {
     for (let n = 0; n < 20; n++) {
       const dealt = eng.createGame({
         players: players(2),

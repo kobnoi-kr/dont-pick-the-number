@@ -26,7 +26,7 @@ html,body{background:#070b14}
 <link rel="stylesheet" href="/css/ui-dialog.css">
 <link rel="stylesheet" href="/css/snake-ladders.css">
 <link rel="stylesheet" href="/css/imposter.css?v=imp19">
-<link rel="stylesheet" href="/css/memory.css?v=mem3">
+<link rel="stylesheet" href="/css/memory.css?v=mem5">
 </head>
 <body>
   <div id="nvBoot" class="nv-boot" aria-busy="true" aria-live="polite" role="status">
@@ -402,8 +402,15 @@ html,body{background:#070b14}
           <select id="memoryBoard" class="input">
             <option value="4x4">4×4 · 8 คู่</option>
             <option value="6x4">6×4 · 12 คู่</option>
+            <option value="8x4">8×4 · 16 คู่</option>
             <option value="6x6">6×6 · 18 คู่</option>
             <option value="8x6">8×6 · 24 คู่</option>
+            <option value="10x6">10×6 · 30 คู่</option>
+            <option value="8x8">8×8 · 32 คู่</option>
+            <option value="10x8">10×8 · 40 คู่</option>
+            <option value="12x8">12×8 · 48 คู่</option>
+            <option value="10x10">10×10 · 50 คู่</option>
+            <option value="12x10">12×10 · 60 คู่</option>
           </select>
         </div>
         <div class="row count-row"><label for="memoryTurnSec">เวลาต่อเทิร์น</label>
@@ -645,9 +652,9 @@ html,body{background:#070b14}
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     await import("/js/imposter/live-ui.js?v=imp19");
-    await import("/js/memory/live-ui.js?v=mem4");
+    await import("/js/memory/live-ui.js?v=mem5");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=mem4";
+    s.src = "/js/game.js?v=mem5";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

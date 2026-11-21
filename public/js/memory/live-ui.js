@@ -23,7 +23,43 @@
     mushroom: "🍄",
     sun: "🌻",
     penguin: "🐧",
-    fox: "🦊"
+    fox: "🦊",
+    heart: "❤️",
+    cherry: "🍒",
+    peach: "🍑",
+    melon: "🍉",
+    banana: "🍌",
+    kiwi: "🥝",
+    coconut: "🥥",
+    avocado: "🥑",
+    bee: "🐝",
+    butterfly: "🦋",
+    turtle: "🐢",
+    whale: "🐳",
+    octopus: "🐙",
+    crab: "🦀",
+    frog: "🐸",
+    unicorn: "🦄",
+    crown: "👑",
+    key: "🔑",
+    bell: "🔔",
+    gift: "🎁",
+    trophy: "🏆",
+    soccer: "⚽",
+    basket: "🏀",
+    car: "🚗",
+    plane: "✈️",
+    ship: "🚢",
+    house: "🏠",
+    tree: "🌲",
+    snow: "❄️",
+    pizza: "🍕",
+    burger: "🍔",
+    sushi: "🍣",
+    ice: "🍦",
+    cake: "🎂",
+    cookie: "🍪",
+    coffee: "☕"
   };
 
   function createLiveUi(opts) {
@@ -108,6 +144,7 @@
           ? "รอ " + name
           : "";
       board.style.gridTemplateColumns = "repeat(" + (state.cols || 4) + ", minmax(0, 1fr))";
+      board.dataset.cols = String(state.cols || 4);
       board.innerHTML = (state.cards || []).map(function (card) {
         const open = card.state === "revealed" || card.state === "matched";
         const face = open ? (FACE[card.face] || "✦") : "";

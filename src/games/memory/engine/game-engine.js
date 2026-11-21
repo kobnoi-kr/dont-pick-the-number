@@ -5,13 +5,25 @@ const MAX_PLAYERS = 8;
 const FACES = [
   "moon", "star", "fire", "drop", "clover", "note", "dice", "target",
   "rocket", "rainbow", "apple", "lemon", "grape", "flower", "cat", "dog",
-  "fish", "balloon", "bolt", "gem", "mushroom", "sun", "penguin", "fox"
+  "fish", "balloon", "bolt", "gem", "mushroom", "sun", "penguin", "fox",
+  "heart", "cherry", "peach", "melon", "banana", "kiwi", "coconut", "avocado",
+  "bee", "butterfly", "turtle", "whale", "octopus", "crab", "frog", "unicorn",
+  "crown", "key", "bell", "gift", "trophy", "soccer", "basket", "car",
+  "plane", "ship", "house", "tree", "snow", "pizza", "burger", "sushi",
+  "ice", "cake", "cookie", "coffee"
 ];
 const BOARDS = {
   "4x4": { cols: 4, rows: 4 },
   "6x4": { cols: 6, rows: 4 },
+  "8x4": { cols: 8, rows: 4 },
   "6x6": { cols: 6, rows: 6 },
-  "8x6": { cols: 8, rows: 6 }
+  "8x6": { cols: 8, rows: 6 },
+  "10x6": { cols: 10, rows: 6 },
+  "8x8": { cols: 8, rows: 8 },
+  "10x8": { cols: 10, rows: 8 },
+  "12x8": { cols: 12, rows: 8 },
+  "10x10": { cols: 10, rows: 10 },
+  "12x10": { cols: 12, rows: 10 }
 };
 const PHASE = {
   PLAYING: "PLAYING",
@@ -76,20 +88,26 @@ function chebyshev(a, b, cols) {
 function tryDeal(faces, cols, total, rng, minGap, attempt) {
   const deck = new Array(total);
   let open = shuffle(Array.from({ length: total }, (_, i) => i), rng);
-  for (const face of faces) {
-    const choices = [];
-    for (let i = 0; i < open.length; i++) {
-      for (let j = i + 1; j < open.length; j++) {
-        if (chebyshev(open[i], open[j], cols) >= minGap) choices.push([i, j]);
+  for (let faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+    const face = faces[faceIndex];
+    const start = (Math.floor(rng() * open.length) + attempt + faceIndex) % open.length;
+    let placed = false;
+    for (let shift = 0; shift < open.length && !placed; shift++) {
+      const i = (start + shift) % open.length;
+      const a = open[i];
+      const partners = [];
+      for (let j = 0; j < open.length; j++) {
+        if (j !== i && chebyshev(a, open[j], cols) >= minGap) partners.push(j);
       }
+      if (!partners.length) continue;
+      const j = partners[(Math.floor(rng() * partners.length) + attempt) % partners.length];
+      const b = open[j];
+      deck[a] = face;
+      deck[b] = face;
+      open = open.filter((cell) => cell !== a && cell !== b);
+      placed = true;
     }
-    if (!choices.length) return null;
-    const pick = choices[(Math.floor(rng() * choices.length) + attempt) % choices.length];
-    const a = open[pick[0]];
-    const b = open[pick[1]];
-    deck[a] = face;
-    deck[b] = face;
-    open = open.filter((cell) => cell !== a && cell !== b);
+    if (!placed) return null;
   }
   return deck.every((face) => face) ? deck : null;
 }
