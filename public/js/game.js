@@ -2560,6 +2560,7 @@ if($("impostorInfoModes")) $("impostorInfoModes").onclick=e=>{
   }
   if(onlineMode&&!applying&&isHost()){
     const info=b.getAttribute("data-impostor-info")==="category"?"category":"none";
+    syncWordCategoryLock();
     send({t:"setup",patch:{impostorInfo:info}});
   }
 };
@@ -3431,7 +3432,7 @@ const GUIDE_GAMES={
 </ul></section>`,
   imposter:`<section><h4>Imposter</h4><ul>
 <li>ผู้เล่น 4–8 คน จั่วการ์ดปิดตาทีละคน ได้บทบาททีมปกติหรือ Imposter</li>
-<li>โฮสต์เลือกหมวดคำได้ หรือสุ่มทุกหมวด</li>
+<li>โฮสต์เลือกหมวดคำได้เมื่อเปิดให้ Imposter เห็นหมวด หรือสุ่มทุกหมวด</li>
 <li>ทีมปกติเห็นคำศัพท์ · Imposter ไม่เห็นคำ หรือเห็นแค่หมวด ถ้าโฮสต์เปิดไว้</li>
 <li>ให้คำใบ้ทีละคน วนจากคนแรกถึงคนท้ายตามจำนวนรอบที่ตั้ง แล้วค่อยคุยและโหวตครั้งเดียว</li>
 <li>คำใบ้ห้ามพิมพ์คำศัพท์ตรงๆ · หมดเวลาหรือกดข้ามได้</li>
@@ -3592,6 +3593,15 @@ function paintWordCategory(s){
     return `<option value="${escHtml(name)}">${escHtml(label)}</option>`;
   }).join("");
   sel.value=options.indexOf(cur)>=0?cur:"all";
+  syncWordCategoryLock();
+}
+function syncWordCategoryLock(){
+  const sel=$("wordCategory");
+  if(!sel) return;
+  const infoBtn=$("impostorInfoModes")&&$("impostorInfoModes").querySelector(".on[data-impostor-info]");
+  const seesCategory=!!(infoBtn&&infoBtn.getAttribute("data-impostor-info")==="category");
+  const hostCan=!onlineMode||(isHost()&&netPhase==="lobby");
+  sel.disabled=!seesCategory||!hostCan;
 }
 function paintSnakeMapSelect(s){
   const sel=$("snakeMap");
@@ -3687,12 +3697,13 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","wordCategory","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
       const wrap=$(id);
       if(!wrap) return;
       for(const btn of wrap.querySelectorAll("button")) btn.disabled=false;
     });
+    syncWordCategoryLock();
     return;
   }
   const host=isHost();
@@ -3700,7 +3711,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","wordCategory","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -3731,6 +3742,7 @@ function hostLocks(){
   if($("settingsGearBtn")) $("settingsGearBtn").classList.toggle("hidden",!(host&&lobby&&!spectating));
   if(!canRenameRoom) closeRenameRoom();
   if(!(host&&lobby)||spectating) closeSettingsModal();
+  syncWordCategoryLock();
 }
 function paintRoom(s){
   const code=s.code||"";
@@ -4475,6 +4487,8 @@ async function bootOnline(){
   if($("snakeMap")) $("snakeMap").addEventListener("change",pushSnakeMap);
   if($("wordCategory")) $("wordCategory").addEventListener("change",()=>{
     if(applying||!isHost()||netPhase!=="lobby") return;
+    const infoBtn=$("impostorInfoModes")&&$("impostorInfoModes").querySelector(".on[data-impostor-info]");
+    if(!infoBtn||infoBtn.getAttribute("data-impostor-info")!=="category") return;
     send({t:"setup",patch:{wordCategory:$("wordCategory").value||"all"}});
   });
   ["memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{

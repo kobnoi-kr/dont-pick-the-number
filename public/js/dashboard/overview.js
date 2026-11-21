@@ -8,7 +8,12 @@ function modeLabel(mode) {
   if (mode === "wheel") return "วงล้อ";
   if (mode === "snake") return "บันไดงู";
   if (mode === "imposter") return "Imposter";
+  if (mode === "cardmemory") return "Memory Card";
   return "หาเลข";
+}
+function modeCat(mode) {
+  if (mode === "wheel" || mode === "snake" || mode === "imposter" || mode === "cardmemory") return mode;
+  return "secret";
 }
 
 export async function renderOverview(root, { user, openCreate, openRooms, summaryData }) {
@@ -104,17 +109,7 @@ export async function renderOverview(root, { user, openCreate, openRooms, summar
         <button type="button" class="btn sm" id="ovPlayAgain">เล่นเกมนี้อีก</button>
       </div>`;
     lastBox.querySelector("#ovPlayAgain").onclick = () =>
-      openCreate &&
-        openCreate({
-          cat:
-            lastGame.gameMode === "wheel"
-              ? "wheel"
-              : lastGame.gameMode === "snake"
-                ? "snake"
-                : lastGame.gameMode === "imposter"
-                  ? "imposter"
-                  : "secret"
-        });
+      openCreate && openCreate({ cat: modeCat(lastGame.gameMode) });
   }
 
   const topBox = root.querySelector("#ovTopRank");

@@ -373,10 +373,11 @@ html,body{background:#070b14}
           </select>
         </div>
         <div class="row count-row"><label for="wordCategory">หมวดคำ</label>
-          <select id="wordCategory" class="input" aria-label="หมวดคำ">
+          <select id="wordCategory" class="input" aria-label="หมวดคำ" disabled>
             <option value="all">สุ่มทุกหมวด</option>
           </select>
         </div>
+        <p class="tiny muted">เลือกหมวดได้เมื่อเปิดโหมด Imposter เห็นแค่หมวดหมู่</p>
         <p class="label">Imposter เห็นอะไร</p>
         <div class="modes" id="impostorInfoModes">
           <button type="button" class="mode on" data-impostor-info="none" aria-pressed="true">ไม่เห็นอะไร</button>
@@ -654,7 +655,7 @@ html,body{background:#070b14}
     await import("/js/imposter/live-ui.js?v=imp19");
     await import("/js/memory/live-ui.js?v=mem5");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=mem5";
+    s.src = "/js/game.js?v=imp21";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

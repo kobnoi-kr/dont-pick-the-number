@@ -1,9 +1,9 @@
 import { ensureGuest, api, playUrl } from "./api.js";
 import { paintUser, wireShell, logout } from "./shell.js";
 import { connectDashboardWs, onDashboardMessage, disconnectDashboardWs } from "./ws.js";
-import { renderOverview } from "./overview.js?v=welcome2";
+import { renderOverview } from "./overview.js?v=last1";
 import { renderLibrary } from "./library.js?v=mem1";
-import { renderRooms } from "./rooms.js";
+import { renderRooms } from "./rooms.js?v=last1";
 import { renderFriends } from "./friends.js";
 import { renderRanking } from "./ranking.js";
 import { renderProfile } from "./profile.js";
@@ -69,7 +69,7 @@ function readLastPlayedLocal() {
   if (!key) return "";
   try {
     const v = localStorage.getItem(key) || "";
-    return v === "wheel" || v === "snake" || v === "secret" || v === "imposter" ? v : "";
+    return v === "wheel" || v === "snake" || v === "secret" || v === "imposter" || v === "cardmemory" ? v : "";
   } catch (_) {
     return "";
   }
@@ -83,7 +83,7 @@ function writeLastPlayedLocal(mode) {
   } catch (_) {}
 }
 function normalizeMode(mode) {
-  return mode === "wheel" || mode === "snake" || mode === "secret" || mode === "imposter"
+  return mode === "wheel" || mode === "snake" || mode === "secret" || mode === "imposter" || mode === "cardmemory"
     ? mode
     : "";
 }

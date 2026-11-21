@@ -407,7 +407,15 @@ async function handleDashboardApi(req, res, pathname) {
       items: rows.map((r) => ({
         title: r.game.roomName,
         subtitle:
-          (r.game.gameMode === "wheel" ? "วงล้อ" : r.game.gameMode === "snake" ? "บันไดงู" : "หาเลข") +
+          (r.game.gameMode === "wheel"
+            ? "วงล้อ"
+            : r.game.gameMode === "snake"
+              ? "บันไดงู"
+              : r.game.gameMode === "imposter"
+                ? "Imposter"
+                : r.game.gameMode === "cardmemory"
+                  ? "Memory Card"
+                  : "หาเลข") +
           " · " +
           (r.won ? "ชนะ" : "เล่น") +
           " · #" +

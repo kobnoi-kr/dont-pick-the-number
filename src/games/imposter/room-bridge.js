@@ -128,7 +128,7 @@ function startImposter(room) {
     voteSec: room.voteSec,
     clueSec: room.clueSec,
     maxRounds: room.clueRounds,
-    wordCategory: room.wordCategory
+    wordCategory: room.impostorInfo === "category" ? room.wordCategory : "all"
   });
   room.imposter = state;
   room.phase = "imposter";
