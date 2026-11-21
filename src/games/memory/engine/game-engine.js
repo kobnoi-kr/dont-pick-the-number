@@ -67,9 +67,49 @@ function shuffle(arr, rng) {
   return a;
 }
 
+function chebyshev(a, b, cols) {
+  const dr = Math.abs(Math.floor(a / cols) - Math.floor(b / cols));
+  const dc = Math.abs((a % cols) - (b % cols));
+  return Math.max(dr, dc);
+}
+
+function tryDeal(faces, cols, total, rng, minGap, attempt) {
+  const deck = new Array(total);
+  let open = shuffle(Array.from({ length: total }, (_, i) => i), rng);
+  for (const face of faces) {
+    const choices = [];
+    for (let i = 0; i < open.length; i++) {
+      for (let j = i + 1; j < open.length; j++) {
+        if (chebyshev(open[i], open[j], cols) >= minGap) choices.push([i, j]);
+      }
+    }
+    if (!choices.length) return null;
+    const pick = choices[(Math.floor(rng() * choices.length) + attempt) % choices.length];
+    const a = open[pick[0]];
+    const b = open[pick[1]];
+    deck[a] = face;
+    deck[b] = face;
+    open = open.filter((cell) => cell !== a && cell !== b);
+  }
+  return deck.every((face) => face) ? deck : null;
+}
+
+function dealSpread(faces, cols, rows, rng) {
+  const total = cols * rows;
+  const gaps = total >= 24 ? [3, 2] : [2];
+  for (const gap of gaps) {
+    for (let attempt = 0; attempt < 48; attempt++) {
+      const deck = tryDeal(faces, cols, total, rng, gap, attempt);
+      if (deck) return deck;
+    }
+  }
+  return shuffle(faces.concat(faces), rng);
+}
+
 function armTurn(state, now) {
   const sec = state.turnSec;
   state.phase = PHASE.PLAYING;
+  state.turnSerial = (state.turnSerial || 0) + 1;
   state.phaseEndsAt = sec > 0 ? now + sec * 1000 : 0;
 }
 
@@ -136,7 +176,7 @@ function createGame(opts) {
   const spec = BOARDS[board];
   const total = spec.cols * spec.rows;
   const faces = shuffle(FACES, rng).slice(0, total / 2);
-  const deck = shuffle(faces.concat(faces), rng);
+  const deck = dealSpread(faces, spec.cols, spec.rows, rng);
   const order = players.map((p) => String(p.id));
   const names = {};
   const scores = {};
@@ -351,6 +391,7 @@ function publicState(state, viewerId) {
     names: Object.assign({}, state.names),
     turnId,
     turnIndex: state.turnIndex,
+    turnSerial: state.turnSerial || 0,
     yourTurn: !!(viewerId && turnId && String(viewerId) === String(turnId) && state.phase === PHASE.PLAYING),
     canFlip: !!(viewerId && turnId && String(viewerId) === String(turnId) && state.phase === PHASE.PLAYING),
     scores: Object.assign({}, state.scores),

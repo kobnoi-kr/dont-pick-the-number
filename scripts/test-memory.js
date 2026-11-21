@@ -72,6 +72,28 @@ function run() {
     eng.flipCard(closer, id, mate.id);
     guard += 1;
   }
+  for (const board of ["4x4", "6x4", "6x6", "8x6"]) {
+    for (let n = 0; n < 20; n++) {
+      const dealt = eng.createGame({
+        players: players(2),
+        board,
+        rng: () => Math.random()
+      });
+      const cols = dealt.cols;
+      const seen = {};
+      dealt.cards.forEach((card) => {
+        if (!seen[card.face]) seen[card.face] = [];
+        seen[card.face].push(card.id);
+      });
+      Object.keys(seen).forEach((face) => {
+        const ids = seen[face];
+        assert.strictEqual(ids.length, 2, board + " " + face);
+        const dr = Math.abs(Math.floor(ids[0] / cols) - Math.floor(ids[1] / cols));
+        const dc = Math.abs((ids[0] % cols) - (ids[1] % cols));
+        assert.ok(Math.max(dr, dc) >= 2, board + " mates touch " + face);
+      });
+    }
+  }
   assert.strictEqual(closer.phase, eng.PHASE.FINISHED);
   assert.ok(closer.winnerIds.length >= 1);
   assert.ok(closer.scores[closer.winnerIds[0]] > 100);

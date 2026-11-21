@@ -17,7 +17,9 @@ function ensureMemoryUi(){
   if(!root||!window.NVMemory||typeof window.NVMemory.createLiveUi!=="function") return null;
   memoryLive=window.NVMemory.createLiveUi({
     root,
-    onFlip:(cardId)=>{ if(onlineMode&&!spectating) send({t:"memory:flip",cardId}); }
+    onFlip:(cardId)=>{ if(onlineMode&&!spectating) send({t:"memory:flip",cardId}); },
+    onYourTurn:()=>{ if(!spectating) playClip(YOUR_TURN_SOUND); },
+    onCountdown:()=>{ if(!spectating) playClip(COOLDOWN_SOUND); }
   });
   return memoryLive;
 }
@@ -3429,6 +3431,7 @@ const GUIDE_GAMES={
 </ul></section>`,
   imposter:`<section><h4>Imposter</h4><ul>
 <li>ผู้เล่น 4–8 คน จั่วการ์ดปิดตาทีละคน ได้บทบาททีมปกติหรือ Imposter</li>
+<li>โฮสต์เลือกหมวดคำได้ หรือสุ่มทุกหมวด</li>
 <li>ทีมปกติเห็นคำศัพท์ · Imposter ไม่เห็นคำ หรือเห็นแค่หมวด ถ้าโฮสต์เปิดไว้</li>
 <li>ให้คำใบ้ทีละคน วนจากคนแรกถึงคนท้ายตามจำนวนรอบที่ตั้ง แล้วค่อยคุยและโหวตครั้งเดียว</li>
 <li>คำใบ้ห้ามพิมพ์คำศัพท์ตรงๆ · หมดเวลาหรือกดข้ามได้</li>
@@ -3576,6 +3579,19 @@ function choosePick(n){
   send({t:"pickNum",n:n});
 }
 let _snakeMapsCache=[];
+function paintWordCategory(s){
+  const sel=$("wordCategory");
+  if(!sel) return;
+  const cats=Array.isArray(s&&s.wordCategories)?s.wordCategories:[];
+  const cur=String((s&&s.wordCategory)||sel.value||"all");
+  if(document.activeElement===sel) return;
+  const options=["all"].concat(cats.filter(name=>name&&name!=="all"));
+  sel.innerHTML=options.map(name=>{
+    const label=name==="all"?"สุ่มทุกหมวด":name;
+    return `<option value="${escHtml(name)}">${escHtml(label)}</option>`;
+  }).join("");
+  sel.value=options.indexOf(cur)>=0?cur:"all";
+}
 function paintSnakeMapSelect(s){
   const sel=$("snakeMap");
   const hint=$("snakeMapHint");
@@ -3658,6 +3674,7 @@ function syncSetup(s){
   if($("voteSec")&&document.activeElement!==$("voteSec")){
     $("voteSec").value=Number(s.voteSec)||45;
   }
+  paintWordCategory(s);
   if($("memoryBoard")&&document.activeElement!==$("memoryBoard")) $("memoryBoard").value=s.memoryBoard||"4x4";
   if($("memoryTurnSec")&&document.activeElement!==$("memoryTurnSec")) $("memoryTurnSec").value=String(s.memoryTurnSec==null?20:s.memoryTurnSec);
   if($("memoryRevealMs")&&document.activeElement!==$("memoryRevealMs")) $("memoryRevealMs").value=String(s.memoryRevealMs||1500);
@@ -3669,7 +3686,7 @@ function syncSetup(s){
 function hostLocks(){
   if(!onlineMode){
     $("setup").classList.remove("locked");
-    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
+    ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","wordCategory","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{ const el=$(id); if(el) el.disabled=false; });
     ["cats","modes","restModes","impostorInfoModes"].forEach(id=>{
       const wrap=$(id);
       if(!wrap) return;
@@ -3682,7 +3699,7 @@ function hostLocks(){
   const canSetup=host&&lobby;
   $("setup").classList.toggle("locked",!canSetup);
   $("setup").setAttribute("aria-disabled",canSetup?"false":"true");
-  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
+  ["winScore","turnSec","secretCount","pickEach","cmin","cmax","snakeMap","impostorCount","clueRounds","clueSec","discussionSec","voteSec","wordCategory","memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!canSetup;
   });
@@ -4455,6 +4472,10 @@ async function bootOnline(){
   if($("myName")) $("myName").addEventListener("change",typedName);
   ["winScore","turnSec","secretCount","pickEach","cmin","cmax"].forEach(id=>{ const el=$(id); if(el) el.addEventListener("input",pushNums); });
   if($("snakeMap")) $("snakeMap").addEventListener("change",pushSnakeMap);
+  if($("wordCategory")) $("wordCategory").addEventListener("change",()=>{
+    if(applying||!isHost()||netPhase!=="lobby") return;
+    send({t:"setup",patch:{wordCategory:$("wordCategory").value||"all"}});
+  });
   ["memoryBoard","memoryTurnSec","memoryRevealMs","memoryPoints","memoryOnMatch","memoryOnWrong","memoryCombo"].forEach(id=>{
     const el=$(id);
     if(el) el.addEventListener("change",pushMemory);

@@ -372,6 +372,11 @@ html,body{background:#070b14}
             <option value="2">2 คน (≥6 ผู้เล่น)</option>
           </select>
         </div>
+        <div class="row count-row"><label for="wordCategory">หมวดคำ</label>
+          <select id="wordCategory" class="input" aria-label="หมวดคำ">
+            <option value="all">สุ่มทุกหมวด</option>
+          </select>
+        </div>
         <p class="label">Imposter เห็นอะไร</p>
         <div class="modes" id="impostorInfoModes">
           <button type="button" class="mode on" data-impostor-info="none" aria-pressed="true">ไม่เห็นอะไร</button>
@@ -640,9 +645,9 @@ html,body{background:#070b14}
     const { paintSnakeMapPreview } = await import("/js/snake-ladders/map-preview.js");
     window.NVSnake = { createLiveBoard, paintSnakeMapPreview };
     await import("/js/imposter/live-ui.js?v=imp19");
-    await import("/js/memory/live-ui.js?v=mem1");
+    await import("/js/memory/live-ui.js?v=mem4");
     const s = document.createElement("script");
-    s.src = "/js/game.js?v=mem3";
+    s.src = "/js/game.js?v=mem4";
     document.body.appendChild(s);
   } else {
     restoreBanNotice();

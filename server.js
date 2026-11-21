@@ -532,6 +532,7 @@ function blankRoom(code, visibility, host) {
     voteSec: 45,
     clueSec: 45,
     clueRounds: 5,
+    wordCategory: "all",
     imposterTimer: null,
     memory: null,
     memoryBoard: "4x4",
@@ -581,6 +582,9 @@ function applyRoomSetup(room, setup) {
   }
   if (setup.clueRounds != null) {
     room.clueRounds = imposterBridge.normalizeClueRounds(setup.clueRounds);
+  }
+  if (setup.wordCategory != null) {
+    room.wordCategory = imposterBridge.normalizeCategory(setup.wordCategory);
   }
   if (setup.memoryBoard != null) room.memoryBoard = memoryBridge.normalizeBoard(setup.memoryBoard);
   if (setup.memoryTurnSec != null) room.memoryTurnSec = memoryBridge.normalizeTurnSec(setup.memoryTurnSec);
@@ -661,6 +665,8 @@ function snap(room, player, opts) {
     voteSec: Number(room.voteSec) || 45,
     clueSec: Number(room.clueSec) || 45,
     clueRounds: imposterBridge.normalizeClueRounds(room.clueRounds),
+    wordCategory: imposterBridge.normalizeCategory(room.wordCategory),
+    wordCategories: imposterBridge.listCategories(),
     imposter: imposterBridge.snapImposter(room, spectator ? null : player),
     youImposter: spectator ? null : imposterBridge.privateImposter(room, player),
     memoryBoard: memoryBridge.normalizeBoard(room.memoryBoard),
@@ -1511,6 +1517,9 @@ async function onSetup(ws, msg) {
   }
   if (patch.clueRounds != null) {
     room.clueRounds = imposterBridge.normalizeClueRounds(patch.clueRounds);
+  }
+  if (patch.wordCategory != null) {
+    room.wordCategory = imposterBridge.normalizeCategory(patch.wordCategory);
   }
   if (patch.memoryBoard != null) room.memoryBoard = memoryBridge.normalizeBoard(patch.memoryBoard);
   if (patch.memoryTurnSec != null) room.memoryTurnSec = memoryBridge.normalizeTurnSec(patch.memoryTurnSec);

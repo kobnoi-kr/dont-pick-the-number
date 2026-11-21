@@ -23,7 +23,9 @@ const {
   tick,
   normalizeInfo,
   normalizeImpostorCount,
-  normalizeClueRounds
+  normalizeClueRounds,
+  listCategories,
+  normalizeCategory
 } = require("./index");
 
 function isImposterCat(cat) {
@@ -57,6 +59,7 @@ function applyLobbyDefaults(room) {
   const c = Number(room.clueSec);
   room.clueSec = Number.isFinite(c) ? Math.min(120, Math.max(15, c)) : 45;
   room.clueRounds = normalizeClueRounds(room.clueRounds);
+  room.wordCategory = normalizeCategory(room.wordCategory);
 }
 
 function orderedPlayers(room) {
@@ -124,7 +127,8 @@ function startImposter(room) {
     discussionSec: room.discussionSec,
     voteSec: room.voteSec,
     clueSec: room.clueSec,
-    maxRounds: room.clueRounds
+    maxRounds: room.clueRounds,
+    wordCategory: room.wordCategory
   });
   room.imposter = state;
   room.phase = "imposter";
@@ -222,5 +226,7 @@ module.exports = {
   submitGuess,
   normalizeInfo,
   normalizeImpostorCount,
-  normalizeClueRounds
+  normalizeClueRounds,
+  listCategories,
+  normalizeCategory
 };

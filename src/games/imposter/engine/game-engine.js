@@ -1,6 +1,6 @@
 "use strict";
 
-const { pickWord } = require("../config/words");
+const { pickWord, normalizeCategory } = require("../config/words");
 
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 8;
@@ -72,7 +72,8 @@ function createGame(opts) {
   );
   const impostorInfo = normalizeInfo(opts.impostorInfo);
   const impostorCount = normalizeImpostorCount(opts.impostorCount, players.length);
-  const picked = pickWord(opts.rng);
+  const wordCategory = normalizeCategory(opts.wordCategory);
+  const picked = pickWord(opts.rng, wordCategory);
   const order = players.map((p) => String(p.id));
   const names = {};
   for (const p of players) names[String(p.id)] = String(p.name || "Player");
@@ -94,6 +95,7 @@ function createGame(opts) {
     maxRounds,
     word: picked.word,
     category: picked.category,
+    wordCategory,
     impostorInfo,
     impostorCount,
     discussionSec,

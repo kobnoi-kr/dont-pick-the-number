@@ -91,12 +91,139 @@ const WORDS = [
   { word: "กล้วย", category: "ผลไม้" },
   { word: "สตรอว์เบอร์รี", category: "ผลไม้" },
   { word: "แตงโม", category: "ผลไม้" },
-  { word: "สับปะรด", category: "ผลไม้" }
+  { word: "สับปะรด", category: "ผลไม้" },
+  { word: "ข้าวไข่เจียว", category: "อาหาร" },
+  { word: "ผัดไทย", category: "อาหาร" },
+  { word: "โจ๊ก", category: "อาหาร" },
+  { word: "ก๋วยเตี๋ยว", category: "อาหาร" },
+  { word: "สเต๊ก", category: "อาหาร" },
+  { word: "ไก่ทอด", category: "อาหาร" },
+  { word: "ขนมจีน", category: "อาหาร" },
+  { word: "หมูปิ้ง", category: "อาหาร" },
+  { word: "ข้าวต้ม", category: "อาหาร" },
+  { word: "สลัด", category: "อาหาร" },
+  { word: "ลาบ", category: "อาหาร" },
+  { word: "แกงเขียวหวาน", category: "อาหาร" },
+  { word: "ข้าวขาหมู", category: "อาหาร" },
+  { word: "ปลาเผา", category: "อาหาร" },
+  { word: "กะเพรา", category: "อาหาร" },
+  { word: "ไข่ดาว", category: "อาหาร" },
+  { word: "น้ำเปล่า", category: "เครื่องดื่ม" },
+  { word: "โซดา", category: "เครื่องดื่ม" },
+  { word: "นม", category: "เครื่องดื่ม" },
+  { word: "ชาเย็น", category: "เครื่องดื่ม" },
+  { word: "น้ำอัดลม", category: "เครื่องดื่ม" },
+  { word: "สมูทตี้", category: "เครื่องดื่ม" },
+  { word: "โอวัลติน", category: "เครื่องดื่ม" },
+  { word: "มัทฉะ", category: "เครื่องดื่ม" },
+  { word: "ม้า", category: "สัตว์" },
+  { word: "กบ", category: "สัตว์" },
+  { word: "นกฮูก", category: "สัตว์" },
+  { word: "ลิง", category: "สัตว์" },
+  { word: "จระเข้", category: "สัตว์" },
+  { word: "หมี", category: "สัตว์" },
+  { word: "นกแก้ว", category: "สัตว์" },
+  { word: "เต่า", category: "สัตว์" },
+  { word: "แกะ", category: "สัตว์" },
+  { word: "วัว", category: "สัตว์" },
+  { word: "กวาง", category: "สัตว์" },
+  { word: "นกอินทรี", category: "สัตว์" },
+  { word: "ปลาทอง", category: "สัตว์" },
+  { word: "กระรอก", category: "สัตว์" },
+  { word: "งู", category: "สัตว์" },
+  { word: "ปิงปอง", category: "กีฬา" },
+  { word: "กอล์ฟ", category: "กีฬา" },
+  { word: "วิ่ง", category: "กีฬา" },
+  { word: "ยิมนาสติก", category: "กีฬา" },
+  { word: "โบว์ลิ่ง", category: "กีฬา" },
+  { word: "สเกตบอร์ด", category: "กีฬา" },
+  { word: "ยกน้ำหนัก", category: "กีฬา" },
+  { word: "ยิงธนู", category: "กีฬา" },
+  { word: "สวนสาธารณะ", category: "สถานที่" },
+  { word: "ห้องสมุด", category: "สถานที่" },
+  { word: "ตลาด", category: "สถานที่" },
+  { word: "น้ำตก", category: "สถานที่" },
+  { word: "สนามกีฬา", category: "สถานที่" },
+  { word: "ร้านกาแฟ", category: "สถานที่" },
+  { word: "สถานีรถไฟ", category: "สถานที่" },
+  { word: "อุทยาน", category: "สถานที่" },
+  { word: "สนามเด็กเล่น", category: "สถานที่" },
+  { word: "ปากกา", category: "ของใช้" },
+  { word: "หนังสือ", category: "ของใช้" },
+  { word: "โคมไฟ", category: "ของใช้" },
+  { word: "กรรไกร", category: "ของใช้" },
+  { word: "กระจก", category: "ของใช้" },
+  { word: "หูฟัง", category: "ของใช้" },
+  { word: "โน้ตบุ๊ก", category: "ของใช้" },
+  { word: "ผ้าห่ม", category: "ของใช้" },
+  { word: "เก้าอี้", category: "ของใช้" },
+  { word: "พัดลม", category: "ของใช้" },
+  { word: "ขลุ่ย", category: "ดนตรี" },
+  { word: "แซกโซโฟน", category: "ดนตรี" },
+  { word: "ระนาด", category: "ดนตรี" },
+  { word: "ทรัมเป็ต", category: "ดนตรี" },
+  { word: "อูคูเลเล่", category: "ดนตรี" },
+  { word: "ดาว", category: "ธรรมชาติ" },
+  { word: "เมฆ", category: "ธรรมชาติ" },
+  { word: "ฟ้าผ่า", category: "ธรรมชาติ" },
+  { word: "แม่น้ำ", category: "ธรรมชาติ" },
+  { word: "ป่า", category: "ธรรมชาติ" },
+  { word: "ดอกไม้", category: "ธรรมชาติ" },
+  { word: "พระอาทิตย์", category: "ธรรมชาติ" },
+  { word: "ทราย", category: "ธรรมชาติ" },
+  { word: "รถยนต์", category: "ยานพาหนะ" },
+  { word: "แท็กซี่", category: "ยานพาหนะ" },
+  { word: "รถบรรทุก", category: "ยานพาหนะ" },
+  { word: "เรือดำน้ำ", category: "ยานพาหนะ" },
+  { word: "รถไฟฟ้า", category: "ยานพาหนะ" },
+  { word: "สกูตเตอร์", category: "ยานพาหนะ" },
+  { word: "รถตู้", category: "ยานพาหนะ" },
+  { word: "พยาบาล", category: "อาชีพ" },
+  { word: "วิศวกร", category: "อาชีพ" },
+  { word: "นักข่าว", category: "อาชีพ" },
+  { word: "ช่างภาพ", category: "อาชีพ" },
+  { word: "ทหาร", category: "อาชีพ" },
+  { word: "แคชเชียร์", category: "อาชีพ" },
+  { word: "มัคคุเทศก์", category: "อาชีพ" },
+  { word: "นักวิทยาศาสตร์", category: "อาชีพ" },
+  { word: "ทันตแพทย์", category: "อาชีพ" },
+  { word: "นักเขียน", category: "อาชีพ" },
+  { word: "แอปเปิล", category: "ผลไม้" },
+  { word: "ส้ม", category: "ผลไม้" },
+  { word: "องุ่น", category: "ผลไม้" },
+  { word: "มะละกอ", category: "ผลไม้" },
+  { word: "ลิ้นจี่", category: "ผลไม้" },
+  { word: "เงาะ", category: "ผลไม้" },
+  { word: "ลำไย", category: "ผลไม้" },
+  { word: "ฝรั่ง", category: "ผลไม้" },
+  { word: "เชอร์รี่", category: "ผลไม้" },
+  { word: "ไข่ลูกเขย", category: "อาหาร" },
+  { word: "ลาเต้", category: "เครื่องดื่ม" },
+  { word: "ฮิปโป", category: "สัตว์" },
+  { word: "รักบี้", category: "กีฬา" },
+  { word: "สระว่ายน้ำ", category: "สถานที่" }
 ];
 
-function pickWord(rng = Math.random) {
-  const i = Math.floor(rng() * WORDS.length) % WORDS.length;
-  return WORDS[i] || WORDS[0];
+function listCategories() {
+  const seen = [];
+  for (const item of WORDS) {
+    if (seen.indexOf(item.category) < 0) seen.push(item.category);
+  }
+  return seen;
 }
 
-module.exports = { WORDS, pickWord };
+function normalizeCategory(value) {
+  const name = String(value || "").trim();
+  if (!name || name === "all") return "all";
+  return listCategories().indexOf(name) >= 0 ? name : "all";
+}
+
+function pickWord(rng = Math.random, category) {
+  const cat = normalizeCategory(category);
+  const pool = cat === "all" ? WORDS : WORDS.filter((item) => item.category === cat);
+  const bag = pool.length ? pool : WORDS;
+  const i = Math.floor(rng() * bag.length) % bag.length;
+  return bag[i] || WORDS[0];
+}
+
+module.exports = { WORDS, pickWord, listCategories, normalizeCategory };
